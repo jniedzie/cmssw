@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --offline --data /dev/CMSSW_9_2_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run2_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_9_2_0/HLT/V401 (CMSSW_9_2_8)
+# /dev/CMSSW_9_2_0/HLT/V403 (CMSSW_9_2_8)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_9_2_0/HLT/V401')
+  tableName = cms.string('/dev/CMSSW_9_2_0/HLT/V403')
 )
 
 process.transferSystem = cms.PSet( 
@@ -2080,6 +2080,8 @@ process.streams = cms.PSet(
   ExpressAlignment = cms.vstring( 'ExpressAlignment' ),
   HLTMonitor = cms.vstring( 'HLTMonitor' ),
   NanoDST = cms.vstring( 'L1Accept' ),
+  Parking = cms.vstring( 'ParkingHT',
+    'ParkingMuon' ),
   PhysicsCommissioning = cms.vstring( 'Commissioning',
     'HLTPhysics',
     'HcalNZS',
@@ -3244,6 +3246,21 @@ process.datasets = cms.PSet(
     'HLT_ZeroBias_IsolatedBunches_v5',
     'HLT_ZeroBias_LastCollisionInTrain_v3',
     'HLT_ZeroBias_v6') ),
+  ParkingHT = cms.vstring( 'DST_CaloJet40_BTagScouting_v9',
+    'DST_CaloJet40_CaloBTagScouting_v8',
+    'DST_CaloJet40_CaloScouting_PFScouting_v9',
+    'DST_HT250_CaloBTagScouting_v6',
+    'DST_HT250_CaloScouting_v7',
+    'DST_HT410_BTagScouting_v10',
+    'DST_HT410_PFScouting_v10',
+    'DST_L1HTT_BTagScouting_v9',
+    'DST_L1HTT_CaloBTagScouting_v8',
+    'DST_L1HTT_CaloScouting_PFScouting_v9',
+    'DST_ZeroBias_BTagScouting_v9',
+    'DST_ZeroBias_CaloScouting_PFScouting_v8' ),
+  ParkingMuon = cms.vstring( 'DST_DoubleMu3_noVtx_CaloScouting_v3',
+    'DST_L1DoubleMu_BTagScouting_v10',
+    'DST_L1DoubleMu_CaloScouting_PFScouting_v9' ),
   ParkingScoutingMonitor = cms.vstring( 'DST_CaloJet40_BTagScouting_v9',
     'DST_CaloJet40_CaloBTagScouting_v8',
     'DST_CaloJet40_CaloScouting_PFScouting_v9',
@@ -85448,6 +85465,35 @@ process.hltOutputPhysicsForward = cms.OutputModule( "PoolOutputModule",
       'keep edmTriggerResults_*_*_*',
       'keep triggerTriggerEvent_*_*_*' )
 )
+process.hltOutputParking = cms.OutputModule( "PoolOutputModule",
+    fileName = cms.untracked.string( "outputParking.root" ),
+    fastCloning = cms.untracked.bool( False ),
+    dataset = cms.untracked.PSet(
+        filterName = cms.untracked.string( "" ),
+        dataTier = cms.untracked.string( "RAW" )
+    ),
+    SelectEvents = cms.untracked.PSet(  SelectEvents = cms.vstring( 'DST_CaloJet40_BTagScouting_v9',
+  'DST_CaloJet40_CaloBTagScouting_v8',
+  'DST_CaloJet40_CaloScouting_PFScouting_v9',
+  'DST_DoubleMu3_noVtx_CaloScouting_v3',
+  'DST_HT250_CaloBTagScouting_v6',
+  'DST_HT250_CaloScouting_v7',
+  'DST_HT410_BTagScouting_v10',
+  'DST_HT410_PFScouting_v10',
+  'DST_L1DoubleMu_BTagScouting_v10',
+  'DST_L1DoubleMu_CaloScouting_PFScouting_v9',
+  'DST_L1HTT_BTagScouting_v9',
+  'DST_L1HTT_CaloBTagScouting_v8',
+  'DST_L1HTT_CaloScouting_PFScouting_v9',
+  'DST_ZeroBias_BTagScouting_v9',
+  'DST_ZeroBias_CaloScouting_PFScouting_v8' ) ),
+    outputCommands = cms.untracked.vstring( 'drop *',
+      'keep FEDRawDataCollection_rawDataCollector_*_*',
+      'keep FEDRawDataCollection_source_*_*',
+      'keep GlobalObjectMapRecord_hltGtStage2ObjectMap_*_*',
+      'keep edmTriggerResults_*_*_*',
+      'keep triggerTriggerEvent_*_*_*' )
+)
 process.hltOutputDQM = cms.OutputModule( "PoolOutputModule",
     fileName = cms.untracked.string( "outputDQM.root" ),
     fastCloning = cms.untracked.bool( False ),
@@ -87615,7 +87661,7 @@ process.PhysicsForwardOutput = cms.EndPath( process.hltGtStage2Digis + process.h
 process.PhysicsMinimumBias0Output = cms.EndPath( process.hltGtStage2Digis + process.hltPrePhysicsMinimumBias0Output )
 process.PhysicsMinimumBias1Output = cms.EndPath( process.hltGtStage2Digis + process.hltPrePhysicsMinimumBias1Output )
 process.PhysicsMinimumBias2Output = cms.EndPath( process.hltGtStage2Digis + process.hltPrePhysicsMinimumBias2Output )
-process.ParkingOutput = cms.EndPath( process.hltGtStage2Digis + process.hltPreParkingOutput )
+process.ParkingOutput = cms.EndPath( process.hltGtStage2Digis + process.hltPreParkingOutput + process.hltOutputParking )
 
 # load the DQMStore and DQMRootOutputModule
 process.load( "DQMServices.Core.DQMStore_cfi" )
