@@ -1,13 +1,13 @@
-# hltGetConfiguration --full --data /dev/CMSSW_9_2_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
+# hltGetConfiguration --full --data /dev/CMSSW_10_0_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_9_2_0/GRun/V167 (CMSSW_9_2_14)
+# /dev/CMSSW_10_0_0/GRun/V3 (CMSSW_10_0_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_9_2_0/GRun/V167')
+  tableName = cms.string('/dev/CMSSW_10_0_0/GRun/V3')
 )
 
 process.transferSystem = cms.PSet( 
@@ -3425,11 +3425,6 @@ process.GlobalTag = cms.ESSource( "PoolDBESSource",
 process.HepPDTESSource = cms.ESSource( "HepPDTESSource",
     pdtFileName = cms.FileInPath( "SimGeneral/HepPDTESSource/data/pythiaparticle.tbl" )
 )
-process.StableParametersRcdSource = cms.ESSource( "EmptyESSource",
-    iovIsRunNotTime = cms.bool( True ),
-    recordName = cms.string( "L1TGlobalStableParametersRcd" ),
-    firstValid = cms.vuint32( 1 )
-)
 process.eegeom = cms.ESSource( "EmptyESSource",
     iovIsRunNotTime = cms.bool( True ),
     recordName = cms.string( "EcalMappingRcd" ),
@@ -3506,8 +3501,9 @@ process.CastorDbProducer = cms.ESProducer( "CastorDbProducer",
 )
 process.ClusterShapeHitFilterESProducer = cms.ESProducer( "ClusterShapeHitFilterESProducer",
   ComponentName = cms.string( "ClusterShapeHitFilter" ),
+  PixelShapeFileL1 = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_loose.par" ),
   clusterChargeCut = cms.PSet(  refToPSet_ = cms.string( "HLTSiStripClusterChargeCutNone" ) ),
-  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShape_Phase1TkNewFPix.par" )
+  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_noL1.par" )
 )
 process.DTGeometryESModule = cms.ESProducer( "DTGeometryESModule",
   appendToDataLabel = cms.string( "" ),
@@ -3528,6 +3524,35 @@ process.EcalEndcapGeometryFromDBEP = cms.ESProducer( "EcalEndcapGeometryFromDBEP
 process.EcalLaserCorrectionService = cms.ESProducer( "EcalLaserCorrectionService" )
 process.EcalPreshowerGeometryFromDBEP = cms.ESProducer( "EcalPreshowerGeometryFromDBEP",
   applyAlignment = cms.bool( True )
+)
+process.GlobalParameters = cms.ESProducer( "StableParametersTrivialProducer",
+  NumberL1JetCounts = cms.uint32( 12 ),
+  NumberL1NoIsoEG = cms.uint32( 4 ),
+  NumberL1CenJet = cms.uint32( 4 ),
+  NumberL1Tau = cms.uint32( 12 ),
+  NumberConditionChips = cms.uint32( 1 ),
+  NumberL1EGamma = cms.uint32( 12 ),
+  TotalBxInEvent = cms.int32( 5 ),
+  NumberL1Mu = cms.uint32( 4 ),
+  PinsOnConditionChip = cms.uint32( 512 ),
+  WordLength = cms.int32( 64 ),
+  PinsOnChip = cms.uint32( 512 ),
+  OrderOfChip = cms.vint32( 1 ),
+  IfMuEtaNumberBits = cms.uint32( 6 ),
+  OrderConditionChip = cms.vint32( 1 ),
+  appendToDataLabel = cms.string( "" ),
+  NumberL1TauJet = cms.uint32( 4 ),
+  NumberL1Jet = cms.uint32( 12 ),
+  NumberPhysTriggers = cms.uint32( 512 ),
+  NumberL1Muon = cms.uint32( 8 ),
+  UnitLength = cms.int32( 8 ),
+  NumberL1IsoEG = cms.uint32( 4 ),
+  NumberTechnicalTriggers = cms.uint32( 64 ),
+  NumberL1ForJet = cms.uint32( 4 ),
+  IfCaloEtaNumberBits = cms.uint32( 4 ),
+  NumberPsbBoards = cms.int32( 7 ),
+  NumberChips = cms.uint32( 1 ),
+  NumberPhysTriggersExtended = cms.uint32( 64 )
 )
 process.HcalGeometryFromDBEP = cms.ESProducer( "HcalGeometryFromDBEP",
   applyAlignment = cms.bool( False )
@@ -3682,35 +3707,6 @@ process.SimpleSecondaryVertex3TrkComputer = cms.ESProducer( "SimpleSecondaryVert
   use3d = cms.bool( True ),
   unBoost = cms.bool( False ),
   useSignificance = cms.bool( True )
-)
-process.StableParameters = cms.ESProducer( "StableParametersTrivialProducer",
-  NumberL1JetCounts = cms.uint32( 12 ),
-  NumberL1NoIsoEG = cms.uint32( 4 ),
-  NumberL1CenJet = cms.uint32( 4 ),
-  NumberL1Tau = cms.uint32( 8 ),
-  NumberConditionChips = cms.uint32( 1 ),
-  NumberL1EGamma = cms.uint32( 12 ),
-  TotalBxInEvent = cms.int32( 5 ),
-  NumberL1Mu = cms.uint32( 4 ),
-  PinsOnConditionChip = cms.uint32( 512 ),
-  WordLength = cms.int32( 64 ),
-  PinsOnChip = cms.uint32( 512 ),
-  OrderOfChip = cms.vint32( 1 ),
-  IfMuEtaNumberBits = cms.uint32( 6 ),
-  OrderConditionChip = cms.vint32( 1 ),
-  appendToDataLabel = cms.string( "" ),
-  NumberL1TauJet = cms.uint32( 4 ),
-  NumberL1Jet = cms.uint32( 12 ),
-  NumberPhysTriggers = cms.uint32( 512 ),
-  NumberL1Muon = cms.uint32( 12 ),
-  UnitLength = cms.int32( 8 ),
-  NumberL1IsoEG = cms.uint32( 4 ),
-  NumberTechnicalTriggers = cms.uint32( 64 ),
-  NumberL1ForJet = cms.uint32( 4 ),
-  IfCaloEtaNumberBits = cms.uint32( 4 ),
-  NumberPsbBoards = cms.int32( 7 ),
-  NumberChips = cms.uint32( 5 ),
-  NumberPhysTriggersExtended = cms.uint32( 64 )
 )
 process.SteppingHelixPropagatorAny = cms.ESProducer( "SteppingHelixPropagatorESProducer",
   NoErrorPropagation = cms.bool( False ),
@@ -4711,8 +4707,9 @@ process.hltESPMeasurementTracker = cms.ESProducer( "MeasurementTrackerESProducer
 )
 process.hltESPMixedStepClusterShapeHitFilter = cms.ESProducer( "ClusterShapeHitFilterESProducer",
   ComponentName = cms.string( "hltESPMixedStepClusterShapeHitFilter" ),
+  PixelShapeFileL1 = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_loose.par" ),
   clusterChargeCut = cms.PSet(  refToPSet_ = cms.string( "HLTSiStripClusterChargeCutTight" ) ),
-  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShape_Phase1TkNewFPix.par" )
+  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_noL1.par" )
 )
 process.hltESPMixedStepTrajectoryCleanerBySharedHits = cms.ESProducer( "TrajectoryCleanerESProducer",
   ComponentName = cms.string( "hltESPMixedStepTrajectoryCleanerBySharedHits" ),
@@ -4794,8 +4791,9 @@ process.hltESPPixelLessStepChi2ChargeMeasurementEstimator16 = cms.ESProducer( "C
 )
 process.hltESPPixelLessStepClusterShapeHitFilter = cms.ESProducer( "ClusterShapeHitFilterESProducer",
   ComponentName = cms.string( "hltESPPixelLessStepClusterShapeHitFilter" ),
+  PixelShapeFileL1 = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_loose.par" ),
   clusterChargeCut = cms.PSet(  refToPSet_ = cms.string( "HLTSiStripClusterChargeCutTight" ) ),
-  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShape_Phase1TkNewFPix.par" )
+  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_noL1.par" )
 )
 process.hltESPPixelLessStepTrajectoryCleanerBySharedHits = cms.ESProducer( "TrajectoryCleanerESProducer",
   ComponentName = cms.string( "hltESPPixelLessStepTrajectoryCleanerBySharedHits" ),
@@ -4988,8 +4986,9 @@ process.hltESPTobTecStepChi2ChargeMeasurementEstimator16 = cms.ESProducer( "Chi2
 )
 process.hltESPTobTecStepClusterShapeHitFilter = cms.ESProducer( "ClusterShapeHitFilterESProducer",
   ComponentName = cms.string( "hltESPTobTecStepClusterShapeHitFilter" ),
+  PixelShapeFileL1 = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_loose.par" ),
   clusterChargeCut = cms.PSet(  refToPSet_ = cms.string( "HLTSiStripClusterChargeCutTight" ) ),
-  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShape_Phase1TkNewFPix.par" )
+  PixelShapeFile = cms.string( "RecoPixelVertexing/PixelLowPtUtilities/data/pixelShapePhase1_noL1.par" )
 )
 process.hltESPTobTecStepFittingSmoother = cms.ESProducer( "KFFittingSmootherESProducer",
   EstimateCut = cms.double( 30.0 ),
@@ -5091,14 +5090,6 @@ process.hltESPTrajectoryCleanerBySharedHits = cms.ESProducer( "TrajectoryCleaner
   ComponentType = cms.string( "TrajectoryCleanerBySharedHits" ),
   MissingHitPenalty = cms.double( 0.0 ),
   allowSharedFirstHit = cms.bool( False )
-)
-process.hltESPTrajectoryCleanerBySharedSeeds = cms.ESProducer( "TrajectoryCleanerESProducer",
-  ComponentName = cms.string( "hltESPTrajectoryCleanerBySharedSeeds" ),
-  fractionShared = cms.double( 0.5 ),
-  ValidHitBonus = cms.double( 100.0 ),
-  ComponentType = cms.string( "TrajectoryCleanerBySharedSeeds" ),
-  MissingHitPenalty = cms.double( 0.0 ),
-  allowSharedFirstHit = cms.bool( True )
 )
 process.hltESPTrajectoryFitterRK = cms.ESProducer( "KFTrajectoryFitterESProducer",
   appendToDataLabel = cms.string( "" ),
@@ -5214,11 +5205,6 @@ process.trackerTopology = cms.ESProducer( "TrackerTopologyEP",
   appendToDataLabel = cms.string( "" )
 )
 
-process.ThroughputService = cms.Service( "ThroughputService",
-    dqmPath = cms.untracked.string( "HLT/Throughput" ),
-    timeRange = cms.untracked.double( 60000.0 ),
-    timeResolution = cms.untracked.double( 5.828 )
-)
 process.FastTimerService = cms.Service( "FastTimerService",
     dqmPath = cms.untracked.string( "HLT/TimerService" ),
     dqmModuleTimeRange = cms.untracked.double( 40.0 ),
@@ -5349,6 +5335,11 @@ process.MessageLogger = cms.Service( "MessageLogger",
       'hltPFJetCtfWithMaterialTracks',
       'hltL3TkTracksFromL2IOHit',
       'hltL3TkTracksFromL2OIHit' )
+)
+process.ThroughputService = cms.Service( "ThroughputService",
+    dqmPath = cms.untracked.string( "HLT/Throughput" ),
+    timeRange = cms.untracked.double( 60000.0 ),
+    timeResolution = cms.untracked.double( 5.828 )
 )
 
 process.hltGetConditions = cms.EDAnalyzer( "EventSetupRecordDataGetter",
@@ -5784,11 +5775,6 @@ process.hltHfreco = cms.EDProducer( "HFPhase1Reconstructor",
     )
 )
 process.hltHoreco = cms.EDProducer( "HcalHitReconstructor",
-    pedestalUpperLimit = cms.double( 2.7 ),
-    timeSlewPars = cms.vdouble( 12.2999, -2.19142, 0.0, 12.2999, -2.19142, 0.0, 12.2999, -2.19142, 0.0 ),
-    respCorrM3 = cms.double( 1.0 ),
-    timeSlewParsType = cms.int32( 3 ),
-    applyTimeSlewM3 = cms.bool( True ),
     digiTimeFromDB = cms.bool( True ),
     mcOOTCorrectionName = cms.string( "" ),
     S9S1stat = cms.PSet(  ),
@@ -5797,7 +5783,6 @@ process.hltHoreco = cms.EDProducer( "HcalHitReconstructor",
     samplesToAdd = cms.int32( 4 ),
     mcOOTCorrectionCategory = cms.string( "MC" ),
     dataOOTCorrectionName = cms.string( "" ),
-    puCorrMethod = cms.int32( 0 ),
     correctionPhaseNS = cms.double( 13.0 ),
     HFInWindowStat = cms.PSet(  ),
     digiLabel = cms.InputTag( "hltHcalDigis" ),
@@ -5815,36 +5800,12 @@ process.hltHoreco = cms.EDProducer( "HcalHitReconstructor",
     correctForTimeslew = cms.bool( True ),
     setNoiseFlags = cms.bool( False ),
     correctTiming = cms.bool( False ),
-    setPulseShapeFlags = cms.bool( False ),
+    recoParamsFromDB = cms.bool( True ),
     Subdetector = cms.string( "HO" ),
     dataOOTCorrectionCategory = cms.string( "Data" ),
     dropZSmarkedPassed = cms.bool( True ),
-    recoParamsFromDB = cms.bool( True ),
-    firstSample = cms.int32( 4 ),
-    noiseHPD = cms.double( 1.0 ),
-    pulseJitter = cms.double( 1.0 ),
-    pedSigmaSiPM = cms.double( 6.5E-4 ),
-    timeMin = cms.double( -15.0 ),
-    setTimingShapedCutsFlags = cms.bool( False ),
-    applyPulseJitter = cms.bool( False ),
-    applyTimeSlew = cms.bool( True ),
-    applyTimeConstraint = cms.bool( True ),
-    timingshapedcutsParameters = cms.PSet(  ),
-    ts4chi2 = cms.vdouble( 15.0, 15.0 ),
-    ts4Min = cms.double( 5.0 ),
-    pulseShapeParameters = cms.PSet(  ),
-    timeSigmaSiPM = cms.double( 2.5 ),
-    applyPedConstraint = cms.bool( True ),
-    ts4Max = cms.vdouble( 100.0, 45000.0 ),
-    noiseSiPM = cms.double( 1.0 ),
-    meanTime = cms.double( -2.5 ),
-    flagParameters = cms.PSet(  ),
-    pedSigmaHPD = cms.double( 0.5 ),
-    fitTimes = cms.int32( 1 ),
-    timeMax = cms.double( 10.0 ),
-    timeSigmaHPD = cms.double( 5.0 ),
-    meanPed = cms.double( 0.0 ),
-    hscpParameters = cms.PSet(  )
+    setPulseShapeFlags = cms.bool( False ),
+    firstSample = cms.int32( 4 )
 )
 process.hltTowerMakerForAll = cms.EDProducer( "CaloTowersCreator",
     EBSumThreshold = cms.double( 0.2 ),
@@ -6795,12 +6756,15 @@ process.hltSiStripRawToClustersFacility = cms.EDProducer( "SiStripClusterizerFro
 )
 process.hltSiStripClusters = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
-    stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" ),
+    Phase2TrackerCluster1DProducer = cms.string( "" ),
+    measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClusters" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
+    badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
-    measurementTracker = cms.string( "hltESPMeasurementTracker" )
+    pixelCablingMapLabel = cms.string( "" ),
+    stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" )
 )
 process.hltIterL3OISeedsFromL2Muons = cms.EDProducer( "TSGForOI",
     hitsToTry = cms.int32( 3 ),
@@ -6847,7 +6811,6 @@ process.hltIterL3OITrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker",
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 500000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetMuonCkfTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "CkfTrajectoryBuilder" )
@@ -6872,7 +6835,6 @@ process.hltIterL3OIMuCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIterL3OIMuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIterL3OIMuCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "Notused" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -6901,8 +6863,7 @@ process.hltIterL3OIMuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier"
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 5, 5 )
     ),
-    ignoreVertices = cms.bool( True ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( True )
 )
 process.hltIterL3OIMuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -7153,7 +7114,6 @@ process.hltIterL3MuonPixelTracksHitQuadruplets = cms.EDProducer( "CAHitQuadruple
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -7213,7 +7173,6 @@ process.hltIter0IterL3MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidat
     RedundantSeedCleaner = cms.string( "none" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0IterL3MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "GroupedCkfTrajectoryBuilder" )
@@ -7238,7 +7197,6 @@ process.hltIter0IterL3MuonCtfWithMaterialTracks = cms.EDProducer( "TrackProducer
 )
 process.hltIter0IterL3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0IterL3MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3MuonTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -7267,8 +7225,7 @@ process.hltIter0IterL3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifi
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0IterL3MuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -7395,7 +7352,6 @@ process.hltIter2IterL3MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidat
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2IterL3MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -7420,7 +7376,6 @@ process.hltIter2IterL3MuonCtfWithMaterialTracks = cms.EDProducer( "TrackProducer
 )
 process.hltIter2IterL3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2IterL3MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3MuonTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -7449,8 +7404,7 @@ process.hltIter2IterL3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifi
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2IterL3MuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -7702,7 +7656,6 @@ process.hltIterL3FromL1MuonPixelTracksHitQuadruplets = cms.EDProducer( "CAHitQua
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -7762,7 +7715,6 @@ process.hltIter0IterL3FromL1MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCa
     RedundantSeedCleaner = cms.string( "none" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0IterL3FromL1MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "GroupedCkfTrajectoryBuilder" )
@@ -7787,7 +7739,6 @@ process.hltIter0IterL3FromL1MuonCtfWithMaterialTracks = cms.EDProducer( "TrackPr
 )
 process.hltIter0IterL3FromL1MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0IterL3FromL1MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3FromL1MuonTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -7816,8 +7767,7 @@ process.hltIter0IterL3FromL1MuonTrackCutClassifier = cms.EDProducer( "TrackCutCl
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0IterL3FromL1MuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -7944,7 +7894,6 @@ process.hltIter2IterL3FromL1MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCa
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2IterL3FromL1MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -7969,7 +7918,6 @@ process.hltIter2IterL3FromL1MuonCtfWithMaterialTracks = cms.EDProducer( "TrackPr
 )
 process.hltIter2IterL3FromL1MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2IterL3FromL1MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3FromL1MuonTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -7998,8 +7946,7 @@ process.hltIter2IterL3FromL1MuonTrackCutClassifier = cms.EDProducer( "TrackCutCl
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2IterL3FromL1MuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -8429,7 +8376,6 @@ process.hltPixelTracksHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDProduce
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -8633,7 +8579,6 @@ process.hltIter0PFlowCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMake
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -8658,7 +8603,6 @@ process.hltIter0PFlowCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIter0PFlowTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0PFlowCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -8687,8 +8631,7 @@ process.hltIter0PFlowTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0PFlowTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -8799,7 +8742,6 @@ process.hltIter1PFlowPixelHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDPro
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -8838,7 +8780,6 @@ process.hltIter1PFlowCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMake
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -8863,7 +8804,6 @@ process.hltIter1PFlowCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIter1PFlowTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1PFlowCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -8892,12 +8832,10 @@ process.hltIter1PFlowTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassif
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1PFlowTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1PFlowCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -8926,8 +8864,7 @@ process.hltIter1PFlowTrackCutClassifierDetached = cms.EDProducer( "TrackCutClass
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1PFlowTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1PFlowTrackCutClassifierPrompt',
@@ -9212,7 +9149,6 @@ process.hltIter2PFlowCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMake
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -9237,7 +9173,6 @@ process.hltIter2PFlowCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIter2PFlowTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2PFlowCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -9266,8 +9201,7 @@ process.hltIter2PFlowTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2PFlowTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -9451,7 +9385,6 @@ process.hltTripletRecoveryPFlowCkfTrackCandidates = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -9476,7 +9409,6 @@ process.hltTripletRecoveryPFlowCtfWithMaterialTracks = cms.EDProducer( "TrackPro
 )
 process.hltTripletRecoveryPFlowTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltTripletRecoveryPFlowCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -9505,8 +9437,7 @@ process.hltTripletRecoveryPFlowTrackCutClassifier = cms.EDProducer( "TrackCutCla
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltTripletRecoveryPFlowTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -9663,7 +9594,6 @@ process.hltDoubletRecoveryPFlowCkfTrackCandidates = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -9688,7 +9618,6 @@ process.hltDoubletRecoveryPFlowCtfWithMaterialTracks = cms.EDProducer( "TrackPro
 )
 process.hltDoubletRecoveryPFlowTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltDoubletRecoveryPFlowCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -9717,8 +9646,7 @@ process.hltDoubletRecoveryPFlowTrackCutClassifier = cms.EDProducer( "TrackCutCla
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltDoubletRecoveryPFlowTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -11856,6 +11784,7 @@ process.hltParticleFlowSuperClusterECALL1Seeded = cms.EDProducer( "PFECALSuperCl
     barrelRecHits = cms.InputTag( 'ecalRecHit','EcalRecHitsEE' ),
     thresh_PFClusterSeedBarrel = cms.double( 1.0 ),
     ClusteringType = cms.string( "Mustache" ),
+    dropUnseedable = cms.bool( False ),
     EnergyWeight = cms.string( "Raw" ),
     PFClusters = cms.InputTag( "hltParticleFlowClusterECALL1Seeded" ),
     thresh_PFClusterSeedEndcap = cms.double( 1.0 ),
@@ -12549,7 +12478,6 @@ process.hltEgammaCkfTrackCandidatesForGSF = cms.EDProducer( "CkfTrackCandidateMa
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 1000000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetTrajectoryBuilderForGsfElectrons" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -13308,7 +13236,6 @@ process.hltIterL3OITrackCandidatesOpenMu = cms.EDProducer( "CkfTrackCandidateMak
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 500000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetMuonCkfTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "CkfTrajectoryBuilder" )
@@ -13333,7 +13260,6 @@ process.hltIterL3OIMuCtfWithMaterialTracksOpenMu = cms.EDProducer( "TrackProduce
 )
 process.hltIterL3OIMuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIterL3OIMuCtfWithMaterialTracksOpenMu" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "Notused" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -13362,8 +13288,7 @@ process.hltIterL3OIMuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutClass
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 5, 5 )
     ),
-    ignoreVertices = cms.bool( True ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( True )
 )
 process.hltIterL3OIMuonTrackSelectionHighPurityOpenMu = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -13572,7 +13497,6 @@ process.hltIterL3MuonPixelTracksHitQuadrupletsOpenMu = cms.EDProducer( "CAHitQua
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -13632,7 +13556,6 @@ process.hltIter0IterL3MuonCkfTrackCandidatesOpenMu = cms.EDProducer( "CkfTrackCa
     RedundantSeedCleaner = cms.string( "none" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0IterL3MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "GroupedCkfTrajectoryBuilder" )
@@ -13657,7 +13580,6 @@ process.hltIter0IterL3MuonCtfWithMaterialTracksOpenMu = cms.EDProducer( "TrackPr
 )
 process.hltIter0IterL3MuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0IterL3MuonCtfWithMaterialTracksOpenMu" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3MuonTrimmedPixelVerticesOpenMu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -13686,8 +13608,7 @@ process.hltIter0IterL3MuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutCl
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0IterL3MuonTrackSelectionHighPurityOpenMu = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -13805,7 +13726,6 @@ process.hltIter2IterL3MuonCkfTrackCandidatesOpenMu = cms.EDProducer( "CkfTrackCa
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2IterL3MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -13830,7 +13750,6 @@ process.hltIter2IterL3MuonCtfWithMaterialTracksOpenMu = cms.EDProducer( "TrackPr
 )
 process.hltIter2IterL3MuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2IterL3MuonCtfWithMaterialTracksOpenMu" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3MuonTrimmedPixelVerticesOpenMu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -13859,8 +13778,7 @@ process.hltIter2IterL3MuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutCl
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2IterL3MuonTrackSelectionHighPurityOpenMu = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -14112,7 +14030,6 @@ process.hltIterL3FromL1MuonPixelTracksHitQuadrupletsOpenMu = cms.EDProducer( "CA
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -14172,7 +14089,6 @@ process.hltIter0IterL3FromL1MuonCkfTrackCandidatesOpenMu = cms.EDProducer( "CkfT
     RedundantSeedCleaner = cms.string( "none" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0IterL3FromL1MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "GroupedCkfTrajectoryBuilder" )
@@ -14197,7 +14113,6 @@ process.hltIter0IterL3FromL1MuonCtfWithMaterialTracksOpenMu = cms.EDProducer( "T
 )
 process.hltIter0IterL3FromL1MuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0IterL3FromL1MuonCtfWithMaterialTracksOpenMu" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3FromL1MuonTrimmedPixelVerticesOpenMu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -14226,8 +14141,7 @@ process.hltIter0IterL3FromL1MuonTrackCutClassifierOpenMu = cms.EDProducer( "Trac
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0IterL3FromL1MuonTrackSelectionHighPurityOpenMu = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -14354,7 +14268,6 @@ process.hltIter2IterL3FromL1MuonCkfTrackCandidatesOpenMu = cms.EDProducer( "CkfT
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2IterL3FromL1MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -14379,7 +14292,6 @@ process.hltIter2IterL3FromL1MuonCtfWithMaterialTracksOpenMu = cms.EDProducer( "T
 )
 process.hltIter2IterL3FromL1MuonTrackCutClassifierOpenMu = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2IterL3FromL1MuonCtfWithMaterialTracksOpenMu" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3FromL1MuonTrimmedPixelVerticesOpenMu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -14408,8 +14320,7 @@ process.hltIter2IterL3FromL1MuonTrackCutClassifierOpenMu = cms.EDProducer( "Trac
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2IterL3FromL1MuonTrackSelectionHighPurityOpenMu = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -15091,6 +15002,7 @@ process.hltParticleFlowSuperClusterECALUnseeded = cms.EDProducer( "PFECALSuperCl
     barrelRecHits = cms.InputTag( 'ecalRecHit','EcalRecHitsEE' ),
     thresh_PFClusterSeedBarrel = cms.double( 1.0 ),
     ClusteringType = cms.string( "Mustache" ),
+    dropUnseedable = cms.bool( False ),
     EnergyWeight = cms.string( "Raw" ),
     PFClusters = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
     thresh_PFClusterSeedEndcap = cms.double( 1.0 ),
@@ -16646,7 +16558,6 @@ process.hltIter0ElectronsCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidate
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -16833,7 +16744,6 @@ process.hltIter1ElectronsCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidate
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -17100,7 +17010,6 @@ process.hltIter2ElectronsCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidate
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -18042,7 +17951,6 @@ process.hltMuCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker",
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetMuTrackJpsiTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -18739,7 +18647,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsJpsi = cms.EDProducer( "CAHitQuadrup
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -18778,7 +18685,6 @@ process.hltIter0DisplacedJpsiCkfTrackCandidates = cms.EDProducer( "CkfTrackCandi
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -18803,7 +18709,6 @@ process.hltIter0DisplacedJpsiCtfWithMaterialTracks = cms.EDProducer( "TrackProdu
 )
 process.hltIter0DisplacedJpsiTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0DisplacedJpsiCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -18832,8 +18737,7 @@ process.hltIter0DisplacedJpsiTrackCutClassifier = cms.EDProducer( "TrackCutClass
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0DisplacedJpsiTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -18982,7 +18886,6 @@ process.hltIter1DisplacedJpsiCkfTrackCandidates = cms.EDProducer( "CkfTrackCandi
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -19007,7 +18910,6 @@ process.hltIter1DisplacedJpsiCtfWithMaterialTracks = cms.EDProducer( "TrackProdu
 )
 process.hltIter1DisplacedJpsiTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedJpsiCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -19036,12 +18938,10 @@ process.hltIter1DisplacedJpsiTrackCutClassifierPrompt = cms.EDProducer( "TrackCu
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedJpsiTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedJpsiCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -19070,8 +18970,7 @@ process.hltIter1DisplacedJpsiTrackCutClassifierDetached = cms.EDProducer( "Track
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedJpsiTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1DisplacedJpsiTrackCutClassifierPrompt',
@@ -19259,7 +19158,6 @@ process.hltTripletRecoveryCkfTrackCandidatesDisplacedJpsiReg = cms.EDProducer( "
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -19284,7 +19182,6 @@ process.hltTripletRecoveryCtfWithMaterialTracksDisplacedJpsiReg = cms.EDProducer
 )
 process.hltTripletRecoveryTrackCutClassifierDisplacedJpsiReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltTripletRecoveryCtfWithMaterialTracksDisplacedJpsiReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -19313,8 +19210,7 @@ process.hltTripletRecoveryTrackCutClassifierDisplacedJpsiReg = cms.EDProducer( "
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltTripletRecoveryTrackSelectionHighPurityDisplacedJpsiReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -19471,7 +19367,6 @@ process.hltDoubletRecoveryCkfTrackCandidatesDisplacedJpsiReg = cms.EDProducer( "
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -19496,7 +19391,6 @@ process.hltDoubletRecoveryCtfWithMaterialTracksDisplacedJpsiReg = cms.EDProducer
 )
 process.hltDoubletRecoveryTrackCutClassifierDisplacedJpsiReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltDoubletRecoveryCtfWithMaterialTracksDisplacedJpsiReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -19525,8 +19419,7 @@ process.hltDoubletRecoveryTrackCutClassifierDisplacedJpsiReg = cms.EDProducer( "
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltDoubletRecoveryTrackSelectionHighPurityDisplacedJpsiReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -19711,7 +19604,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsNR = cms.EDProducer( "CAHitQuadruple
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -19750,7 +19642,6 @@ process.hltIter0DisplacedNRCkfTrackCandidates = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -19775,7 +19666,6 @@ process.hltIter0DisplacedNRCtfWithMaterialTracks = cms.EDProducer( "TrackProduce
 )
 process.hltIter0DisplacedNRTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0DisplacedNRCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4LowMassNonResonant" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -19804,8 +19694,7 @@ process.hltIter0DisplacedNRTrackCutClassifier = cms.EDProducer( "TrackCutClassif
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0DisplacedNRTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -19954,7 +19843,6 @@ process.hltIter1DisplacedNRCkfTrackCandidates = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -19979,7 +19867,6 @@ process.hltIter1DisplacedNRCtfWithMaterialTracks = cms.EDProducer( "TrackProduce
 )
 process.hltIter1DisplacedNRTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedNRCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4LowMassNonResonant" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -20008,12 +19895,10 @@ process.hltIter1DisplacedNRTrackCutClassifierPrompt = cms.EDProducer( "TrackCutC
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedNRTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedNRCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4LowMassNonResonant" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -20042,8 +19927,7 @@ process.hltIter1DisplacedNRTrackCutClassifierDetached = cms.EDProducer( "TrackCu
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedNRTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1DisplacedNRTrackCutClassifierPrompt',
@@ -20231,7 +20115,6 @@ process.hltTripletRecoveryCkfTrackCandidatesDisplacedNRReg = cms.EDProducer( "Ck
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -20256,7 +20139,6 @@ process.hltTripletRecoveryCtfWithMaterialTracksDisplacedNRReg = cms.EDProducer( 
 )
 process.hltTripletRecoveryTrackCutClassifierDisplacedNRReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltTripletRecoveryCtfWithMaterialTracksDisplacedNRReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4LowMassNonResonant" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -20285,8 +20167,7 @@ process.hltTripletRecoveryTrackCutClassifierDisplacedNRReg = cms.EDProducer( "Tr
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltTripletRecoveryTrackSelectionHighPurityDisplacedNRReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -20443,7 +20324,6 @@ process.hltDoubletRecoveryCkfTrackCandidatesDisplacedNRReg = cms.EDProducer( "Ck
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -20468,7 +20348,6 @@ process.hltDoubletRecoveryCtfWithMaterialTracksDisplacedNRReg = cms.EDProducer( 
 )
 process.hltDoubletRecoveryTrackCutClassifierDisplacedNRReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltDoubletRecoveryCtfWithMaterialTracksDisplacedNRReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4LowMassNonResonant" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -20497,8 +20376,7 @@ process.hltDoubletRecoveryTrackCutClassifierDisplacedNRReg = cms.EDProducer( "Tr
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltDoubletRecoveryTrackSelectionHighPurityDisplacedNRReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -20735,7 +20613,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsTau3mu = cms.EDProducer( "CAHitQuadr
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -20774,7 +20651,6 @@ process.hltIter0DisplacedTau3muCkfTrackCandidates = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -20799,7 +20675,6 @@ process.hltIter0DisplacedTau3muCtfWithMaterialTracks = cms.EDProducer( "TrackPro
 )
 process.hltIter0DisplacedTau3muTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0DisplacedTau3muCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3mu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -20828,8 +20703,7 @@ process.hltIter0DisplacedTau3muTrackCutClassifier = cms.EDProducer( "TrackCutCla
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0DisplacedTau3muTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -20946,7 +20820,6 @@ process.hltIter1DisplacedTau3muPixelHitQuadruplets = cms.EDProducer( "CAHitQuadr
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -20978,7 +20851,6 @@ process.hltIter1DisplacedTau3muCkfTrackCandidates = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -21003,7 +20875,6 @@ process.hltIter1DisplacedTau3muCtfWithMaterialTracks = cms.EDProducer( "TrackPro
 )
 process.hltIter1DisplacedTau3muTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedTau3muCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3mu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -21032,12 +20903,10 @@ process.hltIter1DisplacedTau3muTrackCutClassifierPrompt = cms.EDProducer( "Track
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedTau3muTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedTau3muCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3mu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -21066,8 +20935,7 @@ process.hltIter1DisplacedTau3muTrackCutClassifierDetached = cms.EDProducer( "Tra
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedTau3muTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1DisplacedTau3muTrackCutClassifierPrompt',
@@ -21244,7 +21112,6 @@ process.hltIter2DisplacedTau3muCkfTrackCandidates = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -21269,7 +21136,6 @@ process.hltIter2DisplacedTau3muCtfWithMaterialTracks = cms.EDProducer( "TrackPro
 )
 process.hltIter2DisplacedTau3muTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2DisplacedTau3muCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3mu" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -21298,8 +21164,7 @@ process.hltIter2DisplacedTau3muTrackCutClassifier = cms.EDProducer( "TrackCutCla
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2DisplacedTau3muTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -21821,7 +21686,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsPsiPrime = cms.EDProducer( "CAHitQua
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -21860,7 +21724,6 @@ process.hltIter0DisplacedPsiPrimeCkfTrackCandidates = cms.EDProducer( "CkfTrackC
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -21885,7 +21748,6 @@ process.hltIter0DisplacedPsiPrimeCtfWithMaterialTracks = cms.EDProducer( "TrackP
 )
 process.hltIter0DisplacedPsiPrimeTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0DisplacedPsiPrimeCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4PsiPrime" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -21914,8 +21776,7 @@ process.hltIter0DisplacedPsiPrimeTrackCutClassifier = cms.EDProducer( "TrackCutC
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0DisplacedPsiPrimeTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -22064,7 +21925,6 @@ process.hltIter1DisplacedPsiPrimeCkfTrackCandidates = cms.EDProducer( "CkfTrackC
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -22089,7 +21949,6 @@ process.hltIter1DisplacedPsiPrimeCtfWithMaterialTracks = cms.EDProducer( "TrackP
 )
 process.hltIter1DisplacedPsiPrimeTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedPsiPrimeCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4PsiPrime" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -22118,12 +21977,10 @@ process.hltIter1DisplacedPsiPrimeTrackCutClassifierPrompt = cms.EDProducer( "Tra
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedPsiPrimeTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedPsiPrimeCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4PsiPrime" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -22152,8 +22009,7 @@ process.hltIter1DisplacedPsiPrimeTrackCutClassifierDetached = cms.EDProducer( "T
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedPsiPrimeTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1DisplacedPsiPrimeTrackCutClassifierPrompt',
@@ -22341,7 +22197,6 @@ process.hltTripletRecoveryCkfTrackCandidatesDisplacedPsiPrimeReg = cms.EDProduce
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -22366,7 +22221,6 @@ process.hltTripletRecoveryCtfWithMaterialTracksDisplacedPsiPrimeReg = cms.EDProd
 )
 process.hltTripletRecoveryTrackCutClassifierDisplacedPsiPrimeReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltTripletRecoveryCtfWithMaterialTracksDisplacedPsiPrimeReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4PsiPrime" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -22395,8 +22249,7 @@ process.hltTripletRecoveryTrackCutClassifierDisplacedPsiPrimeReg = cms.EDProduce
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltTripletRecoveryTrackSelectionHighPurityDisplacedPsiPrimeReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -22553,7 +22406,6 @@ process.hltDoubletRecoveryCkfTrackCandidatesDisplacedPsiPrimeReg = cms.EDProduce
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -22578,7 +22430,6 @@ process.hltDoubletRecoveryCtfWithMaterialTracksDisplacedPsiPrimeReg = cms.EDProd
 )
 process.hltDoubletRecoveryTrackCutClassifierDisplacedPsiPrimeReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltDoubletRecoveryCtfWithMaterialTracksDisplacedPsiPrimeReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu4PsiPrime" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -22607,8 +22458,7 @@ process.hltDoubletRecoveryTrackCutClassifierDisplacedPsiPrimeReg = cms.EDProduce
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltDoubletRecoveryTrackSelectionHighPurityDisplacedPsiPrimeReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -23283,7 +23133,6 @@ process.hltPixelTracksHitQuadrupletsL3Muon = cms.EDProducer( "CAHitQuadrupletEDP
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -23369,7 +23218,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsL3Muon = cms.EDProducer( "CAHitQuadr
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -23408,7 +23256,6 @@ process.hltIter0L3MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMak
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -23433,7 +23280,6 @@ process.hltIter0L3MuonCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIter0L3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0L3MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3Muon" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -23462,8 +23308,7 @@ process.hltIter0L3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0L3MuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -23580,7 +23425,6 @@ process.hltIter1L3MuonPixelHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDPr
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -23612,7 +23456,6 @@ process.hltIter1L3MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMak
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -23637,7 +23480,6 @@ process.hltIter1L3MuonCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIter1L3MuonTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1L3MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3Muon" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -23666,12 +23508,10 @@ process.hltIter1L3MuonTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassi
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1L3MuonTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1L3MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3Muon" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -23700,8 +23540,7 @@ process.hltIter1L3MuonTrackCutClassifierDetached = cms.EDProducer( "TrackCutClas
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1L3MuonTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1L3MuonTrackCutClassifierPrompt',
@@ -23878,7 +23717,6 @@ process.hltIter2L3MuonCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMak
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -23903,7 +23741,6 @@ process.hltIter2L3MuonCtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltIter2L3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2L3MuonCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3Muon" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -23932,8 +23769,7 @@ process.hltIter2L3MuonTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2L3MuonTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -34620,7 +34456,6 @@ process.hltIter0HighPtTkMuCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidat
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0HighPtTkMuPSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -34809,7 +34644,6 @@ process.hltIter2HighPtTkMuCkfTrackCandidates = cms.EDProducer( "CkfTrackCandidat
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2HighPtTkMuPSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -37558,50 +37392,56 @@ process.hltHcalNoiseInfoProducer = cms.EDProducer( "HcalNoiseInfoProducer",
     lMaxLowEHitTime = cms.double( 9999.0 ),
     TS4TS5EnergyThreshold = cms.double( 50.0 ),
     digiCollName = cms.string( "hltHcalDigis" ),
-    lMinHPDHits = cms.int32( 17 ),
     tMinRBXHits = cms.int32( 50 ),
     TS4TS5UpperThreshold = cms.vdouble( 70.0, 90.0, 100.0, 400.0, 4000.0 ),
-    minEZeros = cms.double( 10.0 ),
-    pMinRBXHits = cms.int32( 20 ),
+    lMinHighEHitTime = cms.double( -9999.0 ),
+    fillLaserMonitor = cms.bool( True ),
     tMinHPDHits = cms.int32( 16 ),
-    pMaxHPDEMF = cms.double( 0.02 ),
     minRecHitE = cms.double( 1.5 ),
-    hlMaxHPDEMF = cms.double( -9999.0 ),
+    pMaxHighEHitTime = cms.double( 5.0 ),
     lRBXRecHitR45Cuts = cms.vdouble( 0.0, 1.0, 0.0, -0.5, 0.0, 0.0, 1.0, -0.5 ),
-    maxCaloTowerIEta = cms.int32( 20 ),
-    maxNHF = cms.double( 0.9 ),
+    calibdigiHFtimeslices = cms.vint32( 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ),
     pMinEEMF = cms.double( 10.0 ),
     pMaxRatio = cms.double( 0.85 ),
-    caloTowerCollName = cms.string( "hltTowerMakerForAll" ),
+    recHitCollName = cms.string( "hltHbhereco" ),
     pMinEZeros = cms.double( 5.0 ),
-    pMaxHighEHitTime = cms.double( 5.0 ),
-    pMaxLowEHitTime = cms.double( 6.0 ),
+    tMaxLowEHitTime = cms.double( 9999.0 ),
+    laserMonTSStart = cms.int32( 0 ),
+    maxNHF = cms.double( 0.9 ),
     minHighHitE = cms.double( 25.0 ),
     minR45HitE = cms.double( 5.0 ),
     tRBXRecHitR45Cuts = cms.vdouble( 0.0, 1.0, 0.0, -0.2, 0.0, 0.0, 1.0, -0.2 ),
-    fillRecHits = cms.bool( True ),
     lMinZeros = cms.int32( 10 ),
     lMinRBXHits = cms.int32( 999 ),
-    pMinRBXRechitR45Fraction = cms.double( 0.1 ),
+    fillRecHits = cms.bool( True ),
+    minERatio = cms.double( 50.0 ),
+    TS4TS5LowerThreshold = cms.vdouble( 100.0, 120.0, 150.0, 200.0, 300.0, 400.0, 500.0 ),
+    lMinHPDNoOtherHits = cms.int32( 10 ),
     pMinRBXRechitR45EnergyFraction = cms.double( 0.1 ),
-    HcalRecHitFlagsToBeExcluded = cms.vint32( 11, 12, 13, 14, 15 ),
-    calibdigiHFthreshold = cms.double( -999.0 ),
+    hlMaxHPDEMF = cms.double( -9999.0 ),
+    maxCaloTowerIEta = cms.int32( 20 ),
     minLowHitE = cms.double( 10.0 ),
-    minEEMF = cms.double( 50.0 ),
+    TS4TS5LowerCut = cms.vdouble( -1.0, -0.95, -0.9, -0.9, -0.9, -0.9, -0.9 ),
+    laserMonIEtaList = cms.vint32( 0, 0, 0, 0, 0, 0, 0, 0 ),
+    laserMonIPhiList = cms.vint32( 23, 17, 11, 5, 29, 35, 41, 47 ),
     pMinRatio = cms.double( 0.75 ),
+    tMinLowEHitTime = cms.double( -9999.0 ),
     HcalAcceptSeverityLevel = cms.uint32( 9 ),
     pMaxRBXEMF = cms.double( 0.02 ),
-    pMinE = cms.double( 40.0 ),
     tMaxRatio = cms.double( 0.92 ),
+    pMinRBXRechitR45Fraction = cms.double( 0.1 ),
     maxTrackEta = cms.double( 2.0 ),
     tMinHighEHitTime = cms.double( -7.0 ),
-    TS4TS5LowerCut = cms.vdouble( -1.0, -0.95, -0.9, -0.9, -0.9, -0.9, -0.9 ),
+    tMinZeros = cms.int32( 8 ),
     lMaxRatio = cms.double( 0.96 ),
-    fillCaloTowers = cms.bool( True ),
+    pMinRBXHits = cms.int32( 20 ),
     fillDigis = cms.bool( True ),
-    lMinHighEHitTime = cms.double( -9999.0 ),
-    calibdigiHFtimeslices = cms.vint32( 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ),
+    minEZeros = cms.double( 10.0 ),
+    laserMonTSEnd = cms.int32( -1 ),
+    minEEMF = cms.double( 50.0 ),
     calibdigiHBHEthreshold = cms.double( 15.0 ),
+    pMinLowEHitTime = cms.double( -6.0 ),
+    fillCaloTowers = cms.bool( True ),
     pMinERatio = cms.double( 25.0 ),
     fillTracks = cms.bool( False ),
     trackCollName = cms.string( "generalTracks" ),
@@ -37609,25 +37449,25 @@ process.hltHcalNoiseInfoProducer = cms.EDProducer( "HcalNoiseInfoProducer",
     minTrackPt = cms.double( 1.0 ),
     tMinRatio = cms.double( 0.73 ),
     TS4TS5UpperCut = cms.vdouble( 999.0, 999.0, 999.0, 999.0, 999.0 ),
-    pMinLowEHitTime = cms.double( -6.0 ),
     maxjetindex = cms.int32( 0 ),
+    laserMonCBoxList = cms.vint32( 6, 6, 6, 6, 6, 6, 6, 6 ),
     pMinRBXRechitR45Count = cms.int32( 1 ),
     pMinHPDHits = cms.int32( 10 ),
     lMinLowEHitTime = cms.double( -9999.0 ),
-    recHitCollName = cms.string( "hltHbhereco" ),
+    caloTowerCollName = cms.string( "hltTowerMakerForAll" ),
     tMinHPDNoOtherHits = cms.int32( 9 ),
-    minERatio = cms.double( 50.0 ),
+    pMaxHPDEMF = cms.double( 0.02 ),
     jetCollName = cms.string( "" ),
-    tMinLowEHitTime = cms.double( -9999.0 ),
+    hlMaxRBXEMF = cms.double( 0.01 ),
     tMaxHighEHitTime = cms.double( 6.0 ),
-    tMinZeros = cms.int32( 8 ),
-    lMinHPDNoOtherHits = cms.int32( 10 ),
+    pMaxLowEHitTime = cms.double( 6.0 ),
+    lMinHPDHits = cms.int32( 17 ),
     maxProblemRBXs = cms.int32( 20 ),
-    TS4TS5LowerThreshold = cms.vdouble( 100.0, 120.0, 150.0, 200.0, 300.0, 400.0, 500.0 ),
-    tMaxLowEHitTime = cms.double( 9999.0 ),
+    calibdigiHFthreshold = cms.double( -999.0 ),
+    pMinE = cms.double( 40.0 ),
     pMinHPDNoOtherHits = cms.int32( 7 ),
     calibdigiHBHEtimeslices = cms.vint32( 3, 4, 5, 6 ),
-    hlMaxRBXEMF = cms.double( 0.01 )
+    HcalRecHitFlagsToBeExcluded = cms.vint32( 11, 12, 13, 14, 15 )
 )
 process.hltHcalTowerNoiseCleanerWithrechit = cms.EDProducer( "HLTHcalTowerNoiseCleanerWithrechit",
     TS4TS5EnergyThreshold = cms.double( 50.0 ),
@@ -38325,7 +38165,6 @@ process.hltFastPVPixelTracksHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDP
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -38412,7 +38251,6 @@ process.hltFastPVPixelTracksHitQuadrupletsRecover = cms.EDProducer( "CAHitQuadru
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -38469,12 +38307,15 @@ process.hltFastPVPixelVerticesFilter = cms.EDFilter( "VertexSelector",
 )
 process.hltSiStripClustersRegForBTag = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
-    stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" ),
+    Phase2TrackerCluster1DProducer = cms.string( "" ),
+    measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersRegForBTag" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
+    badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
-    measurementTracker = cms.string( "hltESPMeasurementTracker" )
+    pixelCablingMapLabel = cms.string( "" ),
+    stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" )
 )
 process.hltIter0PFLowPixelSeedsFromPixelTracksForBTag = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
     useEventsWithNoVertex = cms.bool( True ),
@@ -38503,7 +38344,6 @@ process.hltIter0PFlowCkfTrackCandidatesForBTag = cms.EDProducer( "CkfTrackCandid
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -38528,7 +38368,6 @@ process.hltIter0PFlowCtfWithMaterialTracksForBTag = cms.EDProducer( "TrackProduc
 )
 process.hltIter0PFlowTrackCutClassifierForBTag = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0PFlowCtfWithMaterialTracksForBTag" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFastPVPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -38557,8 +38396,7 @@ process.hltIter0PFlowTrackCutClassifierForBTag = cms.EDProducer( "TrackCutClassi
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0PFlowTrackSelectionHighPurityForBTag = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -38675,7 +38513,6 @@ process.hltIter1PFlowPixelHitQuadrupletsForBTag = cms.EDProducer( "CAHitQuadrupl
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -38707,7 +38544,6 @@ process.hltIter1PFlowCkfTrackCandidatesForBTag = cms.EDProducer( "CkfTrackCandid
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -38732,7 +38568,6 @@ process.hltIter1PFlowCtfWithMaterialTracksForBTag = cms.EDProducer( "TrackProduc
 )
 process.hltIter1PFlowTrackCutClassifierPromptForBTag = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1PFlowCtfWithMaterialTracksForBTag" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFastPVPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -38761,12 +38596,10 @@ process.hltIter1PFlowTrackCutClassifierPromptForBTag = cms.EDProducer( "TrackCut
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1PFlowTrackCutClassifierDetachedForBTag = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1PFlowCtfWithMaterialTracksForBTag" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFastPVPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -38795,8 +38628,7 @@ process.hltIter1PFlowTrackCutClassifierDetachedForBTag = cms.EDProducer( "TrackC
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1PFlowTrackCutClassifierMergedForBTag = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1PFlowTrackCutClassifierPromptForBTag',
@@ -38973,7 +38805,6 @@ process.hltIter2PFlowCkfTrackCandidatesForBTag = cms.EDProducer( "CkfTrackCandid
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -38998,7 +38829,6 @@ process.hltIter2PFlowCtfWithMaterialTracksForBTag = cms.EDProducer( "TrackProduc
 )
 process.hltIter2PFlowTrackCutClassifierForBTag = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2PFlowCtfWithMaterialTracksForBTag" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFastPVPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -39027,8 +38857,7 @@ process.hltIter2PFlowTrackCutClassifierForBTag = cms.EDProducer( "TrackCutClassi
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2PFlowTrackSelectionHighPurityForBTag = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -39146,6 +38975,7 @@ process.hltInclusiveVertexFinder = cms.EDProducer( "InclusiveVertexFinder",
     vertexMinAngleCosine = cms.double( 0.95 ),
     primaryVertices = cms.InputTag( "hltVerticesL3" ),
     tracks = cms.InputTag( "hltIter2MergedForBTag" ),
+    minPt = cms.double( 0.8 ),
     maxNTracks = cms.uint32( 30 ),
     clusterizer = cms.PSet( 
       distanceRatio = cms.double( 20.0 ),
@@ -39161,8 +38991,8 @@ process.hltInclusiveVertexFinder = cms.EDProducer( "InclusiveVertexFinder",
     vertexMinDLenSig = cms.double( 0.5 ),
     useDirectVertexFitter = cms.bool( True ),
     minHits = cms.uint32( 8 ),
-    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
-    minPt = cms.double( 0.8 )
+    maximumTimeSignificance = cms.double( 3.0 ),
+    beamSpot = cms.InputTag( "hltOnlineBeamSpot" )
 )
 process.hltInclusiveSecondaryVertices = cms.EDProducer( "VertexMerger",
     minSignificance = cms.double( 2.0 ),
@@ -39183,6 +39013,7 @@ process.hltTrackVertexArbitrator = cms.EDProducer( "TrackVertexArbitrator",
     tracks = cms.InputTag( "hltIter2MergedForBTag" ),
     dLenFraction = cms.double( 0.333 ),
     trackMinPixels = cms.int32( 1 ),
+    maxTimeSignificance = cms.double( 3.5 ),
     dRCut = cms.double( 0.4 )
 )
 process.hltInclusiveMergedVertices = cms.EDProducer( "VertexMerger",
@@ -40138,22 +39969,24 @@ process.hltBSoftMuonJet40PFMu12L3Jets = cms.EDFilter( "EtMinPFJetSelector",
 process.hltBSoftMuonMu12L3 = cms.EDProducer( "RecoTrackRefSelector",
     minPixelHit = cms.int32( 0 ),
     src = cms.InputTag( "hltIterL3MuonAndMuonFromL1Merged" ),
+    minPhi = cms.double( -3.2 ),
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
-    min3DLayer = cms.int32( 0 ),
+    algorithm = cms.vstring( '' ),
     algorithmMaskContains = cms.vstring(  ),
     usePV = cms.bool( False ),
+    maxRapidity = cms.double( 5.0 ),
     tip = cms.double( 120.0 ),
-    maxChi2 = cms.double( 10000.0 ),
+    originalAlgorithm = cms.vstring(  ),
     minRapidity = cms.double( -5.0 ),
     vertexTag = cms.InputTag( "none" ),
-    lip = cms.double( 300.0 ),
+    maxChi2 = cms.double( 10000.0 ),
     ptMin = cms.double( 12.0 ),
-    maxRapidity = cms.double( 5.0 ),
-    algorithm = cms.vstring( '' ),
+    maxPhi = cms.double( 3.2 ),
+    lip = cms.double( 300.0 ),
     minLayer = cms.int32( 0 ),
     quality = cms.vstring(  ),
     minHit = cms.int32( 0 ),
-    originalAlgorithm = cms.vstring(  )
+    min3DLayer = cms.int32( 0 )
 )
 process.hltBSoftMuonJet40PFMu12L3TagInfos = cms.EDProducer( "SoftLepton",
     muonSelection = cms.uint32( 0 ),
@@ -42277,22 +42110,24 @@ process.hltBSoftMuonDiJet20L1FastJetL25FilterByDR = cms.EDFilter( "HLTCaloJetTag
 process.hltBSoftMuonMu5L3 = cms.EDProducer( "RecoTrackRefSelector",
     minPixelHit = cms.int32( 0 ),
     src = cms.InputTag( "hltIterL3MuonAndMuonFromL1Merged" ),
+    minPhi = cms.double( -3.2 ),
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
-    min3DLayer = cms.int32( 0 ),
+    algorithm = cms.vstring( '' ),
     algorithmMaskContains = cms.vstring(  ),
     usePV = cms.bool( False ),
+    maxRapidity = cms.double( 5.0 ),
     tip = cms.double( 120.0 ),
-    maxChi2 = cms.double( 10000.0 ),
+    originalAlgorithm = cms.vstring(  ),
     minRapidity = cms.double( -5.0 ),
     vertexTag = cms.InputTag( "none" ),
-    lip = cms.double( 300.0 ),
+    maxChi2 = cms.double( 10000.0 ),
     ptMin = cms.double( 5.0 ),
-    maxRapidity = cms.double( 5.0 ),
-    algorithm = cms.vstring( '' ),
+    maxPhi = cms.double( 3.2 ),
+    lip = cms.double( 300.0 ),
     minLayer = cms.int32( 0 ),
     quality = cms.vstring(  ),
     minHit = cms.int32( 0 ),
-    originalAlgorithm = cms.vstring(  )
+    min3DLayer = cms.int32( 0 )
 )
 process.hltBSoftMuonDiJet20L1FastJetMu5SelL3TagInfos = cms.EDProducer( "SoftLepton",
     muonSelection = cms.uint32( 0 ),
@@ -45795,7 +45630,6 @@ process.hltIter0PFlowCkfTrackCandidatesForPhotons = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -45982,7 +45816,6 @@ process.hltIter1PFlowCkfTrackCandidatesForPhotons = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -46249,7 +46082,6 @@ process.hltIter2PFlowCkfTrackCandidatesForPhotons = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -51039,7 +50871,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsTau3muNoL1Mass = cms.EDProducer( "CA
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -51078,7 +50909,6 @@ process.hltIter0DisplacedTau3muNoL1MassCkfTrackCandidates = cms.EDProducer( "Ckf
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -51103,7 +50933,6 @@ process.hltIter0DisplacedTau3muNoL1MassCtfWithMaterialTracks = cms.EDProducer( "
 )
 process.hltIter0DisplacedTau3muNoL1MassTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0DisplacedTau3muNoL1MassCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3muNoL1Mass" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -51132,8 +50961,7 @@ process.hltIter0DisplacedTau3muNoL1MassTrackCutClassifier = cms.EDProducer( "Tra
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0DisplacedTau3muNoL1MassTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -51250,7 +51078,6 @@ process.hltIter1DisplacedTau3muNoL1MassPixelHitQuadruplets = cms.EDProducer( "CA
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -51282,7 +51109,6 @@ process.hltIter1DisplacedTau3muNoL1MassCkfTrackCandidates = cms.EDProducer( "Ckf
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -51307,7 +51133,6 @@ process.hltIter1DisplacedTau3muNoL1MassCtfWithMaterialTracks = cms.EDProducer( "
 )
 process.hltIter1DisplacedTau3muNoL1MassTrackCutClassifierPrompt = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedTau3muNoL1MassCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3muNoL1Mass" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -51336,12 +51161,10 @@ process.hltIter1DisplacedTau3muNoL1MassTrackCutClassifierPrompt = cms.EDProducer
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedTau3muNoL1MassTrackCutClassifierDetached = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedTau3muNoL1MassCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3muNoL1Mass" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -51370,8 +51193,7 @@ process.hltIter1DisplacedTau3muNoL1MassTrackCutClassifierDetached = cms.EDProduc
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedTau3muNoL1MassTrackCutClassifierMerged = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1DisplacedTau3muNoL1MassTrackCutClassifierPrompt',
@@ -51548,7 +51370,6 @@ process.hltIter2DisplacedTau3muNoL1MassCkfTrackCandidates = cms.EDProducer( "Ckf
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -51573,7 +51394,6 @@ process.hltIter2DisplacedTau3muNoL1MassCtfWithMaterialTracks = cms.EDProducer( "
 )
 process.hltIter2DisplacedTau3muNoL1MassTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2DisplacedTau3muNoL1MassCtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3Tau3muNoL1Mass" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -51602,8 +51422,7 @@ process.hltIter2DisplacedTau3muNoL1MassTrackCutClassifier = cms.EDProducer( "Tra
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2DisplacedTau3muNoL1MassTrackSelectionHighPurity = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -53302,7 +53121,6 @@ process.hltDisplacedhltIter4PFlowCkfTrackCandidates = cms.EDProducer( "CkfTrackC
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter4PSetTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -55172,7 +54990,6 @@ process.hltPixelTracksHitQuadrupletsRegForTau = cms.EDProducer( "CAHitQuadruplet
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -55383,7 +55200,6 @@ process.hltIter0PFlowCkfTrackCandidatesTauReg = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -55408,7 +55224,6 @@ process.hltIter0PFlowCtfWithMaterialTracksTauReg = cms.EDProducer( "TrackProduce
 )
 process.hltIter0PFlowTrackCutClassifierTauReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0PFlowCtfWithMaterialTracksTauReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -55437,8 +55252,7 @@ process.hltIter0PFlowTrackCutClassifierTauReg = cms.EDProducer( "TrackCutClassif
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0PFlowTrackSelectionHighPurityTauReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -55655,7 +55469,6 @@ process.hltIter1PFlowPixelHitQuadrupletsTauReg = cms.EDProducer( "CAHitQuadruple
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -55687,7 +55500,6 @@ process.hltIter1PFlowCkfTrackCandidatesTauReg = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -55712,7 +55524,6 @@ process.hltIter1PFlowCtfWithMaterialTracksTauReg = cms.EDProducer( "TrackProduce
 )
 process.hltIter1PFlowTrackCutClassifierPromptTauReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1PFlowCtfWithMaterialTracksTauReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -55741,12 +55552,10 @@ process.hltIter1PFlowTrackCutClassifierPromptTauReg = cms.EDProducer( "TrackCutC
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1PFlowTrackCutClassifierDetachedTauReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1PFlowCtfWithMaterialTracksTauReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -55775,8 +55584,7 @@ process.hltIter1PFlowTrackCutClassifierDetachedTauReg = cms.EDProducer( "TrackCu
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1PFlowTrackCutClassifierMergedTauReg = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1PFlowTrackCutClassifierPromptTauReg',
@@ -56053,7 +55861,6 @@ process.hltIter2PFlowCkfTrackCandidatesTauReg = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -56078,7 +55885,6 @@ process.hltIter2PFlowCtfWithMaterialTracksTauReg = cms.EDProducer( "TrackProduce
 )
 process.hltIter2PFlowTrackCutClassifierTauReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2PFlowCtfWithMaterialTracksTauReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -56107,8 +55913,7 @@ process.hltIter2PFlowTrackCutClassifierTauReg = cms.EDProducer( "TrackCutClassif
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2PFlowTrackSelectionHighPurityTauReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -56292,7 +56097,6 @@ process.hltTripletRecoveryPFlowCkfTrackCandidatesTauReg = cms.EDProducer( "CkfTr
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -56317,7 +56121,6 @@ process.hltTripletRecoveryPFlowCtfWithMaterialTracksTauReg = cms.EDProducer( "Tr
 )
 process.hltTripletRecoveryPFlowTrackCutClassifierTauReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltTripletRecoveryPFlowCtfWithMaterialTracksTauReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -56346,8 +56149,7 @@ process.hltTripletRecoveryPFlowTrackCutClassifierTauReg = cms.EDProducer( "Track
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltTripletRecoveryPFlowTrackSelectionHighPurityTauReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -56504,7 +56306,6 @@ process.hltDoubletRecoveryPFlowCkfTrackCandidatesTauReg = cms.EDProducer( "CkfTr
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -56529,7 +56330,6 @@ process.hltDoubletRecoveryPFlowCtfWithMaterialTracksTauReg = cms.EDProducer( "Tr
 )
 process.hltDoubletRecoveryPFlowTrackCutClassifierTauReg = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltDoubletRecoveryPFlowCtfWithMaterialTracksTauReg" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltTrimmedPixelVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -56558,8 +56358,7 @@ process.hltDoubletRecoveryPFlowTrackCutClassifierTauReg = cms.EDProducer( "Track
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltDoubletRecoveryPFlowTrackSelectionHighPurityTauReg = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -62203,7 +62002,6 @@ process.hltIterL3OITrackCandidatesNoVtx = cms.EDProducer( "CkfTrackCandidateMake
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 500000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetMuonCkfTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "CkfTrajectoryBuilder" )
@@ -62228,7 +62026,6 @@ process.hltIterL3OIMuCtfWithMaterialTracksNoVtx = cms.EDProducer( "TrackProducer
 )
 process.hltIterL3OIMuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIterL3OIMuCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "Notused" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -62257,8 +62054,7 @@ process.hltIterL3OIMuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassi
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 5, 5 )
     ),
-    ignoreVertices = cms.bool( True ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( True )
 )
 process.hltIterL3OIMuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -62509,7 +62305,6 @@ process.hltIterL3MuonPixelTracksHitQuadrupletsNoVtx = cms.EDProducer( "CAHitQuad
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -62569,7 +62364,6 @@ process.hltIter0IterL3MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "none" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0IterL3MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "GroupedCkfTrajectoryBuilder" )
@@ -62594,7 +62388,6 @@ process.hltIter0IterL3MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "TrackPro
 )
 process.hltIter0IterL3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0IterL3MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3MuonTrimmedPixelVerticesNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -62623,8 +62416,7 @@ process.hltIter0IterL3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutCla
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0IterL3MuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -62751,7 +62543,6 @@ process.hltIter2IterL3MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTrackCan
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2IterL3MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -62776,7 +62567,6 @@ process.hltIter2IterL3MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "TrackPro
 )
 process.hltIter2IterL3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2IterL3MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3MuonTrimmedPixelVerticesNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -62805,8 +62595,7 @@ process.hltIter2IterL3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutCla
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2IterL3MuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -63058,7 +62847,6 @@ process.hltIterL3FromL1MuonPixelTracksHitQuadrupletsNoVtx = cms.EDProducer( "CAH
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -63118,7 +62906,6 @@ process.hltIter0IterL3FromL1MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTr
     RedundantSeedCleaner = cms.string( "none" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0IterL3FromL1MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "GroupedCkfTrajectoryBuilder" )
@@ -63143,7 +62930,6 @@ process.hltIter0IterL3FromL1MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "Tr
 )
 process.hltIter0IterL3FromL1MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0IterL3FromL1MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3FromL1MuonTrimmedPixelVerticesNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -63172,8 +62958,7 @@ process.hltIter0IterL3FromL1MuonTrackCutClassifierNoVtx = cms.EDProducer( "Track
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0IterL3FromL1MuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -63300,7 +63085,6 @@ process.hltIter2IterL3FromL1MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTr
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2IterL3FromL1MuonPSetGroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -63325,7 +63109,6 @@ process.hltIter2IterL3FromL1MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "Tr
 )
 process.hltIter2IterL3FromL1MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2IterL3FromL1MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltIterL3FromL1MuonTrimmedPixelVerticesNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -63354,8 +63137,7 @@ process.hltIter2IterL3FromL1MuonTrackCutClassifierNoVtx = cms.EDProducer( "Track
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2IterL3FromL1MuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -67086,6 +66868,7 @@ process.hltInclusiveVertexFinderPF = cms.EDProducer( "InclusiveVertexFinder",
     vertexMinAngleCosine = cms.double( 0.95 ),
     primaryVertices = cms.InputTag( "hltVerticesPFFilter" ),
     tracks = cms.InputTag( "hltPFMuonMerging" ),
+    minPt = cms.double( 0.8 ),
     maxNTracks = cms.uint32( 30 ),
     clusterizer = cms.PSet( 
       distanceRatio = cms.double( 20.0 ),
@@ -67101,8 +66884,8 @@ process.hltInclusiveVertexFinderPF = cms.EDProducer( "InclusiveVertexFinder",
     vertexMinDLenSig = cms.double( 0.5 ),
     useDirectVertexFitter = cms.bool( True ),
     minHits = cms.uint32( 8 ),
-    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
-    minPt = cms.double( 0.8 )
+    maximumTimeSignificance = cms.double( 3.0 ),
+    beamSpot = cms.InputTag( "hltOnlineBeamSpot" )
 )
 process.hltInclusiveSecondaryVerticesPF = cms.EDProducer( "VertexMerger",
     minSignificance = cms.double( 2.0 ),
@@ -67123,6 +66906,7 @@ process.hltTrackVertexArbitratorPF = cms.EDProducer( "TrackVertexArbitrator",
     tracks = cms.InputTag( "hltPFMuonMerging" ),
     dLenFraction = cms.double( 0.333 ),
     trackMinPixels = cms.int32( 1 ),
+    maxTimeSignificance = cms.double( 3.5 ),
     dRCut = cms.double( 0.4 )
 )
 process.hltInclusiveMergedVerticesPF = cms.EDProducer( "VertexMerger",
@@ -67434,6 +67218,7 @@ process.hltDeepInclusiveVertexFinderPF = cms.EDProducer( "InclusiveCandidateVert
     vertexMinAngleCosine = cms.double( 0.95 ),
     primaryVertices = cms.InputTag( "hltVerticesPFFilter" ),
     tracks = cms.InputTag( "hltParticleFlow" ),
+    minPt = cms.double( 0.8 ),
     maxNTracks = cms.uint32( 30 ),
     clusterizer = cms.PSet( 
       distanceRatio = cms.double( 20.0 ),
@@ -67449,8 +67234,8 @@ process.hltDeepInclusiveVertexFinderPF = cms.EDProducer( "InclusiveCandidateVert
     vertexMinDLenSig = cms.double( 0.5 ),
     useDirectVertexFitter = cms.bool( True ),
     minHits = cms.uint32( 8 ),
-    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
-    minPt = cms.double( 0.8 )
+    maximumTimeSignificance = cms.double( 3.0 ),
+    beamSpot = cms.InputTag( "hltOnlineBeamSpot" )
 )
 process.hltDeepInclusiveSecondaryVerticesPF = cms.EDProducer( "CandidateVertexMerger",
     minSignificance = cms.double( 2.0 ),
@@ -67471,6 +67256,7 @@ process.hltDeepTrackVertexArbitratorPF = cms.EDProducer( "CandidateVertexArbitra
     tracks = cms.InputTag( "hltParticleFlow" ),
     dLenFraction = cms.double( 0.333 ),
     trackMinPixels = cms.int32( 1 ),
+    maxTimeSignificance = cms.double( 3.5 ),
     dRCut = cms.double( 0.4 )
 )
 process.hltDeepInclusiveMergedVerticesPF = cms.EDProducer( "CandidateVertexMerger",
@@ -68052,7 +67838,6 @@ process.hltPixelTracksHitQuadrupletsForHighMult = cms.EDProducer( "CAHitQuadrupl
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -68158,12 +67943,15 @@ process.hltSiStripRawToClustersFacilityFull = cms.EDProducer( "SiStripClusterize
 )
 process.hltSiStripClustersFull = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
-    stripClusterProducer = cms.string( "hltSiStripRawToClustersFacilityFull" ),
+    Phase2TrackerCluster1DProducer = cms.string( "" ),
+    measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClusters" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
+    badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
-    measurementTracker = cms.string( "hltESPMeasurementTracker" )
+    pixelCablingMapLabel = cms.string( "" ),
+    stripClusterProducer = cms.string( "hltSiStripRawToClustersFacilityFull" )
 )
 process.hltSiStripMatchedRecHitsFull = cms.EDProducer( "SiStripRecHitConverter",
     StripCPE = cms.ESInputTag( 'hltESPStripCPEfromTrackAngle','hltESPStripCPEfromTrackAngle' ),
@@ -68254,7 +68042,6 @@ process.hltFullIter0PixelHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDProd
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -68293,7 +68080,6 @@ process.hltFullIter0CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetInitialStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -68356,13 +68142,14 @@ process.hltFullIter0PrimaryVertices = cms.EDProducer( "PrimaryVertexProducer",
 )
 process.hltFullIter0TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierPrompt",
     src = cms.InputTag( "hltFullIter0CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorInitialStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.95, -0.85, -0.75 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorInitialStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter0HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -68467,7 +68254,6 @@ process.hltFullIter1PixelHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDProd
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -68499,7 +68285,6 @@ process.hltFullIter1CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetLowPtQuadStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -68524,13 +68309,14 @@ process.hltFullIter1CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter1TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierPrompt",
     src = cms.InputTag( "hltFullIter1CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorLowPtQuadStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.65, -0.35, -0.15 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorLowPtQuadStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter1HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -68679,7 +68465,6 @@ process.hltFullIter2CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetHighPtTripletStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -68704,13 +68489,14 @@ process.hltFullIter2CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter2TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierPrompt",
     src = cms.InputTag( "hltFullIter2CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorHighPtTripletStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( 0.2, 0.3, 0.4 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorHighPtTripletStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter2HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -68859,7 +68645,6 @@ process.hltFullIter3CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetLowPtTripletStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -68884,13 +68669,14 @@ process.hltFullIter3CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter3TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierPrompt",
     src = cms.InputTag( "hltFullIter3CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorLowPtTripletStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( 0.0, 0.2, 0.4 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorLowPtTripletStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter3HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -68995,7 +68781,6 @@ process.hltFullIter4PixelHitQuadruplets = cms.EDProducer( "CAHitQuadrupletEDProd
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.0 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -69034,7 +68819,6 @@ process.hltFullIter4CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetDetachedQuadStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -69059,13 +68843,14 @@ process.hltFullIter4CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter4TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierDetached",
     src = cms.InputTag( "hltFullIter4CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorDetachedQuadStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.5, 0.0, 0.5 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorDetachedQuadStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter4HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -69203,7 +68988,6 @@ process.hltFullIter5CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetDetachedTripletStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -69228,13 +69012,14 @@ process.hltFullIter5CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter5TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierDetached",
     src = cms.InputTag( "hltFullIter5CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorDetachedTripletStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.2, 0.3, 0.8 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorDetachedTripletStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter5HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -69447,7 +69232,6 @@ process.hltFullIter6CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 500000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetPixelPairStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -69472,13 +69256,14 @@ process.hltFullIter6CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter6TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierPrompt",
     src = cms.InputTag( "hltFullIter6CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorIter2_13TeV" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.2, 0.0, 0.3 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorIter2_13TeV" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter6HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -69698,7 +69483,6 @@ process.hltFullIter7CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetMixedTripletStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -69723,13 +69507,14 @@ process.hltFullIter7CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter7TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierDetached",
     src = cms.InputTag( "hltFullIter7CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorMixedTripletStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.5, 0.0, 0.5 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorMixedTripletStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter7HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -69949,7 +69734,6 @@ process.hltFullIter8CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 500000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetPixelLessStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -69974,13 +69758,14 @@ process.hltFullIter8CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter8TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierPrompt",
     src = cms.InputTag( "hltFullIter8CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorPixelLessStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.4, 0.0, 0.4 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorPixelLessStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIter8HighPurityTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -70241,7 +70026,6 @@ process.hltFullIter9CkfTrackCandidates = cms.EDProducer( "CkfTrackCandidateMaker
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( True ),
     maxNSeeds = cms.uint32( 500000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTPSetTobTecStepTrajectoryBuilder" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -70266,13 +70050,14 @@ process.hltFullIter9CtfWithMaterialTracks = cms.EDProducer( "TrackProducer",
 )
 process.hltFullIter9TrackMVAClassifier = cms.EDProducer( "TrackMVAClassifierDetached",
     src = cms.InputTag( "hltFullIter9CtfWithMaterialTracks" ),
-    GBRForestLabel = cms.string( "MVASelectorTobTecStep_Phase1" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullIter0PrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.6, -0.45, -0.3 ),
-    mva = cms.PSet(  ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    mva = cms.PSet( 
+      GBRForestFileName = cms.string( "" ),
+      GBRForestLabel = cms.string( "MVASelectorTobTecStep_Phase1" )
+    ),
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullIterativeTrackingMerged = cms.EDProducer( "TrackCollectionMerger",
     shareFrac = cms.double( 0.19 ),
@@ -70287,8 +70072,9 @@ process.hltFullIterativeTrackingMerged = cms.EDProducer( "TrackCollectionMerger"
       'hltFullIter8TrackMVAClassifier',
       'hltFullIter9TrackMVAClassifier' ),
     minQuality = cms.string( "loose" ),
-    minShareHits = cms.uint32( 2 ),
+    enableMerging = cms.bool( True ),
     copyExtras = cms.untracked.bool( True ),
+    minShareHits = cms.uint32( 2 ),
     copyTrajectories = cms.untracked.bool( False ),
     allowFirstHitShare = cms.bool( True ),
     foundHitBonus = cms.double( 10.0 ),
@@ -70343,7 +70129,6 @@ process.hltFullOnlinePrimaryVertices = cms.EDProducer( "PrimaryVertexProducer",
 )
 process.hltFullGoodHighPurityFullTrackCutClassifier = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltFullIterativeTrackingMerged" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltFullOnlinePrimaryVertices" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -70370,8 +70155,7 @@ process.hltFullGoodHighPurityFullTrackCutClassifier = cms.EDProducer( "TrackCutC
       maxDr = cms.vdouble( 3.40282346639E38, 3.40282346639E38, 3.40282346639E38 ),
       minLayers = cms.vint32( 0, 0, 0 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltFullGoodHighPurityFullTracks = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -70883,7 +70667,6 @@ process.hltPixelTracksHitQuadrupletsForNoPU = cms.EDProducer( "CAHitQuadrupletED
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -71698,7 +71481,6 @@ process.hltPixelTracksHitQuadrupletsL3MuonNoVtx = cms.EDProducer( "CAHitQuadrupl
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -71773,7 +71555,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsL3MuonNoVtx = cms.EDProducer( "CAHit
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -71812,7 +71593,6 @@ process.hltIter0L3MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -71837,7 +71617,6 @@ process.hltIter0L3MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "TrackProduce
 )
 process.hltIter0L3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0L3MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3MuonNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -71866,8 +71645,7 @@ process.hltIter0L3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassif
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0L3MuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -71975,7 +71753,6 @@ process.hltIter1L3MuonPixelHitQuadrupletsNoVtx = cms.EDProducer( "CAHitQuadruple
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -72007,7 +71784,6 @@ process.hltIter1L3MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -72032,7 +71808,6 @@ process.hltIter1L3MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "TrackProduce
 )
 process.hltIter1L3MuonTrackCutClassifierPromptNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1L3MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3MuonNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -72061,12 +71836,10 @@ process.hltIter1L3MuonTrackCutClassifierPromptNoVtx = cms.EDProducer( "TrackCutC
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1L3MuonTrackCutClassifierDetachedNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1L3MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3MuonNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -72095,8 +71868,7 @@ process.hltIter1L3MuonTrackCutClassifierDetachedNoVtx = cms.EDProducer( "TrackCu
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1L3MuonTrackCutClassifierMergedNoVtx = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1L3MuonTrackCutClassifierPromptNoVtx',
@@ -72264,7 +72036,6 @@ process.hltIter2L3MuonCkfTrackCandidatesNoVtx = cms.EDProducer( "CkfTrackCandida
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -72289,7 +72060,6 @@ process.hltIter2L3MuonCtfWithMaterialTracksNoVtx = cms.EDProducer( "TrackProduce
 )
 process.hltIter2L3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2L3MuonCtfWithMaterialTracksNoVtx" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltPixelVerticesL3MuonNoVtx" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -72318,8 +72088,7 @@ process.hltIter2L3MuonTrackCutClassifierNoVtx = cms.EDProducer( "TrackCutClassif
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2L3MuonTrackSelectionHighPurityNoVtx = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -72716,9 +72485,9 @@ process.hltIslandBasicClustersHI = cms.EDProducer( "IslandClusterProducer",
     clustershapecollectionEE = cms.string( "islandEndcapShape" ),
     clustershapecollectionEB = cms.string( "islandBarrelShape" ),
     VerbosityLevel = cms.string( "ERROR" ),
-    barrelClusterCollection = cms.string( "islandBarrelBasicClustersHI" ),
+    IslandBarrelSeedThr = cms.double( 0.5 ),
     endcapClusterCollection = cms.string( "islandEndcapBasicClustersHI" ),
-    IslandBarrelSeedThr = cms.double( 0.5 )
+    barrelClusterCollection = cms.string( "islandBarrelBasicClustersHI" )
 )
 process.hltHiIslandSuperClustersHI = cms.EDProducer( "HiSuperClusterProducer",
     barrelSuperclusterCollection = cms.string( "islandBarrelSuperClustersHI" ),
@@ -80362,7 +80131,6 @@ process.hltPixelTracksHitQuadrupletsForSeedsJpsiDoubleTrk = cms.EDProducer( "CAH
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.2 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -80401,7 +80169,6 @@ process.hltIter0DisplacedJpsiCkfTrackCandidatesDoubleTrk = cms.EDProducer( "CkfT
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter0GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -80426,7 +80193,6 @@ process.hltIter0DisplacedJpsiCtfWithMaterialTracksDoubleTrk = cms.EDProducer( "T
 )
 process.hltIter0DisplacedJpsiTrackCutClassifierDoubleTrk = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter0DisplacedJpsiCtfWithMaterialTracksDoubleTrk" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDoubleTrkmumuVtxProducerDoubleMu2Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -80455,8 +80221,7 @@ process.hltIter0DisplacedJpsiTrackCutClassifierDoubleTrk = cms.EDProducer( "Trac
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 4 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter0DisplacedJpsiTrackSelectionHighPurityDoubleTrk = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
@@ -80564,7 +80329,6 @@ process.hltIter1DisplacedJpsiPixelHitQuadrupletsDoubleTrk = cms.EDProducer( "CAH
       enabled = cms.bool( True ),
       pt2 = cms.double( 2.0 )
     ),
-    CAOnlyOneLastHitPerLayerFilter = cms.bool( False ),
     CAPhiCut = cms.double( 0.3 ),
     useBendingCorrection = cms.bool( True ),
     fitFastCircleChi2Cut = cms.bool( True )
@@ -80596,7 +80360,6 @@ process.hltIter1DisplacedJpsiCkfTrackCandidatesDoubleTrk = cms.EDProducer( "CkfT
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter1GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -80621,7 +80384,6 @@ process.hltIter1DisplacedJpsiCtfWithMaterialTracksDoubleTrk = cms.EDProducer( "T
 )
 process.hltIter1DisplacedJpsiTrackCutClassifierPromptDoubleTrk = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedJpsiCtfWithMaterialTracksDoubleTrk" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDoubleTrkmumuVtxProducerDoubleMu2Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -80650,12 +80412,10 @@ process.hltIter1DisplacedJpsiTrackCutClassifierPromptDoubleTrk = cms.EDProducer(
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedJpsiTrackCutClassifierDetachedDoubleTrk = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter1DisplacedJpsiCtfWithMaterialTracksDoubleTrk" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDoubleTrkmumuVtxProducerDoubleMu2Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -80684,8 +80444,7 @@ process.hltIter1DisplacedJpsiTrackCutClassifierDetachedDoubleTrk = cms.EDProduce
       maxDr = cms.vdouble( 3.40282346639E38, 1.0, 3.40282346639E38 ),
       minLayers = cms.vint32( 5, 5, 5 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter1DisplacedJpsiTrackCutClassifierMergedDoubleTrk = cms.EDProducer( "ClassifierMerger",
     inputClassifiers = cms.vstring( 'hltIter1DisplacedJpsiTrackCutClassifierPromptDoubleTrk',
@@ -80862,7 +80621,6 @@ process.hltIter2DisplacedJpsiCkfTrackCandidatesDoubleTrk = cms.EDProducer( "CkfT
     RedundantSeedCleaner = cms.string( "CachingSeedCleanerBySharedInput" ),
     doSeedingRegionRebuilding = cms.bool( False ),
     maxNSeeds = cms.uint32( 100000 ),
-    produceSeedStopReasons = cms.bool( False ),
     TrajectoryBuilderPSet = cms.PSet(  refToPSet_ = cms.string( "HLTIter2GroupedCkfTrajectoryBuilderIT" ) ),
     NavigationSchool = cms.string( "SimpleNavigationSchool" ),
     TrajectoryBuilder = cms.string( "" )
@@ -80887,7 +80645,6 @@ process.hltIter2DisplacedJpsiCtfWithMaterialTracksDoubleTrk = cms.EDProducer( "T
 )
 process.hltIter2DisplacedJpsiTrackCutClassifierDoubleTrk = cms.EDProducer( "TrackCutClassifier",
     src = cms.InputTag( "hltIter2DisplacedJpsiCtfWithMaterialTracksDoubleTrk" ),
-    GBRForestLabel = cms.string( "" ),
     beamspot = cms.InputTag( "hltOnlineBeamSpot" ),
     vertices = cms.InputTag( "hltDoubleTrkmumuVtxProducerDoubleMu2Jpsi" ),
     qualityCuts = cms.vdouble( -0.7, 0.1, 0.7 ),
@@ -80916,8 +80673,7 @@ process.hltIter2DisplacedJpsiTrackCutClassifierDoubleTrk = cms.EDProducer( "Trac
       maxDr = cms.vdouble( 0.5, 0.03, 3.40282346639E38 ),
       minLayers = cms.vint32( 3, 3, 3 )
     ),
-    ignoreVertices = cms.bool( False ),
-    GBRForestFileName = cms.string( "" )
+    ignoreVertices = cms.bool( False )
 )
 process.hltIter2DisplacedJpsiTrackSelectionHighPurityDoubleTrk = cms.EDProducer( "TrackCollectionFilterCloner",
     minQuality = cms.string( "highPurity" ),
