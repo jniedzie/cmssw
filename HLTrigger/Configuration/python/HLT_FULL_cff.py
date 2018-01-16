@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_10_0_0/HLT --type FULL
 
-# /dev/CMSSW_10_0_0/HLT/V12 (CMSSW_10_0_0_pre3)
+# /dev/CMSSW_10_0_0/HLT/V13 (CMSSW_10_0_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_0_0/HLT/V12')
+  tableName = cms.string('/dev/CMSSW_10_0_0/HLT/V13')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -98769,79 +98769,79 @@ fragment.hltFEDSelectorL1 = cms.EDProducer( "EvFFEDSelector",
 fragment.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
     pfJetCollection = cms.InputTag( "hltAK4PFJets" ),
     doCandidates = cms.bool( True ),
-    pfJetTagCollection = cms.InputTag( "hltCombinedSecondaryVertexBJetTagsPF" ),
+    pfJetTagCollection = cms.InputTag( 'hltCombinedSecondaryVertexBJetTagsPF','','@currentProcess' ),
     doMet = cms.bool( True ),
-    metCollection = cms.InputTag( "hltPFMETProducer" ),
+    metCollection = cms.InputTag( 'hltPFMETProducer','','@currentProcess' ),
     pfJetEtaCut = cms.double( 3.0 ),
-    vertexCollection = cms.InputTag( "hltPixelVertices" ),
+    vertexCollection = cms.InputTag( 'hltPixelVertices','','@currentProcess' ),
     pfJetPtCut = cms.double( 20.0 ),
-    rho = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
+    rho = cms.InputTag( 'hltFixedGridRhoFastjetAll','','@currentProcess' ),
     doJetTags = cms.bool( True ),
-    pfCandidateCollection = cms.InputTag( "hltParticleFlow" ),
+    pfCandidateCollection = cms.InputTag( 'hltParticleFlow','','@currentProcess' ),
     pfCandidatePtCut = cms.double( 0.6 )
 )
 fragment.hltScoutingMuonPacker = cms.EDProducer( "HLTScoutingMuonProducer",
     minVtxProbCut = cms.double( 0.001 ),
-    HcalPFClusterIsoMap = cms.InputTag( "hltMuonHcalPFClusterIsoForMuons" ),
-    EcalPFClusterIsoMap = cms.InputTag( "hltMuonEcalPFClusterIsoForMuons" ),
-    ChargedCandidates = cms.InputTag( "hltL3MuonCandidates" ),
+    HcalPFClusterIsoMap = cms.InputTag( 'hltMuonHcalPFClusterIsoForMuons','','@currentProcess' ),
+    EcalPFClusterIsoMap = cms.InputTag( 'hltMuonEcalPFClusterIsoForMuons','','@currentProcess' ),
+    ChargedCandidates = cms.InputTag( 'hltL3MuonCandidates','','@currentProcess' ),
     muonPtCut = cms.double( 3.0 ),
-    InputLinks = cms.InputTag( "hltL3MuonsIterL3LinksNoVtx" ),
-    displacedvertexCollection = cms.InputTag( "hltDisplacedmumuVtxProducerDoubleMu3NoVtx" ),
+    InputLinks = cms.InputTag( 'hltL3MuonsIterL3LinksNoVtx','','@currentProcess' ),
+    displacedvertexCollection = cms.InputTag( 'hltDisplacedmumuVtxProducerDoubleMu3NoVtx','','@currentProcess' ),
     Tracks = cms.InputTag( "hltL3Muons" ),
     muonEtaCut = cms.double( 2.4 ),
-    TrackIsoMap = cms.InputTag( 'hltMuonTkRelIsolationCut0p09Map','combinedRelativeIsoDeposits' )
+    TrackIsoMap = cms.InputTag( 'hltMuonTkRelIsolationCut0p09Map','combinedRelativeIsoDeposits','@currentProcess' )
 )
 fragment.hltScoutingEgammaPacker = cms.EDProducer( "HLTScoutingEgammaProducer",
     egammaEtaCut = cms.double( 2.5 ),
-    HcalPFClusterIsoMap = cms.InputTag( "hltEgammaHcalPFClusterIso" ),
-    EgammaCandidates = cms.InputTag( "hltEgammaCandidates" ),
+    HcalPFClusterIsoMap = cms.InputTag( 'hltEgammaHcalPFClusterIso','','@currentProcess' ),
+    EgammaCandidates = cms.InputTag( 'hltEgammaCandidates','','@currentProcess' ),
     egammaPtCut = cms.double( 4.0 ),
-    EcalPFClusterIsoMap = cms.InputTag( "hltEgammaEcalPFClusterIso" ),
-    SigmaIEtaIEtaMap = cms.InputTag( 'hltEgammaClusterShape','sigmaIEtaIEta5x5' ),
-    MissingHitsMap = cms.InputTag( 'hltEgammaGsfTrackVars','MissingHits' ),
-    HoverEMap = cms.InputTag( "hltEgammaHoverE" ),
-    EgammaGsfTracks = cms.InputTag( "hltEgammaGsfTracks" ),
-    OneOEMinusOneOPMap = cms.InputTag( 'hltEgammaGsfTrackVars','OneOESuperMinusOneOP' ),
-    DetaMap = cms.InputTag( 'hltEgammaGsfTrackVars','DetaSeed' ),
+    EcalPFClusterIsoMap = cms.InputTag( 'hltEgammaEcalPFClusterIso','','@currentProcess' ),
+    SigmaIEtaIEtaMap = cms.InputTag( 'hltEgammaClusterShape','sigmaIEtaIEta5x5','@currentProcess' ),
+    MissingHitsMap = cms.InputTag( 'hltEgammaGsfTrackVars','MissingHits','@currentProcess' ),
+    HoverEMap = cms.InputTag( 'hltEgammaHoverE','','@currentProcess' ),
+    EgammaGsfTracks = cms.InputTag( 'hltEgammaGsfTracks','','@currentProcess' ),
+    OneOEMinusOneOPMap = cms.InputTag( 'hltEgammaGsfTrackVars','OneOESuperMinusOneOP','@currentProcess' ),
+    DetaMap = cms.InputTag( 'hltEgammaGsfTrackVars','DetaSeed','@currentProcess' ),
     egammaHoverECut = cms.double( 1.0 ),
-    DphiMap = cms.InputTag( 'hltEgammaGsfTrackVars','Dphi' ),
-    EleGsfTrackIsoMap = cms.InputTag( "hltEgammaEleGsfTrackIso" )
+    DphiMap = cms.InputTag( 'hltEgammaGsfTrackVars','Dphi','@currentProcess' ),
+    EleGsfTrackIsoMap = cms.InputTag( 'hltEgammaEleGsfTrackIso','','@currentProcess' )
 )
 fragment.hltScoutingPrimaryVertexPacker = cms.EDProducer( "HLTScoutingPrimaryVertexProducer",
-    vertexCollection = cms.InputTag( "hltPixelVertices" )
+    vertexCollection = cms.InputTag( 'hltPixelVertices','','@currentProcess' )
 )
 fragment.hltPreScoutingCaloMuonOutput = cms.EDFilter( "HLTPrescaler",
     L1GtReadoutRecordTag = cms.InputTag( "hltGtStage2Digis" ),
     offset = cms.uint32( 0 )
 )
 fragment.hltScoutingCaloPacker = cms.EDProducer( "HLTScoutingCaloProducer",
-    metCollection = cms.InputTag( "hltMetClean" ),
+    metCollection = cms.InputTag( 'hltMetClean','','@currentProcess' ),
     doMet = cms.bool( True ),
     doJetBTags = cms.bool( True ),
     caloJetPtCut = cms.double( 20.0 ),
-    vertexCollection = cms.InputTag( "hltPixelVertices" ),
+    vertexCollection = cms.InputTag( 'hltPixelVertices','','@currentProcess' ),
     doJetIDTags = cms.bool( True ),
-    caloJetCollection = cms.InputTag( "hltAK4CaloJetsIDPassed" ),
-    rho = cms.InputTag( "hltFixedGridRhoFastjetAllCalo" ),
-    caloJetIDTagCollection = cms.InputTag( "hltCaloJetFromPV" ),
-    caloJetBTagCollection = cms.InputTag( "hltCombinedSecondaryVertexBJetTagsCalo" ),
+    caloJetCollection = cms.InputTag( 'hltAK4CaloJetsIDPassed','','@currentProcess' ),
+    rho = cms.InputTag( 'hltFixedGridRhoFastjetAllCalo','','@currentProcess' ),
+    caloJetIDTagCollection = cms.InputTag( 'hltCaloJetFromPV','','@currentProcess' ),
+    caloJetBTagCollection = cms.InputTag( 'hltCombinedSecondaryVertexBJetTagsCalo','','@currentProcess' ),
     caloJetEtaCut = cms.double( 3.0 )
 )
 fragment.hltScoutingMuonPackerCalo = cms.EDProducer( "HLTScoutingMuonProducer",
     minVtxProbCut = cms.double( 0.001 ),
     HcalPFClusterIsoMap = cms.InputTag( "" ),
     EcalPFClusterIsoMap = cms.InputTag( "" ),
-    ChargedCandidates = cms.InputTag( "hltIterL3MuonCandidatesNoVtx" ),
+    ChargedCandidates = cms.InputTag( 'hltIterL3MuonCandidatesNoVtx','','@currentProcess' ),
     muonPtCut = cms.double( 3.0 ),
-    InputLinks = cms.InputTag( "hltL3MuonsIterL3LinksNoVtx" ),
-    displacedvertexCollection = cms.InputTag( "hltDisplacedmumuVtxProducer" ),
-    Tracks = cms.InputTag( "hltIterL3MuonAndMuonFromL1MergedNoVtx" ),
+    InputLinks = cms.InputTag( 'hltL3MuonsIterL3LinksNoVtx','','@currentProcess' ),
+    displacedvertexCollection = cms.InputTag( 'hltDisplacedmumuVtxProducer','','@currentProcess' ),
+    Tracks = cms.InputTag( 'hltIterL3MuonAndMuonFromL1MergedNoVtx','','@currentProcess' ),
     muonEtaCut = cms.double( 2.4 ),
-    TrackIsoMap = cms.InputTag( 'hltMuonTkRelIsolationCut0p09MapNoVtx','combinedRelativeIsoDeposits' )
+    TrackIsoMap = cms.InputTag( 'hltMuonTkRelIsolationCut0p09MapNoVtx','combinedRelativeIsoDeposits','@currentProcess' )
 )
 fragment.hltScoutingPrimaryVertexPackerCaloMuon = cms.EDProducer( "HLTScoutingPrimaryVertexProducer",
-    vertexCollection = cms.InputTag( "hltPixelVerticesL3MuonNoVtx" )
+    vertexCollection = cms.InputTag( 'hltPixelVerticesL3MuonNoVtx','','@currentProcess' )
 )
 
 fragment.HLTL1UnpackerSequence = cms.Sequence( fragment.hltGtStage2Digis + fragment.hltGtStage2ObjectMap )
