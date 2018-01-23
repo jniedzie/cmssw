@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_0_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run2_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_10_0_0/HLT/V21 (CMSSW_10_0_0_HLT1)
+# /dev/CMSSW_10_0_0/HLT/V22 (CMSSW_10_0_0_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_0_0/HLT/V21')
+  tableName = cms.string('/dev/CMSSW_10_0_0/HLT/V22')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6804,26 +6804,9 @@ process.hltAK4CaloJetsPFEt5 = cms.EDFilter( "EtMinCaloJetSelector",
     src = cms.InputTag( "hltAK4CaloJetsPF" ),
     etMin = cms.double( 5.0 )
 )
-process.hltMuonDTDigis = cms.EDProducer( "DTUnpackingModule",
-    useStandardFEDid = cms.bool( True ),
-    maxFEDid = cms.untracked.int32( 779 ),
-    inputLabel = cms.InputTag( "rawDataCollector" ),
-    minFEDid = cms.untracked.int32( 770 ),
-    dataType = cms.string( "DDU" ),
-    readOutParameters = cms.PSet( 
-      localDAQ = cms.untracked.bool( False ),
-      debug = cms.untracked.bool( False ),
-      rosParameters = cms.PSet( 
-        localDAQ = cms.untracked.bool( False ),
-        debug = cms.untracked.bool( False ),
-        writeSC = cms.untracked.bool( True ),
-        readDDUIDfromDDU = cms.untracked.bool( True ),
-        readingDDU = cms.untracked.bool( True ),
-        performDataIntegrityMonitor = cms.untracked.bool( False )
-      ),
-      performDataIntegrityMonitor = cms.untracked.bool( False )
-    ),
-    dqmOnly = cms.bool( False )
+process.hltMuonDTDigis = cms.EDProducer( "DTuROSRawToDigi",
+    debug = cms.untracked.bool( False ),
+    inputLabel = cms.InputTag( "rawDataCollector" )
 )
 process.hltDt1DRecHits = cms.EDProducer( "DTRecHitProducer",
     debug = cms.untracked.bool( False ),
