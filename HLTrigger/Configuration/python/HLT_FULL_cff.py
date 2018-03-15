@@ -85278,19 +85278,26 @@ fragment.hltIsolPixelTrackL2FilterHB = cms.EDFilter( "HLTPixelIsolTrackL1TFilter
     filterTrackEnergy = cms.bool( True )
 )
 fragment.hltIsolEcalPixelTrackProdHB = cms.EDProducer( "IsolatedEcalPixelTrackCandidateProducer",
-    ECHitEnergyThreshold = cms.double( 0.05 ),
     filterLabel = cms.InputTag( "hltIsolPixelTrackL2FilterHB" ),
     EBRecHitSource = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEB' ),
-    ECHitCountEnergyThreshold = cms.double( 0.5 ),
-    EcalConeSizeEta0 = cms.double( 0.09 ),
     EERecHitSource = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEE' ),
+    EBHitEnergyThreshold      = cms.double( 0.10 ),
+    EBHitCountEnergyThreshold = cms.double( 0.5 ),
+    EEHitEnergyThreshold0     = cms.double(-20.5332),
+    EEHitEnergyThreshold1     = cms.double(34.3975),
+    EEHitEnergyThreshold2     = cms.double(-19.0741),
+    EEHitEnergyThreshold3     = cms.double(3.52151),
+    EEFacHitCountEnergyThreshold = cms.double(10.0),
+    EcalConeSizeEta0 = cms.double( 0.09 ),
     EcalConeSizeEta1 = cms.double( 0.14 )
 )
 fragment.hltEcalIsolPixelTrackL2FilterHB = cms.EDFilter( "HLTEcalPixelIsolTrackFilter",
     saveTags = cms.bool( True ),
     DropMultiL2Event = cms.bool( False ),
-    MaxEnergyIn = cms.double( 1.2 ),
-    MaxEnergyOut = cms.double( 1.2 ),
+    MaxEnergyInEB  = cms.double( 1.2 ),
+    MaxEnergyInEE  = cms.double( 2.0 ),
+    MaxEnergyOutEB = cms.double( 1.2 ),
+    MaxEnergyOutEE = cms.double( 2.0 ),
     NMaxTrackCandidates = cms.int32( 10 ),
     candTag = cms.InputTag( "hltIsolEcalPixelTrackProdHB" )
 )
@@ -85348,19 +85355,26 @@ fragment.hltIsolPixelTrackL2FilterHE = cms.EDFilter( "HLTPixelIsolTrackL1TFilter
     filterTrackEnergy = cms.bool( True )
 )
 fragment.hltIsolEcalPixelTrackProdHE = cms.EDProducer( "IsolatedEcalPixelTrackCandidateProducer",
-    ECHitEnergyThreshold = cms.double( 0.05 ),
     filterLabel = cms.InputTag( "hltIsolPixelTrackL2FilterHE" ),
     EBRecHitSource = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEB' ),
-    ECHitCountEnergyThreshold = cms.double( 0.5 ),
-    EcalConeSizeEta0 = cms.double( 0.09 ),
     EERecHitSource = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEE' ),
+    EBHitEnergyThreshold      = cms.double( 0.10 ),
+    EBHitCountEnergyThreshold = cms.double( 0.5 ),
+    EEHitEnergyThreshold0     = cms.double(-20.5332),
+    EEHitEnergyThreshold1     = cms.double(34.3975),
+    EEHitEnergyThreshold2     = cms.double(-19.0741),
+    EEHitEnergyThreshold3     = cms.double(3.52151),
+    EEFacHitCountEnergyThreshold = cms.double(10.0),
+    EcalConeSizeEta0 = cms.double( 0.09 ),
     EcalConeSizeEta1 = cms.double( 0.14 )
 )
 fragment.hltEcalIsolPixelTrackL2FilterHE = cms.EDFilter( "HLTEcalPixelIsolTrackFilter",
     saveTags = cms.bool( True ),
     DropMultiL2Event = cms.bool( False ),
-    MaxEnergyIn = cms.double( 1.2 ),
-    MaxEnergyOut = cms.double( 1.2 ),
+    MaxEnergyInEB  = cms.double( 1.2 ),
+    MaxEnergyInEE  = cms.double( 2.0 ),
+    MaxEnergyOutEB = cms.double( 1.2 ),
+    MaxEnergyOutEE = cms.double( 2.0 ),
     NMaxTrackCandidates = cms.int32( 10 ),
     candTag = cms.InputTag( "hltIsolEcalPixelTrackProdHE" )
 )
