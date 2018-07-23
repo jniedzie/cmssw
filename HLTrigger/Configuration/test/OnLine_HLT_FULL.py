@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_1_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run2_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_10_1_0/HLT/V259 (CMSSW_10_1_7)
+# /dev/CMSSW_10_1_0/HLT/V260 (CMSSW_10_1_7)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_1_0/HLT/V259')
+  tableName = cms.string('/dev/CMSSW_10_1_0/HLT/V260')
 )
 
 process.transferSystem = cms.PSet( 
@@ -78002,7 +78002,7 @@ process.hltPreDSTL1HTTCaloBTagScouting = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 )
 )
 process.hltL1sDoubleMuIorTripleMuIorQuadMu = cms.EDFilter( "HLTL1TSeed",
-    L1SeedsLogicalExpression = cms.string( "L1_DoubleMu_12_5 OR L1_DoubleMu_15_7 OR L1_TripleMu_5_3_3 OR L1_TripleMu_5_5_3 OR L1_QuadMu0 OR L1_DoubleMu0er1p5_SQ_OS_dR_Max1p4 OR L1_DoubleMu4p5er2p0_SQ_OS_Mass7to18 OR L1_DoubleMu4_SQ_OS_dR_Max1p2 OR L1_SingleMu22 OR L1_DoubleMu0er1p4_SQ_OS_dR_Max1p4 OR L1_DoubleMu4p5_SQ_OS_dR_Max1p2 OR L1_DoubleMu4p5_SQ_OS OR L1_DoubleMu0er1p5_SQ_dR_Max1p4 OR L1_DoubleMu0er2p0_SQ_dR_Max1p4 OR L1_DoubleMu0_SQ OR L1_DoubleMu4p5er2p0_SQ_OS_Mass_Min7" ),
+    L1SeedsLogicalExpression = cms.string( "L1_DoubleMu_12_5 OR L1_DoubleMu_15_7 OR L1_TripleMu_5_3_3 OR L1_TripleMu_5_5_3 OR L1_QuadMu0 OR L1_DoubleMu0er1p5_SQ_OS_dR_Max1p4 OR L1_DoubleMu4p5er2p0_SQ_OS_Mass7to18 OR L1_DoubleMu4_SQ_OS_dR_Max1p2 OR L1_SingleMu22 OR L1_DoubleMu0er1p4_SQ_OS_dR_Max1p4 OR L1_DoubleMu4p5_SQ_OS_dR_Max1p2 OR L1_DoubleMu4p5_SQ_OS OR L1_DoubleMu0er1p5_SQ_dR_Max1p4 OR L1_DoubleMu0er2p0_SQ_dR_Max1p4 OR L1_DoubleMu0_SQ" ),
     L1EGammaInputTag = cms.InputTag( 'hltGtStage2Digis','EGamma' ),
     L1JetInputTag = cms.InputTag( 'hltGtStage2Digis','Jet' ),
     saveTags = cms.bool( True ),
