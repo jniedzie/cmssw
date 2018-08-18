@@ -6570,8 +6570,7 @@ fragment.hltSiStripRawToClustersFacility = cms.EDProducer( "SiStripClusterizerFr
       TruncateInSuppressor = cms.bool( True ),
       doAPVRestore = cms.bool( False ),
       SiStripFedZeroSuppressionMode = cms.uint32( 4 ),
-      PedestalSubtractionFedMode = cms.bool( True ),
-      Use10bitsTruncation = cms.bool( False )
+      PedestalSubtractionFedMode = cms.bool( True )
     ),
     Clusterizer = cms.PSet( 
       QualityLabel = cms.string( "" ),
@@ -6586,7 +6585,6 @@ fragment.hltSiStripRawToClustersFacility = cms.EDProducer( "SiStripClusterizerFr
       clusterChargeCut = cms.PSet(  refToPSet_ = cms.string( "HLTSiStripClusterChargeCutNone" ) ),
       MaxSequentialBad = cms.uint32( 1 )
     ),
-    HybridZeroSuppressed = cms.bool( False ),
     onDemand = cms.bool( True )
 )
 fragment.hltSiStripClusters = cms.EDProducer( "MeasurementTrackerEventProducer",
