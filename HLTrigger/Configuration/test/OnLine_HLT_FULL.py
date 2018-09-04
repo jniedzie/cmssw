@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_1_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run2_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_10_1_0/HLT/V302 (CMSSW_10_1_10_HLT1)
+# /dev/CMSSW_10_1_0/HLT/V303 (CMSSW_10_1_10_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_1_0/HLT/V302')
+  tableName = cms.string('/dev/CMSSW_10_1_0/HLT/V303')
 )
 
 process.transferSystem = cms.PSet( 
@@ -106327,6 +106327,305 @@ process.hltTriggerBxMonitor = cms.EDAnalyzer( "TriggerBxMonitor",
     l1tResults = cms.untracked.InputTag( "hltGtStage2Digis" ),
     hltResults = cms.untracked.InputTag( 'TriggerResults','','HLT' )
 )
+process.hltTriggerObjectTnPMonitor = cms.EDAnalyzer( "TrigObjTnPSource",
+    triggerResults = cms.InputTag( 'TriggerResults','','HLT' ),
+    triggerEvent = cms.InputTag( 'hltTriggerSummaryAOD','','HLT' ),
+    histColls = cms.VPSet( 
+      cms.PSet(  evtTrigSel = cms.PSet( 
+  selectionStr = cms.string( "HLT_Ele32_WPTight_Gsf_v*" ),
+  isANDForExpandedPaths = cms.bool( False ),
+  verbose = cms.int32( 1 )
+),
+        tagCuts = cms.VPSet( 
+          cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+            rangeVar = cms.string( "eta" )
+          )
+        ),
+        probeFilters = cms.vstring( 'hltEG32L1SingleEGOrEtFilter',
+          'hltEle32WPTightClusterShapeFilter',
+          'hltEle32WPTightHEFilter',
+          'hltEle32WPTightEcalIsoFilter',
+          'hltEle32WPTightHcalIsoFilter',
+          'hltEle32WPTightPixelMatchFilter',
+          'hltEle32WPTightPMS2Filter',
+          'hltEle32WPTightGsfOneOEMinusOneOPFilter',
+          'hltEle32WPTightGsfMissingHitsFilter',
+          'hltEle32WPTightGsfDetaFilter',
+          'hltEle32WPTightGsfDphiFilter',
+          'hltEle32WPTightGsfTrackIsoFilter' ),
+        probeCuts = cms.VPSet( 
+          cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '-1.4442:1.4442',
+  '1.556:2.5' ),
+            rangeVar = cms.string( "eta" )
+          )
+        ),
+        tagFilters = cms.PSet( 
+          filterSets = cms.VPSet( 
+            cms.PSet(  filters = cms.vstring( 'hltEle32WPTightGsfTrackIsoFilter' ),
+              isAND = cms.bool( False )
+            )
+          ),
+          isAND = cms.bool( False )
+        ),
+        histDefs = cms.PSet( 
+          configs = cms.VPSet( 
+            cms.PSet(  bins = cms.vdouble( 32.0, 40.0, 50.0, 100.0 ),
+              titleSuffex = cms.string( " (Barrel);p_{T} GeV;mass GeV" ),
+              nameSuffex = cms.string( "_ptEB" ),
+              filler = cms.PSet( 
+                var = cms.string( "pt" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( 32.0, 40.0, 50.0, 100.0 ),
+              titleSuffex = cms.string( " (Endcap);p_{T} GeV;mass GeV" ),
+              nameSuffex = cms.string( "_ptEE" ),
+              filler = cms.PSet( 
+                var = cms.string( "pt" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '1.556:2.5' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -3.14, -1.57, 0.0, 1.57, 3.14 ),
+              titleSuffex = cms.string( " (Barrel);#phi rad;mass GeV" ),
+              nameSuffex = cms.string( "_phiEB" ),
+              filler = cms.PSet( 
+                var = cms.string( "phi" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -3.14, -1.57, 0.0, 1.57, 3.14 ),
+              titleSuffex = cms.string( " (Endcap);#phi rad;mass GeV" ),
+              nameSuffex = cms.string( "_phiEE" ),
+              filler = cms.PSet( 
+                var = cms.string( "phi" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '1.556:2.5' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -2.5, -1.5, 0.0, 1.5, 2.5 ),
+              titleSuffex = cms.string( ";#eta;mass GeV" ),
+              nameSuffex = cms.string( "_eta" ),
+              filler = cms.PSet( 
+                var = cms.string( "eta" ),
+                localCuts = cms.VPSet( 
+                )
+              )
+            )
+          ),
+          massBins = cms.vdouble( 60.0, 61.0, 62.0, 63.0, 64.0, 65.0, 66.0, 67.0, 68.0, 69.0, 70.0, 71.0, 72.0, 73.0, 74.0, 75.0, 76.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0, 83.0, 84.0, 85.0, 86.0, 87.0, 88.0, 89.0, 90.0, 91.0, 92.0, 93.0, 94.0, 95.0, 96.0, 97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0 )
+        ),
+        folderName = cms.string( "HLT/EGM/TrigObjTnP" ),
+        collName = cms.string( "stdTag" )
+      ),
+      cms.PSet(  evtTrigSel = cms.PSet( 
+  selectionStr = cms.string( "HLT_Ele32_WPTight_Gsf_v*" ),
+  isANDForExpandedPaths = cms.bool( False ),
+  verbose = cms.int32( 1 )
+),
+        tagCuts = cms.VPSet( 
+          cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+            rangeVar = cms.string( "eta" )
+          )
+        ),
+        probeFilters = cms.vstring( 'hltEle23Ele12CaloIdLTrackIdLIsoVLTrackIsoLeg2Filter' ),
+        probeCuts = cms.VPSet( 
+          cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '-1.4442:1.4442',
+  '1.556:2.5' ),
+            rangeVar = cms.string( "eta" )
+          )
+        ),
+        tagFilters = cms.PSet( 
+          filterSets = cms.VPSet( 
+            cms.PSet(  filters = cms.vstring( 'hltEle32WPTightGsfTrackIsoFilter' ),
+              isAND = cms.bool( False )
+            )
+          ),
+          isAND = cms.bool( False )
+        ),
+        histDefs = cms.PSet( 
+          configs = cms.VPSet( 
+            cms.PSet(  bins = cms.vdouble( 12.0, 32.0, 40.0, 50.0, 100.0 ),
+              titleSuffex = cms.string( " (Barrel);p_{T} GeV;mass GeV" ),
+              nameSuffex = cms.string( "_ptEB" ),
+              filler = cms.PSet( 
+                var = cms.string( "pt" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( 12.0, 32.0, 40.0, 50.0, 100.0 ),
+              titleSuffex = cms.string( " (Endcap);p_{T} GeV;mass GeV" ),
+              nameSuffex = cms.string( "_ptEE" ),
+              filler = cms.PSet( 
+                var = cms.string( "pt" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '1.556:2.5' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -3.14, -1.57, 0.0, 1.57, 3.14 ),
+              titleSuffex = cms.string( " (Barrel);#phi rad;mass GeV" ),
+              nameSuffex = cms.string( "_phiEB" ),
+              filler = cms.PSet( 
+                var = cms.string( "phi" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -3.14, -1.57, 0.0, 1.57, 3.14 ),
+              titleSuffex = cms.string( " (Endcap);#phi rad;mass GeV" ),
+              nameSuffex = cms.string( "_phiEE" ),
+              filler = cms.PSet( 
+                var = cms.string( "phi" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '1.556:2.5' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -2.5, -1.5, 0.0, 1.5, 2.5 ),
+              titleSuffex = cms.string( ";#eta;mass GeV" ),
+              nameSuffex = cms.string( "_eta" ),
+              filler = cms.PSet( 
+                var = cms.string( "eta" ),
+                localCuts = cms.VPSet( 
+                )
+              )
+            )
+          ),
+          massBins = cms.vdouble( 60.0, 61.0, 62.0, 63.0, 64.0, 65.0, 66.0, 67.0, 68.0, 69.0, 70.0, 71.0, 72.0, 73.0, 74.0, 75.0, 76.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0, 83.0, 84.0, 85.0, 86.0, 87.0, 88.0, 89.0, 90.0, 91.0, 92.0, 93.0, 94.0, 95.0, 96.0, 97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0 )
+        ),
+        folderName = cms.string( "HLT/EGM/TrigObjTnP" ),
+        collName = cms.string( "stdTag" )
+      ),
+      cms.PSet(  evtTrigSel = cms.PSet( 
+  selectionStr = cms.string( "HLT_Ele32_WPTight_Gsf_v*" ),
+  isANDForExpandedPaths = cms.bool( False ),
+  verbose = cms.int32( 1 )
+),
+        tagCuts = cms.VPSet( 
+          cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+            rangeVar = cms.string( "eta" )
+          )
+        ),
+        probeFilters = cms.vstring( 'hltDiEG25CaloIdLClusterShapeUnseededFilter',
+          'hltDiEle25CaloIdLPixelMatchUnseededFilter',
+          'hltDiEle25CaloIdLMWPMS2UnseededFilter' ),
+        probeCuts = cms.VPSet( 
+          cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '-1.4442:1.4442',
+  '1.556:2.5' ),
+            rangeVar = cms.string( "eta" )
+          )
+        ),
+        tagFilters = cms.PSet( 
+          filterSets = cms.VPSet( 
+            cms.PSet(  filters = cms.vstring( 'hltEle32WPTightGsfTrackIsoFilter',
+  'hltEle25CaloIdLMWPMS2Filter' ),
+              isAND = cms.bool( True )
+            )
+          ),
+          isAND = cms.bool( False )
+        ),
+        histDefs = cms.PSet( 
+          configs = cms.VPSet( 
+            cms.PSet(  bins = cms.vdouble( 25.0, 33.0, 40.0, 50.0, 100.0 ),
+              titleSuffex = cms.string( " (Barrel);p_{T} GeV;mass GeV" ),
+              nameSuffex = cms.string( "_ptEB" ),
+              filler = cms.PSet( 
+                var = cms.string( "pt" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( 25.0, 33.0, 40.0, 50.0, 100.0 ),
+              titleSuffex = cms.string( " (Endcap);p_{T} GeV;mass GeV" ),
+              nameSuffex = cms.string( "_ptEE" ),
+              filler = cms.PSet( 
+                var = cms.string( "pt" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '1.556:2.5' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -3.14, -1.57, 0.0, 1.57, 3.14 ),
+              titleSuffex = cms.string( " (Barrel);#phi rad;mass GeV" ),
+              nameSuffex = cms.string( "_phiEB" ),
+              filler = cms.PSet( 
+                var = cms.string( "phi" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-1.4442:1.4442' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -3.14, -1.57, 0.0, 1.57, 3.14 ),
+              titleSuffex = cms.string( " (Endcap);#phi rad;mass GeV" ),
+              nameSuffex = cms.string( "_phiEE" ),
+              filler = cms.PSet( 
+                var = cms.string( "phi" ),
+                localCuts = cms.VPSet( 
+                  cms.PSet(  allowedRanges = cms.vstring( '-2.5:-1.556',
+  '1.556:2.5' ),
+                    rangeVar = cms.string( "eta" )
+                  )
+                )
+              )
+            ),
+            cms.PSet(  bins = cms.vdouble( -2.5, -1.5, 0.0, 1.5, 2.5 ),
+              titleSuffex = cms.string( ";#eta;mass GeV" ),
+              nameSuffex = cms.string( "_eta" ),
+              filler = cms.PSet( 
+                var = cms.string( "eta" ),
+                localCuts = cms.VPSet( 
+                )
+              )
+            )
+          ),
+          massBins = cms.vdouble( 60.0, 61.0, 62.0, 63.0, 64.0, 65.0, 66.0, 67.0, 68.0, 69.0, 70.0, 71.0, 72.0, 73.0, 74.0, 75.0, 76.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0, 83.0, 84.0, 85.0, 86.0, 87.0, 88.0, 89.0, 90.0, 91.0, 92.0, 93.0, 94.0, 95.0, 96.0, 97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0 )
+        ),
+        folderName = cms.string( "HLT/EGM/TrigObjTnP" ),
+        collName = cms.string( "stdTagAndEle25MW" )
+      )
+    )
+)
 process.hltLumiMonitor = cms.EDAnalyzer( "LumiMonitor",
     useBPixLayer1 = cms.bool( False ),
     minPixelClusterCharge = cms.double( 15000.0 ),
@@ -113197,7 +113496,7 @@ process.HLT_L1HFveto_v1 = cms.Path( process.HLTBeginSequence + process.hltL1sL1H
 process.HLTriggerFinalPath = cms.Path( process.hltGtStage2Digis + process.hltScalersRawToDigi + process.hltFEDSelector + process.hltTriggerSummaryAOD + process.hltTriggerSummaryRAW + process.hltBoolFalse )
 process.HLTAnalyzerEndpath = cms.EndPath( process.hltGtStage2Digis + process.hltPreHLTAnalyzerEndpath + process.hltL1TGlobalSummary + process.hltTrigReport )
 process.RatesMonitoring = cms.EndPath( process.hltGtStage2Digis + process.hltPreRatesMonitoring + process.hltHLTriggerJSONMonitoring + process.hltL1TriggerJSONMonitoring )
-process.DQMHistograms = cms.EndPath( process.hltGtStage2Digis + process.hltScalersRawToDigi + process.hltTriggerRatesMonitor + process.hltTriggerBxMonitor + process.hltLumiMonitor + process.hltPSColumnMonitor )
+process.DQMHistograms = cms.EndPath( process.hltGtStage2Digis + process.hltScalersRawToDigi + process.hltTriggerRatesMonitor + process.hltTriggerBxMonitor + process.hltTriggerObjectTnPMonitor + process.hltLumiMonitor + process.hltPSColumnMonitor )
 process.ParkingHLTPhysicsOutput = cms.EndPath( process.hltGtStage2Digis + process.hltPreParkingHLTPhysicsOutput )
 process.ParkingZeroBiasOutput = cms.EndPath( process.hltGtStage2Digis + process.hltPreParkingZeroBiasOutput )
 process.PhysicsCommissioningOutput = cms.EndPath( process.hltGtStage2Digis + process.hltPrePhysicsCommissioningOutput + process.hltOutputPhysicsCommissioning )
