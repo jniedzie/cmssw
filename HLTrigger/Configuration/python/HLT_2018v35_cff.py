@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /frozen/2018/2e34/v3.5/HLT --type 2018v35
 
-# /frozen/2018/2e34/v3.5/HLT/V3 (CMSSW_10_1_10_HLT1)
+# /frozen/2018/2e34/v3.5/HLT/V5 (CMSSW_10_1_10_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2018/2e34/v3.5/HLT/V3')
+  tableName = cms.string('/frozen/2018/2e34/v3.5/HLT/V5')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -21329,7 +21329,7 @@ fragment.hltTau3muTkVertexProducer = cms.EDProducer( "HLTmumutkVtxProducer",
     OverlapDR = cms.double( 1.44E-4 ),
     MaxEta = cms.double( 2.5 ),
     ThirdTrackMass = cms.double( 0.106 ),
-    MaxInvMass = cms.double( 2.02 ),
+    MaxInvMass = cms.double( 2.1 ),
     TrackCand = cms.InputTag( "hltTau3muTkAllConeTracksIter" ),
     PreviousCandTag = cms.InputTag( "hltDisplacedmumuFilterDoubleMu3Tau3mu" ),
     MinInvMass = cms.double( 1.6 ),
@@ -21668,7 +21668,7 @@ fragment.hltdstau3muDisplaced3muVtxProducer = cms.EDProducer( "HLTDisplacedmumum
     PreviousCandTag = cms.InputTag( "hltdstau3mumuontrkFltr" ),
     MinPt = cms.double( 1.2 ),
     ChargeOpt = cms.int32( -1 ),
-    MaxInvMass = cms.double( 2.02 ),
+    MaxInvMass = cms.double( 2.1 ),
     MinPtTriplet = cms.double( 8.0 ),
     MaxEta = cms.double( 2.5 ),
     MinInvMass = cms.double( 1.6 )

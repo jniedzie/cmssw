@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_1_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_10_1_0/GRun/V79 (CMSSW_10_1_10_HLT1)
+# /dev/CMSSW_10_1_0/GRun/V81 (CMSSW_10_1_10_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_1_0/GRun/V79')
+  tableName = cms.string('/dev/CMSSW_10_1_0/GRun/V81')
 )
 
 process.transferSystem = cms.PSet( 
@@ -21629,7 +21629,7 @@ process.hltTau3muTkVertexProducer = cms.EDProducer( "HLTmumutkVtxProducer",
     OverlapDR = cms.double( 1.44E-4 ),
     MaxEta = cms.double( 2.5 ),
     ThirdTrackMass = cms.double( 0.106 ),
-    MaxInvMass = cms.double( 2.02 ),
+    MaxInvMass = cms.double( 2.1 ),
     TrackCand = cms.InputTag( "hltTau3muTkAllConeTracksIter" ),
     PreviousCandTag = cms.InputTag( "hltDisplacedmumuFilterDoubleMu3Tau3mu" ),
     MinInvMass = cms.double( 1.6 ),
@@ -21968,7 +21968,7 @@ process.hltdstau3muDisplaced3muVtxProducer = cms.EDProducer( "HLTDisplacedmumumu
     PreviousCandTag = cms.InputTag( "hltdstau3mumuontrkFltr" ),
     MinPt = cms.double( 1.2 ),
     ChargeOpt = cms.int32( -1 ),
-    MaxInvMass = cms.double( 2.02 ),
+    MaxInvMass = cms.double( 2.1 ),
     MinPtTriplet = cms.double( 8.0 ),
     MaxEta = cms.double( 2.5 ),
     MinInvMass = cms.double( 1.6 )
