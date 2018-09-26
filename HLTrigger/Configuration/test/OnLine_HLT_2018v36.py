@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /frozen/2018/2e34/v3.6/HLT --type 2018v36 --unprescale --process HLT2018v36 --globaltag auto:run2_hlt_2018v36 --input file:RelVal_Raw_2018v36_DATA.root
 
-# /frozen/2018/2e34/v3.6/HLT/V1 (CMSSW_10_1_10_HLT1)
+# /frozen/2018/2e34/v3.6/HLT/V2 (CMSSW_10_1_10_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLT2018v36" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2018/2e34/v3.6/HLT/V1')
+  tableName = cms.string('/frozen/2018/2e34/v3.6/HLT/V2')
 )
 
 process.transferSystem = cms.PSet( 
