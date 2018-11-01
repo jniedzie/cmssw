@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_3_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_10_3_0/GRun/V20 (CMSSW_10_3_0)
+# /dev/CMSSW_10_3_0/GRun/V22 (CMSSW_10_3_0)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_3_0/GRun/V20')
+  tableName = cms.string('/dev/CMSSW_10_3_0/GRun/V22')
 )
 
 process.transferSystem = cms.PSet( 
@@ -2098,7 +2098,7 @@ process.HLTPSetLowPtTripletStepTrajectoryFilterPPOnAA = cms.PSet(
   strictSeedExtension = cms.bool( False ),
   nSigmaMinPt = cms.double( 5.0 ),
   maxCCCLostHits = cms.int32( 0 ),
-  minPt = cms.double( 0.49 ),
+  minPt = cms.double( 2.0 ),
   maxConsecLostHits = cms.int32( 1 ),
   extraNumberOfHitsBeforeTheFirstLoop = cms.int32( 4 ),
   constantValueForLostHitsFractionFilter = cms.double( 2.0 ),
@@ -2120,7 +2120,7 @@ process.HLTPSetDetachedQuadStepTrajectoryFilterPPOnAA = cms.PSet(
   strictSeedExtension = cms.bool( False ),
   nSigmaMinPt = cms.double( 5.0 ),
   maxCCCLostHits = cms.int32( 0 ),
-  minPt = cms.double( 0.9 ),
+  minPt = cms.double( 3.0 ),
   maxConsecLostHits = cms.int32( 1 ),
   extraNumberOfHitsBeforeTheFirstLoop = cms.int32( 4 ),
   constantValueForLostHitsFractionFilter = cms.double( 2.0 ),
@@ -2304,7 +2304,7 @@ process.HLTPSetDetachedTripletStepTrajectoryFilterPPOnAA = cms.PSet(
   strictSeedExtension = cms.bool( False ),
   nSigmaMinPt = cms.double( 5.0 ),
   maxCCCLostHits = cms.int32( 0 ),
-  minPt = cms.double( 0.9 ),
+  minPt = cms.double( 3.0 ),
   maxConsecLostHits = cms.int32( 1 ),
   extraNumberOfHitsBeforeTheFirstLoop = cms.int32( 4 ),
   constantValueForLostHitsFractionFilter = cms.double( 2.0 ),
@@ -2396,7 +2396,7 @@ process.HLTPSetMixedTripletStepTrajectoryFilterPPOnAA = cms.PSet(
   strictSeedExtension = cms.bool( False ),
   nSigmaMinPt = cms.double( 5.0 ),
   maxCCCLostHits = cms.int32( 9999 ),
-  minPt = cms.double( 0.4 ),
+  minPt = cms.double( 1.0 ),
   maxConsecLostHits = cms.int32( 1 ),
   extraNumberOfHitsBeforeTheFirstLoop = cms.int32( 4 ),
   constantValueForLostHitsFractionFilter = cms.double( 1.4 ),
@@ -2652,7 +2652,7 @@ process.HLTPSetPixelPairStepTrajectoryFilterPPOnAA = cms.PSet(
   strictSeedExtension = cms.bool( False ),
   nSigmaMinPt = cms.double( 5.0 ),
   maxCCCLostHits = cms.int32( 0 ),
-  minPt = cms.double( 0.1 ),
+  minPt = cms.double( 3.5 ),
   maxConsecLostHits = cms.int32( 1 ),
   extraNumberOfHitsBeforeTheFirstLoop = cms.int32( 4 ),
   constantValueForLostHitsFractionFilter = cms.double( 2.0 ),
@@ -88669,7 +88669,7 @@ process.HLTAK4CaloJetsCorrectionNoIDSequence = cms.Sequence( process.hltFixedGri
 process.HLTDiMu5DiEle3CaloIdLTrackIdLMuonlegSequence = cms.Sequence( process.hltDiMu5Ele3CaloIdLTrackIdLMuonlegL1Filtered0 + process.HLTL2muonrecoSequence + cms.ignore(process.hltDiMu5Ele3CaloIdLTrackIdLMuonlegL2Filtered0) + process.HLTL3muonrecoSequence + cms.ignore(process.hltL1fForIterL3DiMu5Ele3CaloIdLTrackIdLMuonlegL1Filtered0) + process.hltL3fL1DoubleMu5EG3f0Filtered5 + process.hltDoubleMu5EG3L3Filtered + process.hltDisplacedmumuVtxProducerDiMu5EG3 + process.hltVertexmumuFilterDiMu5EG3 )
 process.HLTDoFullUnpackingEgammaEcalSequence = cms.Sequence( process.hltEcalDigis + process.hltEcalPreshowerDigis + process.hltEcalUncalibRecHit + process.hltEcalDetIdToBeRecovered + process.hltEcalRecHit + process.hltEcalPreshowerRecHit )
 process.HLTPFClusteringForEgamma = cms.Sequence( process.hltRechitInRegionsECAL + process.hltRechitInRegionsES + process.hltParticleFlowRecHitECALL1Seeded + process.hltParticleFlowRecHitPSL1Seeded + process.hltParticleFlowClusterPSL1Seeded + process.hltParticleFlowClusterECALUncorrectedL1Seeded + process.hltParticleFlowClusterECALL1Seeded + process.hltParticleFlowSuperClusterECALL1Seeded )
-process.HLTFastJetForEgamma = cms.Sequence( process.hltTowerMakerForAll + process.hltTowerMakerForAll + process.hltTowerMakerForAll + process.hltFixedGridRhoFastjetAllCaloForMuons )
+process.HLTFastJetForEgamma = cms.Sequence( process.hltTowerMakerForAll + process.hltFixedGridRhoFastjetAllCaloForMuons )
 process.HLTElePixelMatchSequence = cms.Sequence( process.HLTDoLocalPixelSequence + process.HLTDoLocalStripSequence + process.hltPixelLayerPairs + process.hltPixelLayerTriplets + process.hltEgammaHoverE + process.hltEgammaSuperClustersToPixelMatch + process.hltEleSeedsTrackingRegions + process.hltElePixelHitDoublets + process.hltElePixelHitDoubletsForTriplets + process.hltElePixelHitTriplets + process.hltElePixelSeedsDoublets + process.hltElePixelSeedsTriplets + process.hltElePixelSeedsCombined + process.hltEgammaElectronPixelSeeds + process.hltEgammaPixelMatchVars )
 process.HLTGsfElectronSequence = cms.Sequence( process.hltEgammaCkfTrackCandidatesForGSF + process.hltEgammaGsfTracks + process.hltEgammaGsfElectrons + process.hltEgammaGsfTrackVars )
 process.HLTDiMu5DiEle3CaloIdLTrackIdLElectronlegSequence = cms.Sequence( process.HLTDoFullUnpackingEgammaEcalSequence + process.HLTPFClusteringForEgamma + process.hltEgammaCandidates + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegL1MatchFilter + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegEtFilter + process.hltEgammaClusterShape + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegClusterShapeFilter + process.HLTDoLocalHcalSequence + process.HLTFastJetForEgamma + process.hltEgammaHoverE + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegHEFilter + process.HLTElePixelMatchSequence + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegPixelMatchFilter + process.HLTGsfElectronSequence + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegOneOEMinusOneOPFilter + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegDetaFilter + process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegDphiFilter )
