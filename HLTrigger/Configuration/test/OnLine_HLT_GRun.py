@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_3_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_10_3_0/GRun/V24 (CMSSW_10_3_0)
+# /dev/CMSSW_10_3_0/GRun/V25 (CMSSW_10_3_0)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_3_0/GRun/V24')
+  tableName = cms.string('/dev/CMSSW_10_3_0/GRun/V25')
 )
 
 process.transferSystem = cms.PSet( 
@@ -4147,7 +4147,7 @@ process.GlobalParametersRcdSource = cms.ESSource( "EmptyESSource",
     firstValid = cms.vuint32( 1 )
 )
 process.GlobalTag = cms.ESSource( "PoolDBESSource",
-    globaltag = cms.string( "101X_dataRun2_HLT_v7" ),
+    globaltag = cms.string( "103X_dataRun2_HLT_v1" ),
     RefreshEachRun = cms.untracked.bool( False ),
     snapshotTime = cms.string( "" ),
     toGet = cms.VPSet( 
