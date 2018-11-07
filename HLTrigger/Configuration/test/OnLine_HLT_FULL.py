@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_10_3_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run2_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_10_3_0/HLT/V78 (CMSSW_10_3_0)
+# /dev/CMSSW_10_3_0/HLT/V79 (CMSSW_10_3_0)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_3_0/HLT/V78')
+  tableName = cms.string('/dev/CMSSW_10_3_0/HLT/V79')
 )
 
 process.HLTPSetTobTecStepTrajectoryBuilderPPOnAA = cms.PSet( 
@@ -98172,10 +98172,10 @@ process.hltIterL3MuonsFromL2LinksCombinationPPOnAA = cms.EDProducer( "L3TrackLin
     labels = cms.VInputTag( 'hltL3MuonsIterL3OIPPOnAA','hltL3MuonsIterL3IOPPOnAA' )
 )
 process.hltL1MuonsPt0PPOnAA = cms.EDProducer( "HLTL1TMuonSelector",
-    L1MinPt = cms.double( 9999.0 ),
+    L1MinPt = cms.double( -1.0 ),
     CentralBxOnly = cms.bool( True ),
     InputObjects = cms.InputTag( 'hltGtStage2Digis','Muon' ),
-    L1MinQuality = cms.uint32( 7 ),
+    L1MinQuality = cms.uint32( 0 ),
     L1MaxEta = cms.double( 5.0 )
 )
 process.hltIterL3FromL1MuonPixelTracksTrackingRegionsPPOnAA = cms.EDProducer( "CandidateSeededTrackingRegionsEDProducer",
