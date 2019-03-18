@@ -1,13 +1,13 @@
-# hltGetConfiguration --full --data /dev/CMSSW_10_3_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
+# hltGetConfiguration --full --data /dev/CMSSW_10_5_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run2_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_10_3_0/GRun/V47 (CMSSW_10_3_0)
+# /dev/CMSSW_10_5_0/GRun/V2 (CMSSW_10_5_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_10_3_0/GRun/V47')
+  tableName = cms.string('/dev/CMSSW_10_5_0/GRun/V2')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6766,6 +6766,7 @@ process.preshowerDetIdAssociator = cms.ESProducer( "DetIdAssociatorESProducer",
   includeGEM = cms.bool( False )
 )
 process.siPixelQualityESProducer = cms.ESProducer( "SiPixelQualityESProducer",
+  siPixelQualityLabel = cms.string( "" ),
   ListOfRecordToMerge = cms.VPSet( 
     cms.PSet(  record = cms.string( "SiPixelQualityFromDbRcd" ),
       tag = cms.string( "" )
@@ -7229,6 +7230,7 @@ process.hltHcalDigis = cms.EDProducer( "HcalRawToDigi",
 process.hltHbhePhase1Reco = cms.EDProducer( "HBHEPhase1Reconstructor",
     tsFromDB = cms.bool( False ),
     setPulseShapeFlagsQIE8 = cms.bool( True ),
+    use8ts = cms.bool( False ),
     digiLabelQIE11 = cms.InputTag( "hltHcalDigis" ),
     saveDroppedInfos = cms.bool( False ),
     setNoiseFlagsQIE8 = cms.bool( True ),
@@ -8317,7 +8319,7 @@ process.hltSiPixelClusters = cms.EDProducer( "SiPixelClusterProducer",
     Phase2ReadoutMode = cms.int32( -1 ),
     maxNumberOfClusters = cms.int32( 40000 ),
     ClusterThreshold_L1 = cms.int32( 2000 ),
-    MissCalibrate = cms.untracked.bool( True ),
+    MissCalibrate = cms.bool( True ),
     VCaltoElectronGain = cms.int32( 47 ),
     VCaltoElectronGain_L1 = cms.int32( 50 ),
     VCaltoElectronOffset = cms.int32( -60 ),
@@ -8325,6 +8327,7 @@ process.hltSiPixelClusters = cms.EDProducer( "SiPixelClusterProducer",
     payloadType = cms.string( "HLT" ),
     Phase2Calibration = cms.bool( False ),
     Phase2KinkADC = cms.int32( 8 ),
+    ClusterMode = cms.string( "PixelThresholdClusterizer" ),
     SeedThreshold = cms.int32( 1000 ),
     VCaltoElectronOffset_L1 = cms.int32( -670 ),
     ClusterThreshold = cms.int32( 4000 )
@@ -8720,6 +8723,7 @@ process.hltIterL3MuonPixelTracksHitDoublets = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIterL3MuonPixelLayerQuadruplets" )
 )
@@ -8943,6 +8947,7 @@ process.hltIter2IterL3MuonPixelHitDoublets = cms.EDProducer( "HitPairEDProducer"
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2IterL3MuonPixelLayerTriplets" )
 )
@@ -9184,6 +9189,7 @@ process.hltIter3IterL3MuonPixelHitDoublets = cms.EDProducer( "HitPairEDProducer"
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter3IterL3MuonPixelLayerPairs" )
 )
@@ -9494,6 +9500,7 @@ process.hltIterL3FromL1MuonPixelTracksHitDoublets = cms.EDProducer( "HitPairEDPr
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIterL3FromL1MuonPixelLayerQuadruplets" )
 )
@@ -9717,6 +9724,7 @@ process.hltIter2IterL3FromL1MuonPixelHitDoublets = cms.EDProducer( "HitPairEDPro
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2IterL3FromL1MuonPixelLayerTriplets" )
 )
@@ -9954,6 +9962,7 @@ process.hltIter3IterL3FromL1MuonPixelHitDoublets = cms.EDProducer( "HitPairEDPro
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter3IterL3FromL1MuonPixelLayerPairs" )
 )
@@ -10590,6 +10599,7 @@ process.hltPixelTracksHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -10814,6 +10824,7 @@ process.hltIter1PFlowPixelHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1PixelLayerQuadruplets" )
 )
@@ -11198,6 +11209,7 @@ process.hltIter2PFlowPixelHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2PixelLayerTriplets" )
 )
@@ -11436,6 +11448,7 @@ process.hltDoubletRecoveryPFlowPixelHitDoublets = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayersAndRegions" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -12416,7 +12429,15 @@ process.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
 process.hltParticleFlow = cms.EDProducer( "PFProducer",
     photon_SigmaiEtaiEta_endcap = cms.double( 0.034 ),
     minPtForPostCleaning = cms.double( 20.0 ),
+    electron_protectionsForBadHcal = cms.PSet( 
+      dEta = cms.vdouble( 0.0064, 0.01264 ),
+      dPhi = cms.vdouble( 0.0547, 0.0394 ),
+      enableProtections = cms.bool( False ),
+      eInvPInv = cms.vdouble( 0.184, 0.0721 ),
+      full5x5_sigmaIetaIeta = cms.vdouble( 0.0106, 0.0387 )
+    ),
     pf_nsigma_ECAL = cms.double( 0.0 ),
+    electron_ecalDrivenHademPreselCut = cms.double( 0.15 ),
     GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
     sumPtTrackIsoForPhoton = cms.double( -1.0 ),
     goodPixelTrackDeadHcal_ptErrRel = cms.double( 1.0 ),
@@ -12491,6 +12512,7 @@ process.hltParticleFlow = cms.EDProducer( "PFProducer",
     metFactorForCleaning = cms.double( 4.0 ),
     eventFactorForCosmics = cms.double( 10.0 ),
     egammaElectrons = cms.InputTag( "" ),
+    electron_maxElePtForOnlyMVAPresel = cms.double( 50.0 ),
     minEnergyForPunchThrough = cms.double( 100.0 ),
     minTrackerHits = cms.int32( 8 ),
     iCfgCandConnector = cms.PSet( 
@@ -12515,17 +12537,10 @@ process.hltParticleFlow = cms.EDProducer( "PFProducer",
     pf_electron_mvaCut = cms.double( -0.1 ),
     ptFactorForHighEta = cms.double( 2.0 ),
     goodPixelTrackDeadHcal_maxPt = cms.double( 50.0 ),
-    sumEtEcalIsoForEgammaSC_endcap = cms.double( 2.0 ),
     dptRel_DispVtx = cms.double( 10.0 ),
     pf_electronID_mvaWeightFile = cms.string( "RecoParticleFlow/PFProducer/data/MVAnalysis_BDT.weights_PfElectrons23Jan_IntToFloat.txt" ),
     goodTrackDeadHcal_chi2n = cms.double( 5.0 ),
-    electron_protectionsForBadHcal = cms.PSet( 
-      dEta = cms.vdouble( 0.0064, 0.01264 ),
-      dPhi = cms.vdouble( 0.0547, 0.0394 ),
-      enableProtections = cms.bool( False ),
-      eInvPInv = cms.vdouble( 0.184, 0.0721 ),
-      full5x5_sigmaIetaIeta = cms.vdouble( 0.0106, 0.0387 )
-    ),
+    sumEtEcalIsoForEgammaSC_endcap = cms.double( 2.0 ),
     goodPixelTrackDeadHcal_dz = cms.double( 0.05 ),
     calibHF_b_EMHAD = cms.vdouble( 1.27541, 0.85361, 0.86333, 0.89091, 0.94348, 0.94348, 0.9437, 1.0034, 1.0444, 1.0444 ),
     pf_GlobC_mvaWeightFile = cms.string( "RecoParticleFlow/PFProducer/data/TMVARegression_BDTG_PFGlobalCorr_14Dec2011.root" ),
@@ -13954,6 +13969,7 @@ process.hltElePixelHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerPairs" )
 )
@@ -13964,6 +13980,7 @@ process.hltElePixelHitDoubletsForTriplets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerTriplets" )
 )
@@ -15221,6 +15238,7 @@ process.hltIterL3MuonPixelTracksHitDoubletsOpenMu = cms.EDProducer( "HitPairEDPr
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIterL3MuonPixelLayerQuadruplets" )
 )
@@ -15427,6 +15445,7 @@ process.hltIter2IterL3MuonPixelHitDoubletsOpenMu = cms.EDProducer( "HitPairEDPro
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2IterL3MuonPixelLayerTripletsOpenMu" )
 )
@@ -15758,6 +15777,7 @@ process.hltIterL3FromL1MuonPixelTracksHitDoubletsOpenMu = cms.EDProducer( "HitPa
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIterL3FromL1MuonPixelLayerQuadrupletsOpenMu" )
 )
@@ -15973,6 +15993,7 @@ process.hltIter2IterL3FromL1MuonPixelHitDoubletsOpenMu = cms.EDProducer( "HitPai
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2IterL3FromL1MuonPixelLayerTripletsOpenMu" )
 )
@@ -16890,6 +16911,7 @@ process.hltElePixelHitDoubletsUnseeded = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerPairs" )
 )
@@ -16900,6 +16922,7 @@ process.hltElePixelHitDoubletsForTripletsUnseeded = cms.EDProducer( "HitPairEDPr
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerTriplets" )
 )
@@ -19561,6 +19584,7 @@ process.hltPixelTracksHitDoubletsForSeedsJpsi = cms.EDProducer( "HitPairEDProduc
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -19770,6 +19794,7 @@ process.hltIter1DisplacedJpsiPixelHitDoublets = cms.EDProducer( "HitPairEDProduc
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1DisplacedJpsiPixelLayerQuadruplets" )
 )
@@ -20039,6 +20064,7 @@ process.hltIter2DisplacedJpsiPixelHitDoublets = cms.EDProducer( "HitPairEDProduc
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2DisplacedJpsiPixelLayerTriplets" )
 )
@@ -20277,6 +20303,7 @@ process.hltTripletRecoveryPixelHitDoubletsDisplacedJpsiReg = cms.EDProducer( "Hi
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltTripletRecoveryPixelLayerTripletsDisplacedJpsiReg" )
 )
@@ -20519,6 +20546,7 @@ process.hltDoubletRecoveryPixelHitDoubletsDisplacedJpsiReg = cms.EDProducer( "Hi
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayerPairsDisplacedJpsiReg" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -20767,6 +20795,7 @@ process.hltPixelTracksHitDoubletsForSeedsNR = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -20976,6 +21005,7 @@ process.hltIter1DisplacedNRPixelHitDoublets = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1DisplacedNRPixelLayerQuadruplets" )
 )
@@ -21245,6 +21275,7 @@ process.hltIter2DisplacedNRPixelHitDoublets = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2DisplacedNRPixelLayerTriplets" )
 )
@@ -21483,6 +21514,7 @@ process.hltTripletRecoveryPixelHitDoubletsDisplacedNRReg = cms.EDProducer( "HitP
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltTripletRecoveryPixelLayerTripletsDisplacedNRReg" )
 )
@@ -21725,6 +21757,7 @@ process.hltDoubletRecoveryPixelHitDoubletsDisplacedNRReg = cms.EDProducer( "HitP
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayerPairsDisplacedNRReg" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -22025,6 +22058,7 @@ process.hltPixelTracksHitDoubletsForSeedsTau3mu = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -22234,6 +22268,7 @@ process.hltIter1DisplacedTau3muPixelHitDoublets = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1DisplacedTau3muPixelLayerQuadruplets" )
 )
@@ -22503,6 +22538,7 @@ process.hltIter2DisplacedTau3muPixelHitDoublets = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2DisplacedTau3muPixelLayerTriplets" )
 )
@@ -22741,6 +22777,7 @@ process.hltTripletRecoveryPixelHitDoubletsDisplacedTau3muReg = cms.EDProducer( "
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltTripletRecoveryPixelLayerTripletsDisplacedTau3muReg" )
 )
@@ -22983,6 +23020,7 @@ process.hltDoubletRecoveryPixelHitDoubletsDisplacedTau3muReg = cms.EDProducer( "
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayerPairsDisplacedTau3muReg" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -23568,6 +23606,7 @@ process.hltPixelTracksHitDoubletsForSeedsPsiPrime = cms.EDProducer( "HitPairEDPr
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -23777,6 +23816,7 @@ process.hltIter1DisplacedPsiPrimePixelHitDoublets = cms.EDProducer( "HitPairEDPr
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1DisplacedPsiPrimePixelLayerQuadruplets" )
 )
@@ -24046,6 +24086,7 @@ process.hltIter2DisplacedPsiPrimePixelHitDoublets = cms.EDProducer( "HitPairEDPr
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2DisplacedPsiPrimePixelLayerTriplets" )
 )
@@ -24284,6 +24325,7 @@ process.hltTripletRecoveryPixelHitDoubletsDisplacedPsiPrimeReg = cms.EDProducer(
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltTripletRecoveryPixelLayerTripletsDisplacedPsiPrimeReg" )
 )
@@ -24526,6 +24568,7 @@ process.hltDoubletRecoveryPixelHitDoubletsDisplacedPsiPrimeReg = cms.EDProducer(
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayerPairsDisplacedPsiPrimeReg" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -25193,6 +25236,7 @@ process.hltPixelTracksHitDoubletsL3Muon = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -25279,6 +25323,7 @@ process.hltPixelTracksHitDoubletsForSeedsL3Muon = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -25488,6 +25533,7 @@ process.hltIter1L3MuonPixelHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1L3MuonPixelLayerQuadruplets" )
 )
@@ -25757,6 +25803,7 @@ process.hltIter2L3MuonPixelHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2L3MuonPixelLayerTriplets" )
 )
@@ -30976,7 +31023,15 @@ process.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
 process.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     photon_SigmaiEtaiEta_endcap = cms.double( 0.034 ),
     minPtForPostCleaning = cms.double( 20.0 ),
+    electron_protectionsForBadHcal = cms.PSet( 
+      dEta = cms.vdouble( 0.0064, 0.01264 ),
+      dPhi = cms.vdouble( 0.0547, 0.0394 ),
+      enableProtections = cms.bool( False ),
+      eInvPInv = cms.vdouble( 0.184, 0.0721 ),
+      full5x5_sigmaIetaIeta = cms.vdouble( 0.0106, 0.0387 )
+    ),
     pf_nsigma_ECAL = cms.double( 0.0 ),
+    electron_ecalDrivenHademPreselCut = cms.double( 0.15 ),
     GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
     sumPtTrackIsoForPhoton = cms.double( -1.0 ),
     goodPixelTrackDeadHcal_ptErrRel = cms.double( 1.0 ),
@@ -31051,6 +31106,7 @@ process.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     metFactorForCleaning = cms.double( 4.0 ),
     eventFactorForCosmics = cms.double( 10.0 ),
     egammaElectrons = cms.InputTag( "" ),
+    electron_maxElePtForOnlyMVAPresel = cms.double( 50.0 ),
     minEnergyForPunchThrough = cms.double( 100.0 ),
     minTrackerHits = cms.int32( 8 ),
     iCfgCandConnector = cms.PSet( 
@@ -31075,17 +31131,10 @@ process.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     pf_electron_mvaCut = cms.double( -0.1 ),
     ptFactorForHighEta = cms.double( 2.0 ),
     goodPixelTrackDeadHcal_maxPt = cms.double( 50.0 ),
-    sumEtEcalIsoForEgammaSC_endcap = cms.double( 2.0 ),
     dptRel_DispVtx = cms.double( 10.0 ),
     pf_electronID_mvaWeightFile = cms.string( "RecoParticleFlow/PFProducer/data/MVAnalysis_BDT.weights_PfElectrons23Jan_IntToFloat.txt" ),
     goodTrackDeadHcal_chi2n = cms.double( 5.0 ),
-    electron_protectionsForBadHcal = cms.PSet( 
-      dEta = cms.vdouble( 0.0064, 0.01264 ),
-      dPhi = cms.vdouble( 0.0547, 0.0394 ),
-      enableProtections = cms.bool( False ),
-      eInvPInv = cms.vdouble( 0.184, 0.0721 ),
-      full5x5_sigmaIetaIeta = cms.vdouble( 0.0106, 0.0387 )
-    ),
+    sumEtEcalIsoForEgammaSC_endcap = cms.double( 2.0 ),
     goodPixelTrackDeadHcal_dz = cms.double( 0.05 ),
     calibHF_b_EMHAD = cms.vdouble( 1.27541, 0.85361, 0.86333, 0.89091, 0.94348, 0.94348, 0.9437, 1.0034, 1.0444, 1.0444 ),
     pf_GlobC_mvaWeightFile = cms.string( "RecoParticleFlow/PFProducer/data/TMVARegression_BDTG_PFGlobalCorr_14Dec2011.root" ),
@@ -35192,7 +35241,7 @@ process.hltSiPixelClustersRegL1TauSeeded = cms.EDProducer( "SiPixelClusterProduc
     Phase2ReadoutMode = cms.int32( -1 ),
     maxNumberOfClusters = cms.int32( 20000 ),
     ClusterThreshold_L1 = cms.int32( 2000 ),
-    MissCalibrate = cms.untracked.bool( True ),
+    MissCalibrate = cms.bool( True ),
     VCaltoElectronGain = cms.int32( 47 ),
     VCaltoElectronGain_L1 = cms.int32( 50 ),
     VCaltoElectronOffset = cms.int32( -60 ),
@@ -35200,6 +35249,7 @@ process.hltSiPixelClustersRegL1TauSeeded = cms.EDProducer( "SiPixelClusterProduc
     payloadType = cms.string( "HLT" ),
     Phase2Calibration = cms.bool( False ),
     Phase2KinkADC = cms.int32( 8 ),
+    ClusterMode = cms.string( "PixelThresholdClusterizer" ),
     SeedThreshold = cms.int32( 1000 ),
     VCaltoElectronOffset_L1 = cms.int32( -670 ),
     ClusterThreshold = cms.int32( 4000 )
@@ -35273,6 +35323,7 @@ process.hltPixelTracksHitDoubletsRegL1TauSeeded = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadrupletsRegL1TauSeeded" )
 )
@@ -35371,6 +35422,7 @@ process.hltPixelTracksHitDoubletsForTripletsRegL1TauSeeded = cms.EDProducer( "Hi
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerTripletsWithClustersRemovalRegL1TauSeeded" )
 )
@@ -35755,6 +35807,7 @@ process.hltIter1PFlowPixelHitDoubletsTauReg = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1PixelLayerQuadrupletsTauReg" )
 )
@@ -36124,6 +36177,7 @@ process.hltIter2PFlowPixelHitDoubletsTauReg = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2PixelLayerTripletsTauReg" )
 )
@@ -36366,6 +36420,7 @@ process.hltDoubletRecoveryPFlowPixelHitDoubletsTauReg = cms.EDProducer( "HitPair
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayersAndRegionsTauReg" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -36836,7 +36891,15 @@ process.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
 process.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     photon_SigmaiEtaiEta_endcap = cms.double( 0.034 ),
     minPtForPostCleaning = cms.double( 20.0 ),
+    electron_protectionsForBadHcal = cms.PSet( 
+      dEta = cms.vdouble( 0.0064, 0.01264 ),
+      dPhi = cms.vdouble( 0.0547, 0.0394 ),
+      enableProtections = cms.bool( False ),
+      eInvPInv = cms.vdouble( 0.184, 0.0721 ),
+      full5x5_sigmaIetaIeta = cms.vdouble( 0.0106, 0.0387 )
+    ),
     pf_nsigma_ECAL = cms.double( 0.0 ),
+    electron_ecalDrivenHademPreselCut = cms.double( 0.15 ),
     GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
     sumPtTrackIsoForPhoton = cms.double( -1.0 ),
     goodPixelTrackDeadHcal_ptErrRel = cms.double( 1.0 ),
@@ -36911,6 +36974,7 @@ process.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     metFactorForCleaning = cms.double( 4.0 ),
     eventFactorForCosmics = cms.double( 10.0 ),
     egammaElectrons = cms.InputTag( "" ),
+    electron_maxElePtForOnlyMVAPresel = cms.double( 50.0 ),
     minEnergyForPunchThrough = cms.double( 100.0 ),
     minTrackerHits = cms.int32( 8 ),
     iCfgCandConnector = cms.PSet( 
@@ -36935,17 +36999,10 @@ process.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     pf_electron_mvaCut = cms.double( -0.1 ),
     ptFactorForHighEta = cms.double( 2.0 ),
     goodPixelTrackDeadHcal_maxPt = cms.double( 50.0 ),
-    sumEtEcalIsoForEgammaSC_endcap = cms.double( 2.0 ),
     dptRel_DispVtx = cms.double( 10.0 ),
     pf_electronID_mvaWeightFile = cms.string( "RecoParticleFlow/PFProducer/data/MVAnalysis_BDT.weights_PfElectrons23Jan_IntToFloat.txt" ),
     goodTrackDeadHcal_chi2n = cms.double( 5.0 ),
-    electron_protectionsForBadHcal = cms.PSet( 
-      dEta = cms.vdouble( 0.0064, 0.01264 ),
-      dPhi = cms.vdouble( 0.0547, 0.0394 ),
-      enableProtections = cms.bool( False ),
-      eInvPInv = cms.vdouble( 0.184, 0.0721 ),
-      full5x5_sigmaIetaIeta = cms.vdouble( 0.0106, 0.0387 )
-    ),
+    sumEtEcalIsoForEgammaSC_endcap = cms.double( 2.0 ),
     goodPixelTrackDeadHcal_dz = cms.double( 0.05 ),
     calibHF_b_EMHAD = cms.vdouble( 1.27541, 0.85361, 0.86333, 0.89091, 0.94348, 0.94348, 0.9437, 1.0034, 1.0444, 1.0444 ),
     pf_GlobC_mvaWeightFile = cms.string( "RecoParticleFlow/PFProducer/data/TMVARegression_BDTG_PFGlobalCorr_14Dec2011.root" ),
@@ -40794,7 +40851,7 @@ process.hltSiPixelClustersRegForTau = cms.EDProducer( "SiPixelClusterProducer",
     Phase2ReadoutMode = cms.int32( -1 ),
     maxNumberOfClusters = cms.int32( 20000 ),
     ClusterThreshold_L1 = cms.int32( 2000 ),
-    MissCalibrate = cms.untracked.bool( True ),
+    MissCalibrate = cms.bool( True ),
     VCaltoElectronGain = cms.int32( 47 ),
     VCaltoElectronGain_L1 = cms.int32( 50 ),
     VCaltoElectronOffset = cms.int32( -60 ),
@@ -40802,6 +40859,7 @@ process.hltSiPixelClustersRegForTau = cms.EDProducer( "SiPixelClusterProducer",
     payloadType = cms.string( "HLT" ),
     Phase2Calibration = cms.bool( False ),
     Phase2KinkADC = cms.int32( 8 ),
+    ClusterMode = cms.string( "PixelThresholdClusterizer" ),
     SeedThreshold = cms.int32( 1000 ),
     VCaltoElectronOffset_L1 = cms.int32( -670 ),
     ClusterThreshold = cms.int32( 4000 )
@@ -40875,6 +40933,7 @@ process.hltPixelTracksHitDoubletsRegForTau = cms.EDProducer( "HitPairEDProducer"
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadrupletsRegForTau" )
 )
@@ -40973,6 +41032,7 @@ process.hltPixelTracksHitDoubletsForTripletsRegForTau = cms.EDProducer( "HitPair
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerTripletsWithClustersRemovalRegForTau" )
 )
@@ -45214,6 +45274,7 @@ process.hltIter0HighPtTkMuPixelTracksHitDoublets = cms.EDProducer( "HitPairEDPro
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerTriplets" )
 )
@@ -45421,6 +45482,7 @@ process.hltIter2HighPtTkMuPixelHitDoublets = cms.EDProducer( "HitPairEDProducer"
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2HighPtTkMuPixelLayerPairs" )
 )
@@ -49055,7 +49117,7 @@ process.hltSiPixelClustersRegForBTag = cms.EDProducer( "SiPixelClusterProducer",
     Phase2ReadoutMode = cms.int32( -1 ),
     maxNumberOfClusters = cms.int32( 40000 ),
     ClusterThreshold_L1 = cms.int32( 2000 ),
-    MissCalibrate = cms.untracked.bool( True ),
+    MissCalibrate = cms.bool( True ),
     VCaltoElectronGain = cms.int32( 47 ),
     VCaltoElectronGain_L1 = cms.int32( 50 ),
     VCaltoElectronOffset = cms.int32( -60 ),
@@ -49063,6 +49125,7 @@ process.hltSiPixelClustersRegForBTag = cms.EDProducer( "SiPixelClusterProducer",
     payloadType = cms.string( "HLT" ),
     Phase2Calibration = cms.bool( False ),
     Phase2KinkADC = cms.int32( 8 ),
+    ClusterMode = cms.string( "PixelThresholdClusterizer" ),
     SeedThreshold = cms.int32( 1000 ),
     VCaltoElectronOffset_L1 = cms.int32( -670 ),
     ClusterThreshold = cms.int32( 4000 )
@@ -49196,6 +49259,7 @@ process.hltFastPVPixelTracksHitDoublets = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadrupletsRegForBTag" )
 )
@@ -49291,6 +49355,7 @@ process.hltFastPVPixelTracksHitDoubletsRecover = cms.EDProducer( "HitPairEDProdu
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadrupletsRegForBTag" )
 )
@@ -49555,6 +49620,7 @@ process.hltIter1PFlowPixelHitDoubletsForBTag = cms.EDProducer( "HitPairEDProduce
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1PixelLayerQuadrupletsForBTag" )
 )
@@ -49839,6 +49905,7 @@ process.hltIter2PFlowPixelHitDoubletsForBTag = cms.EDProducer( "HitPairEDProduce
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2PixelLayerTripletsForBTag" )
 )
@@ -50078,6 +50145,7 @@ process.hltDoubletRecoveryPFlowPixelHitDoubletsForBTag = cms.EDProducer( "HitPai
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayersAndRegionsForBTag" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -63271,6 +63339,7 @@ process.hltPixelTracksHitDoubletsForSeedsTau3muNoL1Mass = cms.EDProducer( "HitPa
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -63480,6 +63549,7 @@ process.hltIter1DisplacedTau3muNoL1MassPixelHitDoublets = cms.EDProducer( "HitPa
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1DisplacedTau3muNoL1MassPixelLayerQuadruplets" )
 )
@@ -63749,6 +63819,7 @@ process.hltIter2DisplacedTau3muNoL1MassPixelHitDoublets = cms.EDProducer( "HitPa
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2DisplacedTau3muNoL1MassPixelLayerTriplets" )
 )
@@ -63987,6 +64058,7 @@ process.hltTripletRecoveryPixelHitDoubletsDisplacedTau3muNoL1MassReg = cms.EDPro
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltTripletRecoveryPixelLayerTripletsDisplacedTau3muNoL1MassReg" )
 )
@@ -64229,6 +64301,7 @@ process.hltDoubletRecoveryPixelHitDoubletsDisplacedTau3muNoL1MassReg = cms.EDPro
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayerPairsDisplacedTau3muNoL1MassReg" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
@@ -66143,6 +66216,7 @@ process.hltDisplacedhltIter4PFlowPixelLessHitDoublets = cms.EDProducer( "HitPair
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltDisplacedhltIter4PixelLessLayerTriplets" )
 )
@@ -71254,6 +71328,7 @@ process.hltIterL3MuonPixelTracksHitDoubletsNoVtx = cms.EDProducer( "HitPairEDPro
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIterL3MuonPixelLayerQuadrupletsNoVtx" )
 )
@@ -71469,6 +71544,7 @@ process.hltIter2IterL3MuonPixelHitDoubletsNoVtx = cms.EDProducer( "HitPairEDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2IterL3MuonPixelLayerTripletsNoVtx" )
 )
@@ -71800,6 +71876,7 @@ process.hltIterL3FromL1MuonPixelTracksHitDoubletsNoVtx = cms.EDProducer( "HitPai
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIterL3FromL1MuonPixelLayerQuadrupletsNoVtx" )
 )
@@ -72015,6 +72092,7 @@ process.hltIter2IterL3FromL1MuonPixelHitDoubletsNoVtx = cms.EDProducer( "HitPair
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2IterL3FromL1MuonPixelLayerTripletsNoVtx" )
 )
@@ -76829,6 +76907,7 @@ process.hltPixelTracksHitDoubletsForNoPU = cms.EDProducer( "HitPairEDProducer",
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadrupletsRegForBTag" )
 )
@@ -77472,6 +77551,7 @@ process.hltPixelTracksHitDoubletsL3MuonNoVtx = cms.EDProducer( "HitPairEDProduce
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -77547,6 +77627,7 @@ process.hltPixelTracksHitDoubletsForSeedsL3MuonNoVtx = cms.EDProducer( "HitPairE
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -77747,6 +77828,7 @@ process.hltIter1L3MuonPixelHitDoubletsNoVtx = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1L3MuonPixelLayerQuadrupletsNoVtx" )
 )
@@ -78007,6 +78089,7 @@ process.hltIter2L3MuonPixelHitDoubletsNoVtx = cms.EDProducer( "HitPairEDProducer
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2L3MuonPixelLayerTripletsNoVtx" )
 )
@@ -84913,6 +84996,7 @@ process.hltPixelTracksHitDoubletsForSeedsJpsiDoubleTrk = cms.EDProducer( "HitPai
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltPixelLayerQuadruplets" )
 )
@@ -85113,6 +85197,7 @@ process.hltIter1DisplacedJpsiPixelHitDoubletsDoubleTrk = cms.EDProducer( "HitPai
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter1DisplacedJpsiPixelLayerQuadrupletsDoubleTrk" )
 )
@@ -85373,6 +85458,7 @@ process.hltIter2DisplacedJpsiPixelHitDoubletsDoubleTrk = cms.EDProducer( "HitPai
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltIter2DisplacedJpsiPixelLayerTripletsDoubleTrk" )
 )
@@ -85611,6 +85697,7 @@ process.hltTripletRecoveryPixelHitDoubletsDisplacedJpsiRegDoubleTrk = cms.EDProd
     produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "hltTripletRecoveryPixelLayerTripletsDisplacedJpsiRegDoubleTrk" )
 )
@@ -85853,6 +85940,7 @@ process.hltDoubletRecoveryPixelHitDoubletsDisplacedJpsiRegDoubleTrk = cms.EDProd
     produceSeedingHitSets = cms.bool( True ),
     produceIntermediateHitDoublets = cms.bool( False ),
     trackingRegionsSeedingLayers = cms.InputTag( "hltDoubletRecoveryPixelLayerPairsDisplacedJpsiRegDoubleTrk" ),
+    maxElementTotal = cms.uint32( 50000000 ),
     maxElement = cms.uint32( 0 ),
     seedingLayers = cms.InputTag( "" )
 )
