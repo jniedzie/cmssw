@@ -11,18 +11,18 @@ def submit(config):
         fi.write(config.pythonise_())
 
 samples = [
-    ("/RelValQCD_FlatPt_15_3000HS_13/CMSSW_10_5_0_pre1-103X_mc2017_realistic_v2_HS-v1/GEN-SIM-DIGI-RAW", "QCD_FlatPt_noPU"),
-    ("/RelValQCD_FlatPt_15_3000HS_13/CMSSW_10_5_0_pre1-PU25ns_103X_mc2017_realistic_v2_HSresub-v1/GEN-SIM-DIGI-RAW", "QCD_FlatPt_PU25ns"),
-    ("/RelValZMM_13/CMSSW_10_5_0_pre1-103X_mc2017_realistic_v2-v1/GEN-SIM-DIGI-RAW", "ZMM"),
-    ("/RelValMinBias_13/CMSSW_10_5_0_pre1-103X_mc2017_realistic_v2-v1/GEN-SIM-DIGI-RAW", "MinBias"),
-    ("/RelValNuGun/CMSSW_10_5_0_pre1-PU25ns_103X_mc2017_realistic_v2_HS-v1/GEN-SIM-DIGI-RAW", "NuGun"),
+    ("/RelValQCD_FlatPt_15_3000HS_13/CMSSW_10_5_0_pre1-103X_upgrade2018_realistic_v8-v1/GEN-SIM-DIGI-RAW", "QCD_FlatPt_noPU_2018"),
+    ("/RelValQCD_FlatPt_15_3000HS_13/CMSSW_10_5_0_pre1-PU25ns_103X_upgrade2018_realistic_v8-v1/GEN-SIM-DIGI-RAW", "QCD_FlatPt_PU25ns_2018"),
+    ("/RelValZMM_13/CMSSW_10_5_0_pre1-103X_upgrade2018_realistic_v8-v1/GEN-SIM-DIGI-RAW", "ZMM_2018"),
+    ("/RelValMinBias_13/CMSSW_10_5_0_pre1-103X_upgrade2018_realistic_v8-v1/GEN-SIM-DIGI-RAW", "MinBias_2018"),
+    ("/RelValNuGun/CMSSW_10_5_0_pre1-PU25ns_103X_upgrade2018_realistic_v8-v1/GEN-SIM-DIGI-RAW", "NuGun_2018"),
 ]
 
 if __name__ == "__main__":
     for dataset, name in samples:
 
-        if os.path.isfile("step3_dump.pyc"):
-            os.remove("step3_dump.pyc")
+        if os.path.isfile("step3_2018_dump.pyc"):
+            os.remove("step3_2018_dump.pyc")
  
         conf = config()
         
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         conf.General.transferLogs = True
         conf.General.workArea = 'crab_projects'
         conf.JobType.pluginName = 'Analysis'
-        conf.JobType.psetName = 'step3_dump.py'
+        conf.JobType.psetName = 'step3_2018_dump.py'
         conf.JobType.maxJobRuntimeMin = 4*60
         conf.JobType.allowUndistributedCMSSW = True
         conf.JobType.outputFiles = ["step3_inMINIAODSIM.root"]
