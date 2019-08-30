@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_0_0/HLT --type FULL
 
-# /dev/CMSSW_11_0_0/HLT/V6 (CMSSW_11_0_0_pre4)
+# /dev/CMSSW_11_0_0/HLT/V8 (CMSSW_11_0_0_pre6)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_0_0/HLT/V6')
+  tableName = cms.string('/dev/CMSSW_11_0_0/HLT/V8')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -7505,7 +7505,7 @@ fragment.hltESPLowPtTripletStepTrajectoryCleanerBySharedHits = cms.ESProducer( "
 fragment.hltESPMeasurementTracker = cms.ESProducer( "MeasurementTrackerESProducer",
   UseStripStripQualityDB = cms.bool( True ),
   StripCPE = cms.string( "hltESPStripCPEfromTrackAngle" ),
-  UsePixelROCQualityDB = cms.bool( True ),
+  appendToDataLabel = cms.string( "" ),
   DebugPixelROCQualityDB = cms.untracked.bool( False ),
   UseStripAPVFiberQualityDB = cms.bool( True ),
   badStripCuts = cms.PSet( 
@@ -7528,15 +7528,17 @@ fragment.hltESPMeasurementTracker = cms.ESProducer( "MeasurementTrackerESProduce
   ),
   DebugStripModuleQualityDB = cms.untracked.bool( False ),
   ComponentName = cms.string( "hltESPMeasurementTracker" ),
-  DebugPixelModuleQualityDB = cms.untracked.bool( False ),
+  UsePixelROCQualityDB = cms.bool( True ),
   UsePixelModuleQualityDB = cms.bool( True ),
   DebugStripAPVFiberQualityDB = cms.untracked.bool( False ),
   HitMatcher = cms.string( "StandardMatcher" ),
   DebugStripStripQualityDB = cms.untracked.bool( False ),
-  PixelCPE = cms.string( "hltESPPixelCPEGeneric" ),
+  DebugPixelModuleQualityDB = cms.untracked.bool( False ),
+  MaskBadAPVFibers = cms.bool( True ),
   SiStripQualityLabel = cms.string( "" ),
   UseStripModuleQualityDB = cms.bool( True ),
-  MaskBadAPVFibers = cms.bool( True )
+  PixelCPE = cms.string( "hltESPPixelCPEGeneric" ),
+  Phase2StripCPE = cms.string( "" )
 )
 fragment.hltESPMixedStepClusterShapeHitFilter = cms.ESProducer( "ClusterShapeHitFilterESProducer",
   ComponentName = cms.string( "hltESPMixedStepClusterShapeHitFilter" ),
@@ -8241,16 +8243,18 @@ fragment.hltEcalRecHit = cms.EDProducer( "EcalRecHitProducer",
     dbStatusToBeExcludedEB = cms.vint32( 14, 78, 142 ),
     EEuncalibRecHitCollection = cms.InputTag( 'hltEcalUncalibRecHit','EcalUncalibRecHitsEE' ),
     EBLaserMAX = cms.double( 3.0 ),
-    EELaserMIN = cms.double( 0.5 ),
+    bdtWeightFileNoCracks = cms.FileInPath( "RecoLocalCalo/EcalDeadChannelRecoveryAlgos/data/BDTWeights/bdtgAllRH_8GT700MeV_noCracks_ZskimData2017_v1.xml" ),
     ebFEToBeRecovered = cms.InputTag( 'hltEcalDetIdToBeRecovered','ebFE' ),
     EELaserMAX = cms.double( 8.0 ),
     recoverEEIsolatedChannels = cms.bool( False ),
     eeDetIdToBeRecovered = cms.InputTag( 'hltEcalDetIdToBeRecovered','eeDetId' ),
     recoverEBFE = cms.bool( True ),
+    sum8ChannelRecoveryThreshold = cms.double( 0.0 ),
     algo = cms.string( "EcalRecHitWorkerSimple" ),
     ebDetIdToBeRecovered = cms.InputTag( 'hltEcalDetIdToBeRecovered','ebDetId' ),
     singleChannelRecoveryThreshold = cms.double( 8.0 ),
     ChannelStatusToBeExcluded = cms.vstring(  ),
+    bdtWeightFileCracks = cms.FileInPath( "RecoLocalCalo/EcalDeadChannelRecoveryAlgos/data/BDTWeights/bdtgAllRH_8GT700MeV_onlyCracks_ZskimData2017_v1.xml" ),
     EBrechitCollection = cms.string( "EcalRecHitsEB" ),
     singleChannelRecoveryMethod = cms.string( "NeuralNetworks" ),
     recoverEEFE = cms.bool( True ),
@@ -8270,6 +8274,7 @@ fragment.hltEcalRecHit = cms.EDProducer( "EcalRecHitProducer",
         'kFixedG1' ),
       kTowerRecovered = cms.vstring( 'kDeadFE' )
     ),
+    EELaserMIN = cms.double( 0.5 ),
     EBuncalibRecHitCollection = cms.InputTag( 'hltEcalUncalibRecHit','EcalUncalibRecHitsEB' ),
     skipTimeCalib = cms.bool( True ),
     algoRecover = cms.string( "EcalRecHitWorkerRecover" ),
