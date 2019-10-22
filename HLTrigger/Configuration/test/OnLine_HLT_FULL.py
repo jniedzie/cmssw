@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_0_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run2_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_11_0_0/HLT/V19 (CMSSW_11_0_0_pre9)
+# /dev/CMSSW_11_0_0/HLT/V20 (CMSSW_11_0_0_pre9)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_0_0/HLT/V19')
+  tableName = cms.string('/dev/CMSSW_11_0_0/HLT/V20')
 )
 
 process.transferSystem = cms.PSet( 
@@ -13739,7 +13739,7 @@ process.hltParticleFlowClusterHCAL = cms.EDProducer( "PFMultiDepthClusterProduce
         algoName = cms.string( "Basic2DGenericPFlowPositionCalc" ),
         minFractionInCalc = cms.double( 1.0E-9 ),
         logWeightDenominatorByDetector = cms.VPSet( 
-          cms.PSet(  depths = cms.vuint32( 1, 2, 3, 4 ),
+          cms.PSet(  depths = cms.vint32( 1, 2, 3, 4 ),
             detector = cms.string( "HCAL_BARREL1" ),
             logWeightDenominator = cms.vdouble( 0.1, 0.2, 0.3, 0.3 )
           ),
