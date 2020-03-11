@@ -1,13 +1,13 @@
-# hltGetConfiguration --cff --data /frozen/2018/110X/HLT --type 2018
+# hltGetConfiguration --cff --data /frozen/2018/111X/HLT --type 2018
 
-# /frozen/2018/110X/HLT/V3 (CMSSW_11_0_0_pre12)
+# /frozen/2018/111X/HLT/V3 (CMSSW_11_1_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2018/110X/HLT/V3')
+  tableName = cms.string('/frozen/2018/111X/HLT/V3')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -6688,15 +6688,7 @@ fragment.preshowerDetIdAssociator = cms.ESProducer( "DetIdAssociatorESProducer",
   includeGEM = cms.bool( False )
 )
 fragment.siPixelQualityESProducer = cms.ESProducer( "SiPixelQualityESProducer",
-  siPixelQualityLabel = cms.string( "" ),
-  ListOfRecordToMerge = cms.VPSet( 
-    cms.PSet(  record = cms.string( "SiPixelQualityFromDbRcd" ),
-      tag = cms.string( "" )
-    ),
-    cms.PSet(  record = cms.string( "SiPixelDetVOffRcd" ),
-      tag = cms.string( "" )
-    )
-  )
+  siPixelQualityLabel = cms.string( "" )
 )
 fragment.siPixelTemplateDBObjectESProducer = cms.ESProducer( "SiPixelTemplateDBObjectESProducer" )
 fragment.siStripBackPlaneCorrectionDepESProducer = cms.ESProducer( "SiStripBackPlaneCorrectionDepESProducer",
@@ -8579,6 +8571,7 @@ fragment.hltIterL3MuonTrimmedPixelVertices = cms.EDProducer( "PixelVertexCollect
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0IterL3MuonPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -9356,6 +9349,7 @@ fragment.hltIterL3FromL1MuonTrimmedPixelVertices = cms.EDProducer( "PixelVertexC
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -10462,6 +10456,7 @@ fragment.hltTrimmedPixelVertices = cms.EDProducer( "PixelVertexCollectionTrimmer
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0PFLowPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -10666,6 +10661,7 @@ fragment.hltIter1PixelTracks = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltIter1PFlowPixelHitQuadruplets" )
 )
 fragment.hltIter1PFLowPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -11918,6 +11914,8 @@ fragment.hltParticleFlowClusterECALUncorrectedUnseeded = cms.EDProducer( "PFClus
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -11976,6 +11974,8 @@ fragment.hltParticleFlowClusterPSUnseeded = cms.EDProducer( "PFClusterProducer",
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( False )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -12079,6 +12079,8 @@ fragment.hltParticleFlowClusterHBHE = cms.EDProducer( "PFClusterProducer",
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -12165,6 +12167,8 @@ fragment.hltParticleFlowClusterHF = cms.EDProducer( "PFClusterProducer",
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( False )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -12206,7 +12210,9 @@ fragment.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
       ),
       cms.PSet(  linkType = cms.string( "TRACK:HCAL" ),
         useKDTree = cms.bool( True ),
-        linkerName = cms.string( "TrackAndHCALLinker" )
+        linkerName = cms.string( "TrackAndHCALLinker" ),
+        trajectoryLayerEntrance = cms.string( "HCALEntrance" ),
+        trajectoryLayerExit = cms.string( "HCALExit" )
       ),
       cms.PSet(  linkType = cms.string( "ECAL:HCAL" ),
         useKDTree = cms.bool( False ),
@@ -12294,12 +12300,13 @@ fragment.hltParticleFlow = cms.EDProducer( "PFProducer",
     verbose = cms.untracked.bool( False ),
     pf_nsigma_ECAL = cms.double( 0.0 ),
     usePFConversions = cms.bool( False ),
-    goodPixelTrackDeadHcal_maxLost4Hit = cms.int32( 1 ),
+    GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
     useCalibrationsFromDB = cms.bool( True ),
+    resolHF_square = cms.vdouble( 7.834401, 0.012996, 0.0 ),
     goodPixelTrackDeadHcal_ptErrRel = cms.double( 1.0 ),
     goodTrackDeadHcal_validFr = cms.double( 0.5 ),
     postMuonCleaning = cms.bool( True ),
-    egammaElectrons = cms.InputTag( "" ),
+    calibrationsLabel = cms.string( "HLT" ),
     muon_HO = cms.vdouble( 0.9, 0.9 ),
     postHFCleaning = cms.bool( False ),
     factors_45 = cms.vdouble( 10.0, 100.0 ),
@@ -12311,7 +12318,7 @@ fragment.hltParticleFlow = cms.EDProducer( "PFProducer",
     ),
     rejectTracks_Bad = cms.bool( False ),
     vertexCollection = cms.InputTag( "hltPixelVertices" ),
-    calibrationsLabel = cms.string( "HLT" ),
+    egammaElectrons = cms.InputTag( "" ),
     calibHF_a_EMonly = cms.vdouble( 0.96945, 0.96701, 0.76309, 0.82268, 0.87583, 0.89718, 0.98674, 1.4681, 1.458, 1.458 ),
     dptRel_DispVtx = cms.double( 10.0 ),
     muons = cms.InputTag( "hltMuons" ),
@@ -12322,6 +12329,7 @@ fragment.hltParticleFlow = cms.EDProducer( "PFProducer",
     blocks = cms.InputTag( "hltParticleFlowBlock" ),
     goodTrackDeadHcal_ptErrRel = cms.double( 0.2 ),
     useEGammaFilters = cms.bool( False ),
+    pf_nsigma_HFHAD = cms.double( 1.0 ),
     useEGammaElectrons = cms.bool( False ),
     useHO = cms.bool( False ),
     nsigma_TRACK = cms.double( 1.0 ),
@@ -12378,19 +12386,13 @@ fragment.hltParticleFlow = cms.EDProducer( "PFProducer",
     goodTrackDeadHcal_dxy = cms.double( 0.5 ),
     goodPixelTrackDeadHcal_dz = cms.double( 0.05 ),
     PFEGammaCandidates = cms.InputTag( "particleFlowEGamma" ),
-    goodTrackDeadHcal_layers = cms.uint32( 4 ),
+    pf_nsigma_HFEM = cms.double( 1.0 ),
     usePFDecays = cms.bool( False ),
     calibHF_b_EMHAD = cms.vdouble( 1.27541, 0.85361, 0.86333, 0.89091, 0.94348, 0.94348, 0.9437, 1.0034, 1.0444, 1.0444 ),
     rejectTracks_Step45 = cms.bool( False ),
-    GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
-    PFHFCleaningParameters = cms.PSet( 
-      minSignificance = cms.double( 2.5 ),
-      maxSignificance = cms.double( 2.5 ),
-      minDeltaMet = cms.double( 0.4 ),
-      maxDeltaPhiPt = cms.double( 7.0 ),
-      minHFCleaningPt = cms.double( 5.0 ),
-      minSignificanceReduction = cms.double( 1.4 )
-    ),
+    goodPixelTrackDeadHcal_maxLost4Hit = cms.int32( 1 ),
+    calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
+    goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
@@ -12400,7 +12402,14 @@ fragment.hltParticleFlow = cms.EDProducer( "PFProducer",
     pt_Error = cms.double( 1.0 ),
     debug = cms.untracked.bool( False ),
     useProtectionsForJetMET = cms.bool( True ),
-    calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 )
+    PFHFCleaningParameters = cms.PSet( 
+      minSignificance = cms.double( 2.5 ),
+      maxSignificance = cms.double( 2.5 ),
+      minDeltaMet = cms.double( 0.4 ),
+      maxDeltaPhiPt = cms.double( 7.0 ),
+      minHFCleaningPt = cms.double( 5.0 ),
+      minSignificanceReduction = cms.double( 1.4 )
+    )
 )
 fragment.hltAK8PFJets = cms.EDProducer( "FastjetJetProducer",
     Active_Area_Repeats = cms.int32( 5 ),
@@ -13338,6 +13347,8 @@ fragment.hltParticleFlowClusterPSL1Seeded = cms.EDProducer( "PFClusterProducer",
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( False )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -13458,6 +13469,8 @@ fragment.hltParticleFlowClusterECALUncorrectedL1Seeded = cms.EDProducer( "PFClus
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -13740,7 +13753,9 @@ fragment.hltPixelLayerTriplets = cms.EDProducer( "SeedingLayersEDProducer",
     TIB = cms.PSet(  )
 )
 fragment.hltEgammaSuperClustersToPixelMatch = cms.EDProducer( "EgammaHLTFilteredSuperClusterProducer",
+    minEtCutEB = cms.double( 0.0 ),
     cands = cms.InputTag( "hltEgammaCandidates" ),
+    minEtCutEE = cms.double( 0.0 ),
     cuts = cms.VPSet( 
       cms.PSet(  endcapCut = cms.PSet( 
   useEt = cms.bool( False ),
@@ -15105,6 +15120,7 @@ fragment.hltIterL3MuonTrimmedPixelVerticesOpenMu = cms.EDProducer( "PixelVertexC
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0IterL3MuonPixelSeedsFromPixelTracksOpenMu = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -15644,6 +15660,7 @@ fragment.hltIterL3FromL1MuonTrimmedPixelVerticesOpenMu = cms.EDProducer( "PixelV
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracksOpenMu = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -16689,7 +16706,9 @@ fragment.hltDiEG25CaloIdLClusterShapeUnseededFilter = cms.EDFilter( "HLTEgammaGe
     rhoScale = cms.double( 1.0 )
 )
 fragment.hltEgammaSuperClustersToPixelMatchUnseeded = cms.EDProducer( "EgammaHLTFilteredSuperClusterProducer",
+    minEtCutEB = cms.double( 0.0 ),
     cands = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
+    minEtCutEE = cms.double( 0.0 ),
     cuts = cms.VPSet( 
       cms.PSet(  endcapCut = cms.PSet( 
   useEt = cms.bool( False ),
@@ -17644,6 +17663,8 @@ fragment.hltParticleFlowClusterHBHEForEgamma = cms.EDProducer( "PFClusterProduce
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -18700,6 +18721,7 @@ fragment.hltL3fL1sMu16orMu25L1f0L2f25L3Filtered37 = cms.EDFilter( "HLTMuonTrkL1T
     allowedTypeMask = cms.uint32( 255 )
 )
 fragment.hltMuTrackSeeds = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 1.0E9 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -19444,6 +19466,7 @@ fragment.hltPixelTracksForSeedsJpsi = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsJpsi" )
 )
 fragment.hltIter0DisplacedJpsiPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -20655,6 +20678,7 @@ fragment.hltPixelTracksForSeedsNR = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsNR" )
 )
 fragment.hltIter0DisplacedNRPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -21918,6 +21942,7 @@ fragment.hltPixelTracksForSeedsTau3mu = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsTau3mu" )
 )
 fragment.hltIter0DisplacedTau3muPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -23473,6 +23498,7 @@ fragment.hltPixelTracksForSeedsPsiPrime = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsPsiPrime" )
 )
 fragment.hltIter0DisplacedPsiPrimePixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -25190,6 +25216,7 @@ fragment.hltPixelTracksForSeedsL3Muon = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsL3Muon" )
 )
 fragment.hltIter0L3MuonPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -30818,7 +30845,9 @@ fragment.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
       ),
       cms.PSet(  linkType = cms.string( "TRACK:HCAL" ),
         useKDTree = cms.bool( True ),
-        linkerName = cms.string( "TrackAndHCALLinker" )
+        linkerName = cms.string( "TrackAndHCALLinker" ),
+        trajectoryLayerEntrance = cms.string( "HCALEntrance" ),
+        trajectoryLayerExit = cms.string( "HCALExit" )
       ),
       cms.PSet(  linkType = cms.string( "ECAL:HCAL" ),
         useKDTree = cms.bool( False ),
@@ -30906,12 +30935,13 @@ fragment.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     verbose = cms.untracked.bool( False ),
     pf_nsigma_ECAL = cms.double( 0.0 ),
     usePFConversions = cms.bool( False ),
-    goodPixelTrackDeadHcal_maxLost4Hit = cms.int32( 1 ),
+    GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
     useCalibrationsFromDB = cms.bool( True ),
+    resolHF_square = cms.vdouble( 7.834401, 0.012996, 0.0 ),
     goodPixelTrackDeadHcal_ptErrRel = cms.double( 1.0 ),
     goodTrackDeadHcal_validFr = cms.double( 0.5 ),
     postMuonCleaning = cms.bool( True ),
-    egammaElectrons = cms.InputTag( "" ),
+    calibrationsLabel = cms.string( "HLT" ),
     muon_HO = cms.vdouble( 0.9, 0.9 ),
     postHFCleaning = cms.bool( False ),
     factors_45 = cms.vdouble( 10.0, 100.0 ),
@@ -30923,7 +30953,7 @@ fragment.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     ),
     rejectTracks_Bad = cms.bool( False ),
     vertexCollection = cms.InputTag( "hltPixelVertices" ),
-    calibrationsLabel = cms.string( "HLT" ),
+    egammaElectrons = cms.InputTag( "" ),
     calibHF_a_EMonly = cms.vdouble( 0.96945, 0.96701, 0.76309, 0.82268, 0.87583, 0.89718, 0.98674, 1.4681, 1.458, 1.458 ),
     dptRel_DispVtx = cms.double( 10.0 ),
     muons = cms.InputTag( "hltMuons" ),
@@ -30934,6 +30964,7 @@ fragment.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     blocks = cms.InputTag( "hltParticleFlowBlockForTaus" ),
     goodTrackDeadHcal_ptErrRel = cms.double( 0.2 ),
     useEGammaFilters = cms.bool( False ),
+    pf_nsigma_HFHAD = cms.double( 1.0 ),
     useEGammaElectrons = cms.bool( False ),
     useHO = cms.bool( False ),
     nsigma_TRACK = cms.double( 1.0 ),
@@ -30990,19 +31021,13 @@ fragment.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     goodTrackDeadHcal_dxy = cms.double( 0.5 ),
     goodPixelTrackDeadHcal_dz = cms.double( 0.05 ),
     PFEGammaCandidates = cms.InputTag( "particleFlowEGamma" ),
-    goodTrackDeadHcal_layers = cms.uint32( 4 ),
+    pf_nsigma_HFEM = cms.double( 1.0 ),
     usePFDecays = cms.bool( False ),
     calibHF_b_EMHAD = cms.vdouble( 1.27541, 0.85361, 0.86333, 0.89091, 0.94348, 0.94348, 0.9437, 1.0034, 1.0444, 1.0444 ),
     rejectTracks_Step45 = cms.bool( False ),
-    GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
-    PFHFCleaningParameters = cms.PSet( 
-      minSignificance = cms.double( 2.5 ),
-      maxSignificance = cms.double( 2.5 ),
-      minDeltaMet = cms.double( 0.4 ),
-      maxDeltaPhiPt = cms.double( 7.0 ),
-      minHFCleaningPt = cms.double( 5.0 ),
-      minSignificanceReduction = cms.double( 1.4 )
-    ),
+    goodPixelTrackDeadHcal_maxLost4Hit = cms.int32( 1 ),
+    calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
+    goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
@@ -31012,7 +31037,14 @@ fragment.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     pt_Error = cms.double( 1.0 ),
     debug = cms.untracked.bool( False ),
     useProtectionsForJetMET = cms.bool( True ),
-    calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 )
+    PFHFCleaningParameters = cms.PSet( 
+      minSignificance = cms.double( 2.5 ),
+      maxSignificance = cms.double( 2.5 ),
+      minDeltaMet = cms.double( 0.4 ),
+      maxDeltaPhiPt = cms.double( 7.0 ),
+      minHFCleaningPt = cms.double( 5.0 ),
+      minSignificanceReduction = cms.double( 1.4 )
+    )
 )
 fragment.hltAK4PFJetsForTaus = cms.EDProducer( "FastjetJetProducer",
     Active_Area_Repeats = cms.int32( 5 ),
@@ -33805,6 +33837,8 @@ fragment.hltParticleFlowClusterECALUncorrectedForMuonsMF = cms.EDProducer( "PFCl
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -33863,6 +33897,8 @@ fragment.hltParticleFlowClusterPSForMuons = cms.EDProducer( "PFClusterProducer",
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( False )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -34052,6 +34088,8 @@ fragment.hltParticleFlowClusterHBHERegForMuons = cms.EDProducer( "PFClusterProdu
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -35389,6 +35427,7 @@ fragment.hltSingleL2IsoTau26eta2p2 = cms.EDFilter( "HLT1CaloJet",
     MaxMass = cms.double( -1.0 )
 )
 fragment.hltIter0PFLowPixelSeedsFromPixelTracksTauReg = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -36718,7 +36757,9 @@ fragment.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
       ),
       cms.PSet(  linkType = cms.string( "TRACK:HCAL" ),
         useKDTree = cms.bool( True ),
-        linkerName = cms.string( "TrackAndHCALLinker" )
+        linkerName = cms.string( "TrackAndHCALLinker" ),
+        trajectoryLayerEntrance = cms.string( "HCALEntrance" ),
+        trajectoryLayerExit = cms.string( "HCALExit" )
       ),
       cms.PSet(  linkType = cms.string( "ECAL:HCAL" ),
         useKDTree = cms.bool( False ),
@@ -36806,12 +36847,13 @@ fragment.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     verbose = cms.untracked.bool( False ),
     pf_nsigma_ECAL = cms.double( 0.0 ),
     usePFConversions = cms.bool( False ),
-    goodPixelTrackDeadHcal_maxLost4Hit = cms.int32( 1 ),
+    GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
     useCalibrationsFromDB = cms.bool( True ),
+    resolHF_square = cms.vdouble( 7.834401, 0.012996, 0.0 ),
     goodPixelTrackDeadHcal_ptErrRel = cms.double( 1.0 ),
     goodTrackDeadHcal_validFr = cms.double( 0.5 ),
     postMuonCleaning = cms.bool( True ),
-    egammaElectrons = cms.InputTag( "" ),
+    calibrationsLabel = cms.string( "HLT" ),
     muon_HO = cms.vdouble( 0.9, 0.9 ),
     postHFCleaning = cms.bool( False ),
     factors_45 = cms.vdouble( 10.0, 100.0 ),
@@ -36823,7 +36865,7 @@ fragment.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     ),
     rejectTracks_Bad = cms.bool( False ),
     vertexCollection = cms.InputTag( "hltPixelVertices" ),
-    calibrationsLabel = cms.string( "HLT" ),
+    egammaElectrons = cms.InputTag( "" ),
     calibHF_a_EMonly = cms.vdouble( 0.96945, 0.96701, 0.76309, 0.82268, 0.87583, 0.89718, 0.98674, 1.4681, 1.458, 1.458 ),
     dptRel_DispVtx = cms.double( 10.0 ),
     muons = cms.InputTag( "hltMuonsReg" ),
@@ -36834,6 +36876,7 @@ fragment.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     blocks = cms.InputTag( "hltParticleFlowBlockReg" ),
     goodTrackDeadHcal_ptErrRel = cms.double( 0.2 ),
     useEGammaFilters = cms.bool( False ),
+    pf_nsigma_HFHAD = cms.double( 1.0 ),
     useEGammaElectrons = cms.bool( False ),
     useHO = cms.bool( False ),
     nsigma_TRACK = cms.double( 1.0 ),
@@ -36890,19 +36933,13 @@ fragment.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     goodTrackDeadHcal_dxy = cms.double( 0.5 ),
     goodPixelTrackDeadHcal_dz = cms.double( 0.05 ),
     PFEGammaCandidates = cms.InputTag( "particleFlowEGamma" ),
-    goodTrackDeadHcal_layers = cms.uint32( 4 ),
+    pf_nsigma_HFEM = cms.double( 1.0 ),
     usePFDecays = cms.bool( False ),
     calibHF_b_EMHAD = cms.vdouble( 1.27541, 0.85361, 0.86333, 0.89091, 0.94348, 0.94348, 0.9437, 1.0034, 1.0444, 1.0444 ),
     rejectTracks_Step45 = cms.bool( False ),
-    GedPhotonValueMap = cms.InputTag( 'tmpGedPhotons','valMapPFEgammaCandToPhoton' ),
-    PFHFCleaningParameters = cms.PSet( 
-      minSignificance = cms.double( 2.5 ),
-      maxSignificance = cms.double( 2.5 ),
-      minDeltaMet = cms.double( 0.4 ),
-      maxDeltaPhiPt = cms.double( 7.0 ),
-      minHFCleaningPt = cms.double( 5.0 ),
-      minSignificanceReduction = cms.double( 1.4 )
-    ),
+    goodPixelTrackDeadHcal_maxLost4Hit = cms.int32( 1 ),
+    calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
+    goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
@@ -36912,7 +36949,14 @@ fragment.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     pt_Error = cms.double( 1.0 ),
     debug = cms.untracked.bool( False ),
     useProtectionsForJetMET = cms.bool( True ),
-    calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 )
+    PFHFCleaningParameters = cms.PSet( 
+      minSignificance = cms.double( 2.5 ),
+      maxSignificance = cms.double( 2.5 ),
+      minDeltaMet = cms.double( 0.4 ),
+      maxDeltaPhiPt = cms.double( 7.0 ),
+      minHFCleaningPt = cms.double( 5.0 ),
+      minSignificanceReduction = cms.double( 1.4 )
+    )
 )
 fragment.hltAK4PFJetsReg = cms.EDProducer( "FastjetJetProducer",
     Active_Area_Repeats = cms.int32( 5 ),
@@ -45220,6 +45264,7 @@ fragment.hltIter0HighPtTkMuPixelTracks = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltIter0HighPtTkMuPixelTracksHitTriplets" )
 )
 fragment.hltIter0HighPtTkMuPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -49368,6 +49413,7 @@ fragment.hltSiStripClustersRegForBTag = cms.EDProducer( "MeasurementTrackerEvent
     stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" )
 )
 fragment.hltIter0PFLowPixelSeedsFromPixelTracksForBTag = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -49578,6 +49624,7 @@ fragment.hltIter1PixelTracksForBTag = cms.EDProducer( "PixelTrackProducer",
     SeedingHitSets = cms.InputTag( "hltIter1PFlowPixelHitQuadrupletsForBTag" )
 )
 fragment.hltIter1PFLowPixelSeedsFromPixelTracksForBTag = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -63306,6 +63353,7 @@ fragment.hltPixelTracksForSeedsTau3muNoL1Mass = cms.EDProducer( "PixelTrackProdu
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsTau3muNoL1Mass" )
 )
 fragment.hltIter0DisplacedTau3muNoL1MassPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -67794,6 +67842,8 @@ fragment.hltParticleFlowClusterHBHEForEgammaUnseeded = cms.EDProducer( "PFCluste
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -67879,6 +67929,8 @@ fragment.hltParticleFlowClusterHFForEgammaUnseeded = cms.EDProducer( "PFClusterP
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( False )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -71316,6 +71368,7 @@ fragment.hltIterL3MuonTrimmedPixelVerticesNoVtx = cms.EDProducer( "PixelVertexCo
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0IterL3MuonPixelSeedsFromPixelTracksNoVtx = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -71864,6 +71917,7 @@ fragment.hltIterL3FromL1MuonTrimmedPixelVerticesNoVtx = cms.EDProducer( "PixelVe
     maxVtx = cms.uint32( 100 )
 )
 fragment.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracksNoVtx = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.3 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -77176,6 +77230,8 @@ fragment.hltParticleFlowClusterECALUncorrectedForMuonsMFNoVtx = cms.EDProducer( 
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
     ),
+    seedCleaners = cms.VPSet( 
+    ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
     ),
@@ -77234,6 +77290,8 @@ fragment.hltParticleFlowClusterPSForMuonsNoVtx = cms.EDProducer( "PFClusterProdu
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( False )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -77401,6 +77459,8 @@ fragment.hltParticleFlowClusterHBHEForMuons = cms.EDProducer( "PFClusterProducer
       ),
       algoName = cms.string( "Basic2DGenericTopoClusterizer" ),
       useCornerCells = cms.bool( True )
+    ),
+    seedCleaners = cms.VPSet( 
     ),
     energyCorrector = cms.PSet(  ),
     recHitCleaners = cms.VPSet( 
@@ -77608,6 +77668,7 @@ fragment.hltPixelTracksForSeedsL3MuonNoVtx = cms.EDProducer( "PixelTrackProducer
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsL3MuonNoVtx" )
 )
 fragment.hltIter0L3MuonPixelSeedsFromPixelTracksNoVtx = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -84981,6 +85042,7 @@ fragment.hltPixelTracksForSeedsJpsiDoubleTrk = cms.EDProducer( "PixelTrackProduc
     SeedingHitSets = cms.InputTag( "hltPixelTracksHitQuadrupletsForSeedsJpsiDoubleTrk" )
 )
 fragment.hltIter0DisplacedJpsiPixelSeedsFromPixelTracksDoubleTrk = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
+    includeFourthHit = cms.bool( False ),
     useEventsWithNoVertex = cms.bool( True ),
     originHalfLength = cms.double( 0.2 ),
     useProtoTrackKinematics = cms.bool( False ),
@@ -88311,6 +88373,7 @@ fragment.hltFEDSelectorL1 = cms.EDProducer( "EvFFEDSelector",
 fragment.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
     pfJetCollection = cms.InputTag( "hltAK4PFJets" ),
     doCandidates = cms.bool( True ),
+    pfCandidateEtaCut = cms.double( 5.0 ),
     pfJetTagCollection = cms.InputTag( 'hltCombinedSecondaryVertexBJetTagsPF','','@currentProcess' ),
     doMet = cms.bool( True ),
     metCollection = cms.InputTag( 'hltPFMETProducer','','@currentProcess' ),
