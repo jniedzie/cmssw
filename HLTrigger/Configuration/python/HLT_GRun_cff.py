@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_1_0/GRun --type GRun
 
-# /dev/CMSSW_11_1_0/GRun/V9 (CMSSW_11_1_0_pre7)
+# /dev/CMSSW_11_1_0/GRun/V10 (CMSSW_11_1_0_pre8_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_1_0/GRun/V9')
+  tableName = cms.string('/dev/CMSSW_11_1_0/GRun/V10')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -6268,11 +6268,12 @@ fragment.hltESPPixelCPEGeneric = cms.ESProducer( "PixelCPEGenericESProducer",
   ClusterProbComputationFlag = cms.int32( 0 ),
   Alpha2Order = cms.bool( True ),
   appendToDataLabel = cms.string( "" ),
-  EdgeClusterErrorY = cms.double( 85.0 ),
+  lAWidthFPix = cms.double( 0.0 ),
   SmallPitch = cms.bool( False ),
   LoadTemplatesFromDB = cms.bool( True ),
+  NoTemplateErrorsWhenNoTrkAngles = cms.bool( False ),
   EdgeClusterErrorX = cms.double( 50.0 ),
-  lAWidthFPix = cms.double( 0.0 ),
+  EdgeClusterErrorY = cms.double( 85.0 ),
   lAOffset = cms.double( 0.0 ),
   ComponentName = cms.string( "hltESPPixelCPEGeneric" ),
   MagneticFieldRecord = cms.ESInputTag( "" ),
@@ -6727,6 +6728,7 @@ fragment.hltGetConditions = cms.EDAnalyzer( "EventSetupRecordDataGetter",
 fragment.hltGetRaw = cms.EDAnalyzer( "HLTGetRaw",
     RawDataCollection = cms.InputTag( "rawDataCollector" )
 )
+fragment.hltPSetMap = cms.EDProducer( "ParameterSetBlobProducer" )
 fragment.hltBoolFalse = cms.EDFilter( "HLTBool",
     result = cms.bool( False )
 )
@@ -33204,6 +33206,7 @@ fragment.hltHT450 = cms.EDFilter( "HLTHtMhtFilter",
     minMeff = cms.vdouble( 0.0 )
 )
 fragment.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
+    TrackTimesLabel = cms.InputTag( "dummy_default" ),
     vertexCollections = cms.VPSet( 
       cms.PSet(  chi2cutoff = cms.double( 3.0 ),
         label = cms.string( "" ),
@@ -33233,6 +33236,7 @@ fragment.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
     ),
     beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackLabel = cms.InputTag( "hltPFMuonMerging" ),
+    TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
         zmerge = cms.double( 0.01 ),
@@ -48237,10 +48241,13 @@ fragment.hltPFMHTTightID100 = cms.EDFilter( "HLTMhtFilter",
     minMht = cms.vdouble( 100.0 )
 )
 fragment.hltPFMETProducer = cms.EDProducer( "PFMETProducer",
-    globalThreshold = cms.double( 0.0 ),
+    src = cms.InputTag( "hltParticleFlow" ),
+    parameters = cms.PSet(  ),
+    applyWeight = cms.bool( False ),
     calculateSignificance = cms.bool( False ),
     alias = cms.string( "hltPFMet" ),
-    src = cms.InputTag( "hltParticleFlow" )
+    srcWeights = cms.InputTag( "" ),
+    globalThreshold = cms.double( 0.0 )
 )
 fragment.hltPFMET100 = cms.EDFilter( "HLT1PFMET",
     saveTags = cms.bool( True ),
@@ -49770,6 +49777,7 @@ fragment.hltMergedTracksForBTag = cms.EDProducer( "TrackListMerger",
     newQuality = cms.string( "confirmed" )
 )
 fragment.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
+    TrackTimesLabel = cms.InputTag( "dummy_default" ),
     vertexCollections = cms.VPSet( 
       cms.PSet(  chi2cutoff = cms.double( 3.0 ),
         label = cms.string( "" ),
@@ -49799,6 +49807,7 @@ fragment.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
     ),
     beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackLabel = cms.InputTag( "hltMergedTracksForBTag" ),
+    TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
         zmerge = cms.double( 0.01 ),
@@ -50119,10 +50128,13 @@ fragment.hltParticleFlowNoMu = cms.EDFilter( "GenericPFCandidateSelector",
     cut = cms.string( "particleId!=3" )
 )
 fragment.hltPFMETNoMuProducer = cms.EDProducer( "PFMETProducer",
-    globalThreshold = cms.double( 0.0 ),
+    src = cms.InputTag( "hltParticleFlowNoMu" ),
+    parameters = cms.PSet(  ),
+    applyWeight = cms.bool( False ),
     calculateSignificance = cms.bool( False ),
     alias = cms.string( "pfMetNoMu" ),
-    src = cms.InputTag( "hltParticleFlowNoMu" )
+    srcWeights = cms.InputTag( "" ),
+    globalThreshold = cms.double( 0.0 )
 )
 fragment.hltPFMETNoMu120 = cms.EDFilter( "HLT1PFMET",
     saveTags = cms.bool( True ),
@@ -66017,10 +66029,13 @@ fragment.hltMET66 = cms.EDFilter( "HLT1CaloMET",
     MaxMass = cms.double( -1.0 )
 )
 fragment.hltPFMETVBFProducer = cms.EDProducer( "PFMETProducer",
-    globalThreshold = cms.double( 0.0 ),
+    src = cms.InputTag( "hltParticleFlowNoMu" ),
+    parameters = cms.PSet(  ),
+    applyWeight = cms.bool( False ),
     calculateSignificance = cms.bool( False ),
     alias = cms.string( "pfMet" ),
-    src = cms.InputTag( "hltParticleFlowNoMu" )
+    srcWeights = cms.InputTag( "" ),
+    globalThreshold = cms.double( 0.0 )
 )
 fragment.hltPFMETVBF110 = cms.EDFilter( "HLT1PFMET",
     saveTags = cms.bool( True ),
@@ -87829,7 +87844,7 @@ fragment.HLTDiphoton3018R9Idb50e90ANDIso60CaloId15b35eANDHE12b10eNoPixelVetoSequ
 fragment.HLTBeginSequenceParking = cms.Sequence( fragment.hltTriggerType + fragment.hltEnableParking + fragment.HLTL1UnpackerSequence + fragment.HLTBeamSpot )
 fragment.HLTPFScoutingPackingSequence = cms.Sequence( fragment.hltScoutingPFPacker + fragment.hltScoutingMuonPacker + fragment.hltScoutingEgammaPacker )
 
-fragment.HLTriggerFirstPath = cms.Path( fragment.hltGetConditions + fragment.hltGetRaw + fragment.hltBoolFalse )
+fragment.HLTriggerFirstPath = cms.Path( fragment.hltGetConditions + fragment.hltGetRaw + fragment.hltPSetMap + fragment.hltBoolFalse )
 fragment.HLT_AK8PFJet360_TrimMass30_v18 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sSingleJet180 + fragment.hltPreAK8PFJet360TrimMass30 + fragment.HLTAK8CaloJetsSequence + fragment.hltAK8SingleCaloJet260 + fragment.HLTAK8PFJetsSequence + fragment.hltAK8PFJetsCorrectedMatchedToCaloJets260 + fragment.hltAK8SinglePFJet360 + fragment.hltAK8TrimModJets + fragment.hltAK8SinglePFJetTrimModMass30 + fragment.HLTEndSequence )
 fragment.HLT_AK8PFJet380_TrimMass30_v11 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sSingleJet180 + fragment.hltPreAK8PFJet380TrimMass30 + fragment.HLTAK8CaloJetsSequence + fragment.hltAK8SingleCaloJet280 + fragment.HLTAK8PFJetsSequence + fragment.hltAK8PFJetsCorrectedMatchedToCaloJets280 + fragment.hltAK8SinglePFJet380 + fragment.hltAK8TrimModJets + fragment.hltAK8SinglePFJetTrimModMass30 + fragment.HLTEndSequence )
 fragment.HLT_AK8PFJet400_TrimMass30_v12 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sSingleJet180 + fragment.hltPreAK8PFJet400TrimMass30 + fragment.HLTAK8CaloJetsSequence + fragment.hltAK8SingleCaloJet300 + fragment.HLTAK8PFJetsSequence + fragment.hltAK8PFJetsCorrectedMatchedToCaloJets300 + fragment.hltAK8SinglePFJet400 + fragment.hltAK8TrimModJets + fragment.hltAK8SinglePFJetTrimModMass30 + fragment.HLTEndSequence )
