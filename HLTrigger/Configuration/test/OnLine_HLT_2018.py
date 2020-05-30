@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /frozen/2018/111X/HLT --type 2018 --unprescale --process HLT2018 --globaltag auto:run2_hlt_2018 --input file:RelVal_Raw_2018_DATA.root
 
-# /frozen/2018/111X/HLT/V11 (CMSSW_11_1_0_pre7)
+# /frozen/2018/111X/HLT/V13 (CMSSW_11_1_0_pre8_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLT2018" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2018/111X/HLT/V11')
+  tableName = cms.string('/frozen/2018/111X/HLT/V13')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6441,11 +6441,12 @@ process.hltESPPixelCPEGeneric = cms.ESProducer( "PixelCPEGenericESProducer",
   ClusterProbComputationFlag = cms.int32( 0 ),
   Alpha2Order = cms.bool( True ),
   appendToDataLabel = cms.string( "" ),
-  EdgeClusterErrorY = cms.double( 85.0 ),
+  lAWidthFPix = cms.double( 0.0 ),
   SmallPitch = cms.bool( False ),
   LoadTemplatesFromDB = cms.bool( True ),
+  NoTemplateErrorsWhenNoTrkAngles = cms.bool( False ),
   EdgeClusterErrorX = cms.double( 50.0 ),
-  lAWidthFPix = cms.double( 0.0 ),
+  EdgeClusterErrorY = cms.double( 85.0 ),
   lAOffset = cms.double( 0.0 ),
   ComponentName = cms.string( "hltESPPixelCPEGeneric" ),
   MagneticFieldRecord = cms.ESInputTag( "" ),
@@ -7042,6 +7043,7 @@ process.hltGetConditions = cms.EDAnalyzer( "EventSetupRecordDataGetter",
 process.hltGetRaw = cms.EDAnalyzer( "HLTGetRaw",
     RawDataCollection = cms.InputTag( "rawDataCollector" )
 )
+process.hltPSetMap = cms.EDProducer( "ParameterSetBlobProducer" )
 process.hltBoolFalse = cms.EDFilter( "HLTBool",
     result = cms.bool( False )
 )
@@ -33643,6 +33645,7 @@ process.hltHT450 = cms.EDFilter( "HLTHtMhtFilter",
     minMeff = cms.vdouble( 0.0 )
 )
 process.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
+    TrackTimesLabel = cms.InputTag( "dummy_default" ),
     vertexCollections = cms.VPSet( 
       cms.PSet(  chi2cutoff = cms.double( 3.0 ),
         label = cms.string( "" ),
@@ -33672,6 +33675,7 @@ process.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
     ),
     beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackLabel = cms.InputTag( "hltPFMuonMerging" ),
+    TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
         zmerge = cms.double( 0.01 ),
@@ -49011,10 +49015,13 @@ process.hltPFMHTTightID100 = cms.EDFilter( "HLTMhtFilter",
     minMht = cms.vdouble( 100.0 )
 )
 process.hltPFMETProducer = cms.EDProducer( "PFMETProducer",
-    globalThreshold = cms.double( 0.0 ),
+    src = cms.InputTag( "hltParticleFlow" ),
+    parameters = cms.PSet(  ),
+    applyWeight = cms.bool( False ),
     calculateSignificance = cms.bool( False ),
     alias = cms.string( "hltPFMet" ),
-    src = cms.InputTag( "hltParticleFlow" )
+    srcWeights = cms.InputTag( "" ),
+    globalThreshold = cms.double( 0.0 )
 )
 process.hltPFMET100 = cms.EDFilter( "HLT1PFMET",
     saveTags = cms.bool( True ),
@@ -50616,6 +50623,7 @@ process.hltMergedTracksForBTag = cms.EDProducer( "TrackListMerger",
     newQuality = cms.string( "confirmed" )
 )
 process.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
+    TrackTimesLabel = cms.InputTag( "dummy_default" ),
     vertexCollections = cms.VPSet( 
       cms.PSet(  chi2cutoff = cms.double( 3.0 ),
         label = cms.string( "" ),
@@ -50645,6 +50653,7 @@ process.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
     ),
     beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackLabel = cms.InputTag( "hltMergedTracksForBTag" ),
+    TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
         zmerge = cms.double( 0.01 ),
@@ -50965,10 +50974,13 @@ process.hltParticleFlowNoMu = cms.EDFilter( "GenericPFCandidateSelector",
     cut = cms.string( "particleId!=3" )
 )
 process.hltPFMETNoMuProducer = cms.EDProducer( "PFMETProducer",
-    globalThreshold = cms.double( 0.0 ),
+    src = cms.InputTag( "hltParticleFlowNoMu" ),
+    parameters = cms.PSet(  ),
+    applyWeight = cms.bool( False ),
     calculateSignificance = cms.bool( False ),
     alias = cms.string( "pfMetNoMu" ),
-    src = cms.InputTag( "hltParticleFlowNoMu" )
+    srcWeights = cms.InputTag( "" ),
+    globalThreshold = cms.double( 0.0 )
 )
 process.hltPFMETNoMu120 = cms.EDFilter( "HLT1PFMET",
     saveTags = cms.bool( True ),
@@ -66996,10 +67008,13 @@ process.hltCaloNoiseCleanedMET66 = cms.EDFilter( "HLT1CaloMET",
     MaxMass = cms.double( -1.0 )
 )
 process.hltPFMETVBFProducer = cms.EDProducer( "PFMETProducer",
-    globalThreshold = cms.double( 0.0 ),
+    src = cms.InputTag( "hltParticleFlowNoMu" ),
+    parameters = cms.PSet(  ),
+    applyWeight = cms.bool( False ),
     calculateSignificance = cms.bool( False ),
     alias = cms.string( "pfMet" ),
-    src = cms.InputTag( "hltParticleFlowNoMu" )
+    srcWeights = cms.InputTag( "" ),
+    globalThreshold = cms.double( 0.0 )
 )
 process.hltPFMETVBF110 = cms.EDFilter( "HLT1PFMET",
     saveTags = cms.bool( True ),
@@ -92059,7 +92074,7 @@ process.HLTDiphoton3018R9Idb50e90ANDIso60CaloId15b35eANDHE12b10eNoPixelVetoSeque
 process.HLTBeginSequenceParking = cms.Sequence( process.hltTriggerType + process.hltEnableParking + process.HLTL1UnpackerSequence + process.HLTBeamSpot )
 process.HLTPFScoutingPackingSequence = cms.Sequence( process.hltScoutingPFPacker + process.hltScoutingMuonPacker + process.hltScoutingEgammaPacker )
 
-process.HLTriggerFirstPath = cms.Path( process.hltGetConditions + process.hltGetRaw + process.hltBoolFalse )
+process.HLTriggerFirstPath = cms.Path( process.hltGetConditions + process.hltGetRaw + process.hltPSetMap + process.hltBoolFalse )
 process.HLT_AK8PFJet360_TrimMass30_v18 = cms.Path( process.HLTBeginSequence + process.hltL1sSingleJet180 + process.hltPreAK8PFJet360TrimMass30 + process.HLTAK8CaloJetsSequence + process.hltAK8SingleCaloJet260 + process.HLTAK8PFJetsSequence + process.hltAK8PFJetsCorrectedMatchedToCaloJets260 + process.hltAK8SinglePFJet360 + process.hltAK8TrimModJets + process.hltAK8SinglePFJetTrimModMass30 + process.HLTEndSequence )
 process.HLT_AK8PFJet380_TrimMass30_v11 = cms.Path( process.HLTBeginSequence + process.hltL1sSingleJet180 + process.hltPreAK8PFJet380TrimMass30 + process.HLTAK8CaloJetsSequence + process.hltAK8SingleCaloJet280 + process.HLTAK8PFJetsSequence + process.hltAK8PFJetsCorrectedMatchedToCaloJets280 + process.hltAK8SinglePFJet380 + process.hltAK8TrimModJets + process.hltAK8SinglePFJetTrimModMass30 + process.HLTEndSequence )
 process.HLT_AK8PFJet400_TrimMass30_v12 = cms.Path( process.HLTBeginSequence + process.hltL1sSingleJet180 + process.hltPreAK8PFJet400TrimMass30 + process.HLTAK8CaloJetsSequence + process.hltAK8SingleCaloJet300 + process.HLTAK8PFJetsSequence + process.hltAK8PFJetsCorrectedMatchedToCaloJets300 + process.hltAK8SinglePFJet400 + process.hltAK8TrimModJets + process.hltAK8SinglePFJetTrimModMass30 + process.HLTEndSequence )
@@ -92815,7 +92830,6 @@ process.ParkingBPH5Output = cms.EndPath( process.hltGtStage2Digis + process.hltP
 
 # load the DQMStore and DQMRootOutputModule
 process.load( "DQMServices.Core.DQMStore_cfi" )
-process.DQMStore.enableMultiThread = True
 
 process.dqmOutput = cms.OutputModule("DQMRootOutputModule",
     fileName = cms.untracked.string("DQMIO.root")
