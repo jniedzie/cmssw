@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_2_0/HLT --type FULL
 
-# /dev/CMSSW_11_2_0/HLT/V4 (CMSSW_11_2_0_pre2)
+# /dev/CMSSW_11_2_0/HLT/V5 (CMSSW_11_2_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V4')
+  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V5')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -6631,6 +6631,7 @@ fragment.ecalSeverityLevel = cms.ESProducer( "EcalSeverityLevelESProducer",
     kTime = cms.vstring( 'kOutOfTime' )
   )
 )
+fragment.hcalChannelPropertiesESProd = cms.ESProducer( "HcalChannelPropertiesEP" )
 fragment.hcalDDDRecConstants = cms.ESProducer( "HcalDDDRecConstantsESModule",
   appendToDataLabel = cms.string( "" )
 )

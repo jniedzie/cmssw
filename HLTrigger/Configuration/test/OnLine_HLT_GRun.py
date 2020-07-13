@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_2_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_11_2_0/GRun/V1 (CMSSW_11_2_0_pre2)
+# /dev/CMSSW_11_2_0/GRun/V2 (CMSSW_11_2_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_2_0/GRun/V1')
+  tableName = cms.string('/dev/CMSSW_11_2_0/GRun/V2')
 )
 
 process.transferSystem = cms.PSet( 
@@ -5474,6 +5474,7 @@ process.ecalSeverityLevel = cms.ESProducer( "EcalSeverityLevelESProducer",
     kTime = cms.vstring( 'kOutOfTime' )
   )
 )
+process.hcalChannelPropertiesESProd = cms.ESProducer( "HcalChannelPropertiesEP" )
 process.hcalDDDRecConstants = cms.ESProducer( "HcalDDDRecConstantsESModule",
   appendToDataLabel = cms.string( "" )
 )
@@ -6109,7 +6110,6 @@ process.hltESPGsfTrajectorySmoother = cms.ESProducer( "GsfTrajectorySmootherESPr
   GeometricalPropagator = cms.string( "hltESPBwdAnalyticalPropagator" ),
   MaterialEffectsUpdator = cms.string( "hltESPElectronMaterialEffects" )
 )
-process.hltESPHcalChannelPropertiesEP = cms.ESProducer( "HcalChannelPropertiesEP" )
 process.hltESPHighPtTripletStepChi2ChargeMeasurementEstimator30 = cms.ESProducer( "Chi2ChargeMeasurementEstimatorESProducer",
   appendToDataLabel = cms.string( "" ),
   clusterChargeCut = cms.PSet(  refToPSet_ = cms.string( "HLTSiStripClusterChargeCutLoose" ) ),
