@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_2_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_11_2_0/HLT/V6 (CMSSW_11_2_0_pre2)
+# /dev/CMSSW_11_2_0/HLT/V11 (CMSSW_11_2_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V6')
+  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V11')
 )
 
 process.transferSystem = cms.PSet( 
@@ -4702,6 +4702,9 @@ process.datasets = cms.PSet(
     'HLT_HT400_DisplacedDijet40_DisplacedTrack_v13',
     'HLT_HT550_DisplacedDijet60_Inclusive_v13',
     'HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL_DZ_v15',
+    'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_CaloDiJet30_CaloBtagDeepCSV_1p5_v1',
+    'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_PFDiJet30_PFBtagDeepCSV_1p5_v1',
+    'HLT_PFHT400_SixPFJet32_DoublePFBTagDeepCSV_2p94_v8',
     'HLT_PFHT510_v17',
     'HLT_PFJet260_v20',
     'HLT_PFJet320_v20',
@@ -13914,14 +13917,6 @@ process.hltLightPFTracks = cms.EDProducer( "LightPFTrackProducer",
 process.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -13957,9 +13952,6 @@ process.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -32713,14 +32705,6 @@ process.hltTauJet5 = cms.EDFilter( "HLT1CaloJet",
 process.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -32756,9 +32740,6 @@ process.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -38577,14 +38558,6 @@ process.hltLightPFTracksReg = cms.EDProducer( "LightPFTrackProducer",
 process.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -38620,9 +38593,6 @@ process.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -102814,14 +102784,6 @@ process.hltLightPFTracksPPOnAA = cms.EDProducer( "LightPFTrackProducer",
 process.hltParticleFlowBlockPPOnAA = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -102857,9 +102819,6 @@ process.hltParticleFlowBlockPPOnAA = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -123863,8 +123822,13 @@ process.hltPreHLTMonitorOutputSmart = cms.EDFilter( "TriggerResultsFilter",
       'HLT_PFHT510_v17 / 3',
       'HLT_PFMET130_PFMHT130_IDTight_v20 / 25',
       'HLT_PFMET140_PFMHT140_IDTight_v20 / 15',
+      'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_PFDiJet30_PFBtagDeepCSV_1p5_v1',
+      'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_CaloDiJet30_CaloBtagDeepCSV_1p5_v1',
       'HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ_v19',
-      'HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL_DZ_v15' ),
+      'HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL_DZ_v15',
+      'HLT_HT400_DisplacedDijet40_DisplacedTrack_v13',
+      'HLT_HT550_DisplacedDijet60_Inclusive_v13',
+      'HLT_PFHT400_SixPFJet32_DoublePFBTagDeepCSV_2p94_v8' ),
     throw = cms.bool( True )
 )
 process.hltPreRPCMONOutput = cms.EDFilter( "HLTPrescaler",
@@ -126467,28 +126431,37 @@ process.hltOutputHLTMonitor = cms.OutputModule( "PoolOutputModule",
   'HLT_HT400_DisplacedDijet40_DisplacedTrack_v13',
   'HLT_HT550_DisplacedDijet60_Inclusive_v13',
   'HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL_DZ_v15',
+  'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_CaloDiJet30_CaloBtagDeepCSV_1p5_v1',
+  'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_PFDiJet30_PFBtagDeepCSV_1p5_v1',
+  'HLT_PFHT400_SixPFJet32_DoublePFBTagDeepCSV_2p94_v8',
   'HLT_PFHT510_v17',
   'HLT_PFJet260_v20',
   'HLT_PFJet320_v20',
   'HLT_PFMET130_PFMHT130_IDTight_v20',
   'HLT_PFMET140_PFMHT140_IDTight_v20' ) ),
     outputCommands = cms.untracked.vstring( 'drop *_hlt*_*_*',
+      'keep *_hltDeepBLifetimeTagInfosPF_*_*',
       'keep *_hltDeepCombinedSecondaryVertexBJetTagsCalo_*_*',
       'keep *_hltDeepCombinedSecondaryVertexBJetTagsInfosCalo_*_*',
       'keep *_hltDeepCombinedSecondaryVertexBJetTagsInfos_*_*',
       'keep *_hltDeepCombinedSecondaryVertexBJetTagsPF_*_*',
+      'keep *_hltDeepSecondaryVertexTagInfosPF_*_*',
       'keep *_hltDisplacedhltIter4PFlowTrackSelectionHighPurity_*_*',
       'keep *_hltEcalRecHit_*_*',
       'keep *_hltEgammaGsfTracks_*_*',
       'keep *_hltElectronsVertex_*_*',
+      'keep *_hltFastPixelBLifetimeL3Associator_*_*',
       'keep *_hltFastPrimaryVertex_*_*',
       'keep *_hltHbhereco_*_*',
       'keep *_hltHfreco_*_*',
       'keep *_hltHoreco_*_*',
+      'keep *_hltImpactParameterTagInfos_*_*',
+      'keep *_hltInclusiveSecondaryVertexFinderTagInfos_*_*',
       'keep *_hltIter0ElectronsTrackSelectionHighPurity_*_*',
       'keep *_hltIter2MergedForBTag_*_*',
       'keep *_hltIter2MergedForElectrons_*_*',
       'keep *_hltIter2Merged_*_*',
+      'keep *_hltMergedTracksForBTag_*_*',
       'keep *_hltMergedTracks_*_*',
       'keep *_hltOnlineBeamSpot_*_*',
       'keep *_hltPFJetForBtag_*_*',

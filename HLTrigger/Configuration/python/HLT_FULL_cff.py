@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_2_0/HLT --type FULL
 
-# /dev/CMSSW_11_2_0/HLT/V6 (CMSSW_11_2_0_pre2)
+# /dev/CMSSW_11_2_0/HLT/V11 (CMSSW_11_2_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V6')
+  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V11')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -4702,6 +4702,9 @@ fragment.datasets = cms.PSet(
     'HLT_HT400_DisplacedDijet40_DisplacedTrack_v13',
     'HLT_HT550_DisplacedDijet60_Inclusive_v13',
     'HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL_DZ_v15',
+    'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_CaloDiJet30_CaloBtagDeepCSV_1p5_v1',
+    'HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ_PFDiJet30_PFBtagDeepCSV_1p5_v1',
+    'HLT_PFHT400_SixPFJet32_DoublePFBTagDeepCSV_2p94_v8',
     'HLT_PFHT510_v17',
     'HLT_PFJet260_v20',
     'HLT_PFJet320_v20',
@@ -13606,14 +13609,6 @@ fragment.hltLightPFTracks = cms.EDProducer( "LightPFTrackProducer",
 fragment.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -13649,9 +13644,6 @@ fragment.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -32405,14 +32397,6 @@ fragment.hltTauJet5 = cms.EDFilter( "HLT1CaloJet",
 fragment.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -32448,9 +32432,6 @@ fragment.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -38269,14 +38250,6 @@ fragment.hltLightPFTracksReg = cms.EDProducer( "LightPFTrackProducer",
 fragment.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -38312,9 +38285,6 @@ fragment.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
@@ -102506,14 +102476,6 @@ fragment.hltLightPFTracksPPOnAA = cms.EDProducer( "LightPFTrackProducer",
 fragment.hltParticleFlowBlockPPOnAA = cms.EDProducer( "PFBlockProducer",
     debug = cms.untracked.bool( False ),
     linkDefinitions = cms.VPSet( 
-      cms.PSet(  linkType = cms.string( "PS1:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
-      cms.PSet(  linkType = cms.string( "PS2:ECAL" ),
-        useKDTree = cms.bool( True ),
-        linkerName = cms.string( "PreshowerAndECALLinker" )
-      ),
       cms.PSet(  linkType = cms.string( "TRACK:ECAL" ),
         useKDTree = cms.bool( True ),
         linkerName = cms.string( "TrackAndECALLinker" )
@@ -102549,9 +102511,6 @@ fragment.hltParticleFlowBlockPPOnAA = cms.EDProducer( "PFBlockProducer",
         importerName = cms.string( "GenericClusterImporter" )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterHF" ),
-        importerName = cms.string( "GenericClusterImporter" )
-      ),
-      cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterPSUnseeded" ),
         importerName = cms.string( "GenericClusterImporter" )
       )
     ),
