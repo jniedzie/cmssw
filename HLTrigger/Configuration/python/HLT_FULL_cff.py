@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_2_0/HLT --type FULL
 
-# /dev/CMSSW_11_2_0/HLT/V27 (CMSSW_11_2_0_pre5)
+# /dev/CMSSW_11_2_0/HLT/V28 (CMSSW_11_2_0_pre5)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V27')
+  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V28')
 )
 
 fragment.transferSystem = cms.PSet( 
