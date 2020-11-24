@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_2_0/HLT --type FULL
 
-# /dev/CMSSW_11_2_0/HLT/V32 (CMSSW_11_2_0_pre7)
+# /dev/CMSSW_11_2_0/HLT/V35 (CMSSW_11_2_0_pre9)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V32')
+  tableName = cms.string('/dev/CMSSW_11_2_0/HLT/V35')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -9497,12 +9497,14 @@ fragment.hltSiStripRawToClustersFacility = cms.EDProducer( "SiStripClusterizerFr
 fragment.hltSiStripClusters = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag( 'hltSiPixelDigis' ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClusters" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag( 'hltSiPixelDigis' ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" )
 )
@@ -14568,6 +14570,7 @@ fragment.hltDisplacedmumuVtxProducerDiMu5EG3 = cms.EDProducer( "HLTDisplacedmumu
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterDiMu5EG3 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -15983,6 +15986,7 @@ fragment.hltDisplacedmumuVtxProducerUpsilonMuon = cms.EDProducer( "HLTDisplacedm
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterUpsilonMuon = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -17862,6 +17866,7 @@ fragment.hltDisplacedmumuVtxProducerUpsilonMuon53p52OpenMuon = cms.EDProducer( "
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterUpsilonMuon53p52OpenMuon = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -20495,6 +20500,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu4Bs = cms.EDProducer( "HLTDisplacedm
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDoubleMu4Bs = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -20555,6 +20561,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu43Jpsi = cms.EDProducer( "HLTDisplac
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltmumuFilterDoubleMu43Jpsi = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -20667,6 +20674,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu4Jpsi = cms.EDProducer( "HLTDisplace
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDoubleMu4Jpsi = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -21919,6 +21927,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu4LowMassNonResonant = cms.EDProducer
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDoubleMu4LowMassNonResonant = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -23223,6 +23232,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu3Tau3mu = cms.EDProducer( "HLTDispla
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDoubleMu3Tau3mu = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -24819,6 +24829,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu4PsiPrime = cms.EDProducer( "HLTDisp
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDoubleMu4PsiPrime = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -34808,8 +34819,10 @@ fragment.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 999.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltPFMuonMerging" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
@@ -50974,12 +50987,14 @@ fragment.hltFastPVPixelVerticesFilter = cms.EDFilter( "VertexSelector",
 fragment.hltSiStripClustersRegForBTag = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersRegForBTag" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltSiStripRawToClustersFacility" )
 )
@@ -51854,8 +51869,10 @@ fragment.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 999.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltMergedTracksForBTag" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
@@ -54960,13 +54977,13 @@ fragment.hltDeepBLifetimeTagInfosPF = cms.EDProducer( "CandIPProducer",
     minimumTransverseMomentum = cms.double( 1.0 ),
     primaryVertex = cms.InputTag( "hltVerticesPFFilter" ),
     maximumLongitudinalImpactParameter = cms.double( 17.0 ),
-    jets = cms.InputTag( "hltPFJetForBtag" ),
+    computeGhostTrack = cms.bool( True ),
     maxDeltaR = cms.double( 0.4 ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     jetDirectionUsingGhostTrack = cms.bool( False ),
     minimumNumberOfPixelHits = cms.int32( 2 ),
     jetDirectionUsingTracks = cms.bool( False ),
-    computeGhostTrack = cms.bool( True ),
+    jets = cms.InputTag( "hltPFJetForBtag" ),
     useTrackQuality = cms.bool( False ),
     ghostTrackPriorDeltaR = cms.double( 0.03 ),
     maximumChiSquared = cms.double( 5.0 ),
@@ -62323,6 +62340,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0JpsiL1sNoOS = cms.EDProducer( "HLTDis
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0JpsiL1sNoOS = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -62484,6 +62502,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0Jpsi = cms.EDProducer( "HLTDisplacedm
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0Jpsi = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -62548,6 +62567,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0JpsiL1s4R0er1p5R = cms.EDProducer( "H
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0JpsiL1s4R0er1p5R = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -62697,6 +62717,7 @@ fragment.hltDisplacedmumuVtxProducerJpsiMuon3p5 = cms.EDProducer( "HLTDisplacedm
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterJpsiMuon3p5 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -62820,6 +62841,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0UpsilonL1s4p5 = cms.EDProducer( "HLTD
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0UpsilonL1s4p5 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -62943,6 +62965,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0UpsilonL1s5 = cms.EDProducer( "HLTDis
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0UpsilonL1s5 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63055,6 +63078,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0UpsilonL1s4p5NoOS = cms.EDProducer( "
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0UpsilonL1s4p5NoOS = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63178,6 +63202,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0UpsilonL1s4p5er2p0 = cms.EDProducer( 
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0UpsilonL1s4p5er2p0 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63290,6 +63315,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0UpsilonL1s4p5er2p0M = cms.EDProducer(
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0UpsilonL1s4p5er2p0M = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63406,6 +63432,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0UpsilonL1s5M = cms.EDProducer( "HLTDi
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0UpsilonL1s5M = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63518,6 +63545,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0LowMassL1s0er1p5R = cms.EDProducer( "
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0LowMassL1s0er1p5R = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63641,6 +63669,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0LowMassL1s0er1p5 = cms.EDProducer( "H
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0LowMassL1s0er1p5 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63701,6 +63730,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0LowMass = cms.EDProducer( "HLTDisplac
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0LowMass = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63824,6 +63854,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0LowMassL1s4 = cms.EDProducer( "HLTDis
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0LowMassL1s4 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -63936,6 +63967,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0LowMassL1s4R = cms.EDProducer( "HLTDi
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0LowMassL1s4R = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -64048,6 +64080,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon0LowMassL1sTM530 = cms.EDProducer( "HL
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon0LowMassL1sTM530 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -64193,6 +64226,7 @@ fragment.hltDisplacedmumuVtxProducerUpsilon5MuonNoL1Mass = cms.EDProducer( "HLTD
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterUpsilon5MuonNoL1Mass = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -64338,6 +64372,7 @@ fragment.hltDisplacedmumuVtxProducerUpsilon0MuonL1sTM0 = cms.EDProducer( "HLTDis
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterUpsilon0MuonL1sTM0 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -64431,6 +64466,7 @@ fragment.hltDisplacedmumuVtxProducerUpsilon0MuonNoL1Mass = cms.EDProducer( "HLTD
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltVertexmumuFilterUpsilon0MuonNoL1Mass = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -65233,6 +65269,7 @@ fragment.hltDisplacedmumuVtxProducerDoubleMu3Tau3muNoL1Mass = cms.EDProducer( "H
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDoubleMu3Tau3muNoL1Mass = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71242,6 +71279,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon10PsiPrimeBarrelnoCow = cms.EDProducer
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon10PsiPrimeBarrelnoCow = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71302,6 +71340,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon20JpsiBarrelnoCow = cms.EDProducer( "H
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon20JpsiBarrelnoCow = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71414,6 +71453,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon12Upsilonsv3 = cms.EDProducer( "HLTDis
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon12Upsilonsv3 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71474,6 +71514,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon14PhiBarrelnoCow = cms.EDProducer( "HL
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon14PhiBarrelnoCow = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71586,6 +71627,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon18PsiPrimes = cms.EDProducer( "HLTDisp
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon18PsiPrimes = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71646,6 +71688,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon25Jpsis = cms.EDProducer( "HLTDisplace
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon25Jpsis = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71758,6 +71801,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon18PsiPrimesNoCorrL1 = cms.EDProducer( 
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon18PsiPrimesNoCorrL1 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71818,6 +71862,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon24UpsilonsNoCorrL1 = cms.EDProducer( "
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon24UpsilonsNoCorrL1 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71878,6 +71923,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon24PhiNoCorrL1 = cms.EDProducer( "HLTDi
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon24PhiBarrelNoCorrL1 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -71938,6 +71984,7 @@ fragment.hltDisplacedmumuVtxProducerDimuon25JpsisNoCorrL1 = cms.EDProducer( "HLT
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDisplacedmumuFilterDimuon25JpsisNoCorrL1 = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -80014,6 +80061,7 @@ fragment.hltDisplacedmumuVtxProducer = cms.EDProducer( "HLTDisplacedmumuVtxProdu
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 99999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltPreDSTDoubleMu1noVtxCaloScouting = cms.EDFilter( "HLTPrescaler",
@@ -80062,6 +80110,7 @@ fragment.hltDisplacedmumu1VtxProducer = cms.EDProducer( "HLTDisplacedmumuVtxProd
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 99999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltPreDSTDoubleMu3noVtxMass10PFScouting = cms.EDFilter( "HLTPrescaler",
@@ -80110,6 +80159,7 @@ fragment.hltDisplacedmumuMass10VtxProducer = cms.EDProducer( "HLTDisplacedmumuVt
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 99999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltPreAK4CaloJet30 = cms.EDFilter( "HLTPrescaler",
@@ -82753,12 +82803,14 @@ fragment.hltSiStripRawToClustersFacilityForPA = cms.EDProducer( "SiStripClusteri
 fragment.hltSiStripClustersAfterSplitting = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersAfterSplitting" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltSiStripRawToClustersFacilityForPA" )
 )
@@ -82894,8 +82946,10 @@ fragment.hltPAIter0PrimaryVertices = cms.EDProducer( "PrimaryVertexProducer",
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 5.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltPAIter0CtfWithMaterialTracks" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
@@ -85444,8 +85498,10 @@ fragment.hltVerticesL3PFBjets = cms.EDProducer( "PrimaryVertexProducer",
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 999.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltPFMuonMerging" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
@@ -93568,6 +93624,7 @@ fragment.hltDoubleTrkmumuVtxProducerDoubleMu2Jpsi = cms.EDProducer( "HLTDisplace
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltDoubleTrkmumuFilterDoubleMu2Jpsi = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -94795,6 +94852,7 @@ fragment.hltMumuVtxProducerDoubleMu2Jpsi = cms.EDProducer( "HLTDisplacedmumuVtxP
     MaxEta = cms.double( 2.5 ),
     MaxInvMass = cms.double( 999999.0 ),
     MinPtPair = cms.double( 0.0 ),
+    matchToPrevious = cms.bool( True ),
     MinInvMass = cms.double( 0.0 )
 )
 fragment.hltMumuFilterDoubleMu2Jpsi = cms.EDFilter( "HLTDisplacedmumuFilter",
@@ -95362,13 +95420,13 @@ fragment.hltDeepBLifetimeTagInfosPFAK8 = cms.EDProducer( "CandIPProducer",
     minimumTransverseMomentum = cms.double( 1.0 ),
     primaryVertex = cms.InputTag( "hltVerticesPFFilter" ),
     maximumLongitudinalImpactParameter = cms.double( 17.0 ),
-    jets = cms.InputTag( "hltPFJetForBtagAK8" ),
+    computeGhostTrack = cms.bool( True ),
     maxDeltaR = cms.double( 0.4 ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     jetDirectionUsingGhostTrack = cms.bool( False ),
     minimumNumberOfPixelHits = cms.int32( 2 ),
     jetDirectionUsingTracks = cms.bool( False ),
-    computeGhostTrack = cms.bool( True ),
+    jets = cms.InputTag( "hltPFJetForBtagAK8" ),
     useTrackQuality = cms.bool( False ),
     ghostTrackPriorDeltaR = cms.double( 0.03 ),
     maximumChiSquared = cms.double( 5.0 ),
@@ -95585,13 +95643,13 @@ fragment.hltBoostedDBLifetimeTagInfosPFAK8 = cms.EDProducer( "CandIPProducer",
     minimumTransverseMomentum = cms.double( 1.0 ),
     primaryVertex = cms.InputTag( "hltVerticesPFFilter" ),
     maximumLongitudinalImpactParameter = cms.double( 17.0 ),
-    jets = cms.InputTag( "hltPFJetForDBtagAK8" ),
+    computeGhostTrack = cms.bool( True ),
     maxDeltaR = cms.double( 0.4 ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     jetDirectionUsingGhostTrack = cms.bool( False ),
     minimumNumberOfPixelHits = cms.int32( 2 ),
     jetDirectionUsingTracks = cms.bool( False ),
-    computeGhostTrack = cms.bool( True ),
+    jets = cms.InputTag( "hltPFJetForDBtagAK8" ),
     useTrackQuality = cms.bool( False ),
     ghostTrackPriorDeltaR = cms.double( 0.03 ),
     maximumChiSquared = cms.double( 5.0 ),
@@ -98451,12 +98509,14 @@ fragment.hltHITrackingSiStripRawToClustersFacilityZeroSuppression = cms.EDProduc
 fragment.hltSiStripClustersPPOnAA = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersPPOnAA" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltHITrackingSiStripRawToClustersFacilityZeroSuppression" )
 )
@@ -100832,8 +100892,10 @@ fragment.hltFullIter0PrimaryVerticesPreSplittingPPOnAA = cms.EDProducer( "Primar
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 2.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPreSplittingPPOnAA" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -100882,12 +100944,14 @@ fragment.hltHITrackingSiStripRawToClustersFacilityFullZeroSuppression = cms.EDPr
 fragment.hltSiStripClustersFullPPOnAA = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersAfterSplittingPPOnAA" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltHITrackingSiStripRawToClustersFacilityFullZeroSuppression" )
 )
@@ -101186,8 +101250,10 @@ fragment.hltFullIter0PrimaryVerticesPPOnAA = cms.EDProducer( "PrimaryVertexProdu
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 2.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPPOnAA" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -102684,8 +102750,10 @@ fragment.hltVerticesPFPPOnAA = cms.EDProducer( "PrimaryVertexProducer",
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 999.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltPFMuonMergingPPOnAA" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       TkDAClusParameters = cms.PSet( 
@@ -104843,12 +104911,14 @@ fragment.hltEle10HcalIsoPPOnAAFilter = cms.EDFilter( "HLTEgammaGenericFilter",
 fragment.hltSiStripClustersPPOnAAZeroSuppression = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag( 'hltSiPixelDigis' ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersPPOnAA" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag( 'hltSiPixelDigis' ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltHITrackingSiStripRawToClustersFacilityZeroSuppression" )
 )
@@ -107963,8 +108033,10 @@ fragment.hltFullIter0PrimaryVerticesPreSplittingPPOnAAForDmeson = cms.EDProducer
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 2.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPreSplittingPPOnAAForDmeson" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -107998,12 +108070,14 @@ fragment.hltSiPixelRecHitsAfterSplittingPPOnAAForDmeson = cms.EDProducer( "SiPix
 fragment.hltSiStripClustersFullPPOnAAForDmeson = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersAfterSplittingPPOnAAForDmeson" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltHITrackingSiStripRawToClustersFacilityFullZeroSuppression" )
 )
@@ -108181,8 +108255,10 @@ fragment.hltFullIter0PrimaryVerticesPPOnAAForDmeson = cms.EDProducer( "PrimaryVe
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 2.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPPOnAAForDmeson" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -110483,8 +110559,10 @@ fragment.hltFullOnlinePrimaryVerticesPPOnAAForDmeson = cms.EDProducer( "PrimaryV
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 3.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIterativeTrackingMergedPPOnAAForDmeson" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -110824,8 +110902,10 @@ fragment.hltFullOnlinePrimaryVerticesPPOnAAForDmesonNoIter10 = cms.EDProducer( "
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 3.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIterativeTrackingMergedPPOnAAForDmesonNoIter10" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -114280,12 +114360,14 @@ fragment.hltSiPixelRecHitsPPOnAAForLowPt = cms.EDProducer( "SiPixelRecHitConvert
 fragment.hltSiStripClustersPPOnAAForLowPt = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersPPOnAAForLowPt" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltHITrackingSiStripRawToClustersFacilityZeroSuppression" )
 )
@@ -114462,8 +114544,10 @@ fragment.hltFullIter0PrimaryVerticesPreSplittingPPOnAAForLowPt = cms.EDProducer(
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 3.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPreSplittingPPOnAAForLowPt" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -114497,12 +114581,14 @@ fragment.hltSiPixelRecHitsAfterSplittingPPOnAAForLowPt = cms.EDProducer( "SiPixe
 fragment.hltSiStripClustersFullPPOnAAForLowPt = cms.EDProducer( "MeasurementTrackerEventProducer",
     inactivePixelDetectorLabels = cms.VInputTag(  ),
     Phase2TrackerCluster1DProducer = cms.string( "" ),
+    vectorHits = cms.InputTag( "" ),
     measurementTracker = cms.string( "hltESPMeasurementTracker" ),
     pixelClusterProducer = cms.string( "hltSiPixelClustersAfterSplittingPPOnAAForLowPt" ),
     switchOffPixelsIfEmpty = cms.bool( True ),
     badPixelFEDChannelCollectionLabels = cms.VInputTag(  ),
     inactiveStripDetectorLabels = cms.VInputTag( 'hltSiStripExcludedFEDListProducer' ),
     skipClusters = cms.InputTag( "" ),
+    vectorHitsRej = cms.InputTag( "" ),
     pixelCablingMapLabel = cms.string( "" ),
     stripClusterProducer = cms.string( "hltHITrackingSiStripRawToClustersFacilityFullZeroSuppression" )
 )
@@ -114678,8 +114764,10 @@ fragment.hltFullIter0PrimaryVerticesPPOnAAForLowPt = cms.EDProducer( "PrimaryVer
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 3.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPPOnAAForLowPt" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -116835,8 +116923,10 @@ fragment.hltFullOnlinePrimaryVerticesPPOnAAForLowPt = cms.EDProducer( "PrimaryVe
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 3.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIterativeTrackingMergedPPOnAAForLowPt" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -119732,8 +119822,10 @@ fragment.hltFullIter0PrimaryVerticesPPOnAAForBTag = cms.EDProducer( "PrimaryVert
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 5.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIter0CtfWithMaterialTracksPPOnAAForBTag" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
@@ -120797,8 +120889,10 @@ fragment.hltFullOnlinePrimaryVerticesPPOnAAForBTag = cms.EDProducer( "PrimaryVer
       algorithm = cms.string( "filter" ),
       maxD0Significance = cms.double( 3.0 )
     ),
-    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
+    recoveryVtxCollection = cms.InputTag( "" ),
+    isRecoveryIteration = cms.bool( False ),
     TrackLabel = cms.InputTag( "hltFullIterativeTrackingMergedPPOnAAForBTag" ),
+    beamSpotLabel = cms.InputTag( "hltOnlineBeamSpot" ),
     TrackTimeResosLabel = cms.InputTag( "dummy_default" ),
     TkClusParameters = cms.PSet( 
       algorithm = cms.string( "gap" ),
