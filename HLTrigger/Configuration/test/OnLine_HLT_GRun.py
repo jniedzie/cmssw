@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_3_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_11_3_0/GRun/V1 (CMSSW_11_3_0_pre1)
+# /dev/CMSSW_11_3_0/GRun/V2 (CMSSW_11_3_0_pre1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V1')
+  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V2')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6993,7 +6993,6 @@ process.MessageLogger = cms.Service( "MessageLogger",
     suppressInfo = cms.untracked.vstring(  ),
     suppressDebug = cms.untracked.vstring(  ),
     suppressFwkInfo = cms.untracked.vstring(  ),
-    cout = cms.untracked.PSet(  placeholder = cms.untracked.bool( True ) ),
     cerr = cms.untracked.PSet( 
       INFO = cms.untracked.PSet(  limit = cms.untracked.int32( 0 ) ),
       noTimeStamps = cms.untracked.bool( False ),
@@ -7009,10 +7008,6 @@ process.MessageLogger = cms.Service( "MessageLogger",
         limit = cms.untracked.int32( 10000000 )
       ),
       threshold = cms.untracked.string( "INFO" ),
-      suppressInfo = cms.untracked.vstring(  ),
-      suppressWarning = cms.untracked.vstring(  ),
-      suppressDebug = cms.untracked.vstring(  ),
-      suppressError = cms.untracked.vstring(  )
     ),
     suppressWarning = cms.untracked.vstring( 'hltOnlineBeamSpot',
       'hltCtf3HitL1SeededWithMaterialTracks',
