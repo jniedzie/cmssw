@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_3_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_11_3_0/HLT/V3 (CMSSW_11_3_0_pre1)
+# /dev/CMSSW_11_3_0/HLT/V4 (CMSSW_11_3_0_pre1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/HLT/V3')
+  tableName = cms.string('/dev/CMSSW_11_3_0/HLT/V4')
 )
 
 process.transferSystem = cms.PSet( 
@@ -8347,7 +8347,6 @@ process.MessageLogger = cms.Service( "MessageLogger",
       'hltBLifetimeRegionalCtfWithMaterialTracksbbPhiL1FastJetFastPV',
       'hltCtfActivityWithMaterialTracks' ),
     debugModules = cms.untracked.vstring(  ),
-    threshold = cms.untracked.string( "INFO" ),
     suppressError = cms.untracked.vstring( 'hltOnlineBeamSpot',
       'hltL3MuonCandidates',
       'hltL3TkTracksFromL2OIState',
