@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_3_0/GRun --type GRun
 
-# /dev/CMSSW_11_3_0/GRun/V5 (CMSSW_11_3_0_pre2)
+# /dev/CMSSW_11_3_0/GRun/V7 (CMSSW_11_3_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V5')
+  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V7')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -12314,7 +12314,8 @@ fragment.hltParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
         DPtOverPtCuts_byTrackAlgo = cms.vdouble( 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ),
         muonMaxDPtOPt = cms.double( 1.0 ),
         trackQuality = cms.string( "highPurity" ),
-        cleanBadConvertedBrems = cms.bool( False )
+        cleanBadConvertedBrems = cms.bool( False ),
+        vetoEndcap = cms.bool( False )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
         importerName = cms.string( "ECALClusterImporter" ),
@@ -31022,7 +31023,8 @@ fragment.hltParticleFlowBlockForTaus = cms.EDProducer( "PFBlockProducer",
         DPtOverPtCuts_byTrackAlgo = cms.vdouble( 20.0, 20.0, 20.0, 20.0, 20.0, 20.0 ),
         muonMaxDPtOPt = cms.double( 1.0 ),
         trackQuality = cms.string( "highPurity" ),
-        cleanBadConvertedBrems = cms.bool( False )
+        cleanBadConvertedBrems = cms.bool( False ),
+        vetoEndcap = cms.bool( False )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
         importerName = cms.string( "ECALClusterImporter" ),
@@ -36812,7 +36814,8 @@ fragment.hltParticleFlowBlockReg = cms.EDProducer( "PFBlockProducer",
         DPtOverPtCuts_byTrackAlgo = cms.vdouble( 20.0, 20.0, 20.0, 20.0, 20.0, 20.0 ),
         muonMaxDPtOPt = cms.double( 1.0 ),
         trackQuality = cms.string( "highPurity" ),
-        cleanBadConvertedBrems = cms.bool( False )
+        cleanBadConvertedBrems = cms.bool( False ),
+        vetoEndcap = cms.bool( False )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
         importerName = cms.string( "ECALClusterImporter" ),
@@ -76417,6 +76420,17 @@ fragment.hltPreDSTZeroBias = cms.EDFilter( "HLTPrescaler",
     L1GtReadoutRecordTag = cms.InputTag( "hltGtStage2Digis" ),
     offset = cms.uint32( 0 )
 )
+fragment.hltL1sDSTRun3PFScoutingPixelTracking = cms.EDFilter( "HLTL1TSeed",
+    L1SeedsLogicalExpression = cms.string( "L1GlobalDecision" ),
+    L1EGammaInputTag = cms.InputTag( 'hltGtStage2Digis','EGamma' ),
+    L1JetInputTag = cms.InputTag( 'hltGtStage2Digis','Jet' ),
+    saveTags = cms.bool( True ),
+    L1ObjectMapInputTag = cms.InputTag( "hltGtStage2ObjectMap" ),
+    L1EtSumInputTag = cms.InputTag( 'hltGtStage2Digis','EtSum' ),
+    L1TauInputTag = cms.InputTag( 'hltGtStage2Digis','Tau' ),
+    L1MuonInputTag = cms.InputTag( 'hltGtStage2Digis','Muon' ),
+    L1GlobalInputTag = cms.InputTag( "hltGtStage2Digis" )
+)
 fragment.hltPreDSTRun3PFScoutingPixelTracking = cms.EDFilter( "HLTPrescaler",
     L1GtReadoutRecordTag = cms.InputTag( "hltGtStage2Digis" ),
     offset = cms.uint32( 0 )
@@ -76785,7 +76799,8 @@ fragment.hltPixelOnlyParticleFlowBlock = cms.EDProducer( "PFBlockProducer",
         DPtOverPtCuts_byTrackAlgo = cms.vdouble( 5.0, 5.0, 5.0, 5.0, 5.0, 5.0 ),
         muonMaxDPtOPt = cms.double( 1.0 ),
         trackQuality = cms.string( "any" ),
-        cleanBadConvertedBrems = cms.bool( False )
+        cleanBadConvertedBrems = cms.bool( False ),
+        vetoEndcap = cms.bool( False )
       ),
       cms.PSet(  source = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
         importerName = cms.string( "ECALClusterImporter" ),
@@ -90829,7 +90844,7 @@ fragment.HLT_ZeroBias_part5_v6 = cms.Path( fragment.HLTBeginSequence + fragment.
 fragment.HLT_ZeroBias_part6_v6 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreZeroBiaspart6 + fragment.HLTEndSequence )
 fragment.HLT_ZeroBias_part7_v6 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreZeroBiaspart7 + fragment.HLTEndSequence )
 fragment.DST_ZeroBias_v2 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreDSTZeroBias + fragment.HLTEndSequence )
-fragment.DST_Run3_PFScoutingPixelTracking_v16 = cms.Path( fragment.HLTBeginSequence + fragment.hltPreDSTRun3PFScoutingPixelTracking + fragment.HLTAK4CaloJetsSequence + fragment.HLTPixelOnlyPFScoutingSequence + fragment.hltEgammaR9ID + fragment.HLTL2muonrecoSequenceScoutingNoVtx + fragment.HLTL3muonrecoSequenceScoutingNoVtx + fragment.hltDisplacedmumuVtxNoMatchingProducer + fragment.HLTMuIsolationSequenceScoutingNoVtx + fragment.HLTEndSequence )
+fragment.DST_Run3_PFScoutingPixelTracking_v16 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDSTRun3PFScoutingPixelTracking + fragment.hltPreDSTRun3PFScoutingPixelTracking + fragment.HLTAK4CaloJetsSequence + fragment.HLTPixelOnlyPFScoutingSequence + fragment.hltEgammaR9ID + fragment.HLTL2muonrecoSequenceScoutingNoVtx + fragment.HLTL3muonrecoSequenceScoutingNoVtx + fragment.hltDisplacedmumuVtxNoMatchingProducer + fragment.HLTMuIsolationSequenceScoutingNoVtx + fragment.HLTEndSequence )
 fragment.HLT_AK4CaloJet30_v11 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreAK4CaloJet30 + fragment.HLTAK4CaloJetsSequence + fragment.hltSingleAK4CaloJet30 + fragment.HLTEndSequence )
 fragment.HLT_AK4CaloJet40_v10 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreAK4CaloJet40 + fragment.HLTAK4CaloJetsSequence + fragment.hltSingleAK4CaloJet40 + fragment.HLTEndSequence )
 fragment.HLT_AK4CaloJet50_v10 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreAK4CaloJet50 + fragment.HLTAK4CaloJetsSequence + fragment.hltSingleAK4CaloJet50 + fragment.HLTEndSequence )
