@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_3_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_11_3_0/GRun/V9 (CMSSW_11_3_0_pre2)
+# /dev/CMSSW_11_3_0/GRun/V11 (CMSSW_11_3_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V9')
+  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V11')
 )
 
 process.transferSystem = cms.PSet( 
@@ -12685,6 +12685,7 @@ process.hltParticleFlow = cms.EDProducer( "PFProducer",
     calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
     goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
+    vetoEndcap = cms.bool( False ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
     goodPixelTrackDeadHcal_chi2n = cms.double( 2.0 ),
@@ -31386,6 +31387,7 @@ process.hltParticleFlowForTaus = cms.EDProducer( "PFProducer",
     calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
     goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
+    vetoEndcap = cms.bool( False ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
     goodPixelTrackDeadHcal_chi2n = cms.double( 2.0 ),
@@ -31770,10 +31772,10 @@ process.hltPFTauLooseAbsoluteChargedIsolationDiscriminator = cms.EDProducer( "PF
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAllCaloForMuons" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -31783,7 +31785,7 @@ process.hltPFTauLooseAbsoluteChargedIsolationDiscriminator = cms.EDProducer( "PF
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -31808,15 +31810,16 @@ process.hltPFTauLooseAbsoluteChargedIsolationDiscriminator = cms.EDProducer( "PF
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -31862,10 +31865,10 @@ process.hltPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( "PF
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -31875,7 +31878,7 @@ process.hltPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( "PF
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -31900,15 +31903,16 @@ process.hltPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( "PF
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 50.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauLooseAbsOrRelChargedIsolationDiscriminator = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -32565,10 +32569,10 @@ process.hltHpsPFTauLooseAbsoluteChargedIsolationDiscriminator = cms.EDProducer( 
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAllCaloForMuons" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -32578,7 +32582,7 @@ process.hltHpsPFTauLooseAbsoluteChargedIsolationDiscriminator = cms.EDProducer( 
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -32603,15 +32607,16 @@ process.hltHpsPFTauLooseAbsoluteChargedIsolationDiscriminator = cms.EDProducer( 
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -32657,10 +32662,10 @@ process.hltHpsPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( 
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -32670,7 +32675,7 @@ process.hltHpsPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( 
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -32695,15 +32700,16 @@ process.hltHpsPFTauLooseRelativeChargedIsolationDiscriminator = cms.EDProducer( 
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 50.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauLooseAbsOrRelChargedIsolationDiscriminator = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -32856,10 +32862,10 @@ process.hltHpsPFTauMediumAbsoluteChargedIsolationDiscriminator = cms.EDProducer(
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.357 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 0.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "NotUsed" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -32869,7 +32875,7 @@ process.hltHpsPFTauMediumAbsoluteChargedIsolationDiscriminator = cms.EDProducer(
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 0.33333 ),
+    rhoConeSize = cms.double( 0.357 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -32894,15 +32900,16 @@ process.hltHpsPFTauMediumAbsoluteChargedIsolationDiscriminator = cms.EDProducer(
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 0.33333 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 0.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -32948,10 +32955,10 @@ process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer(
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -32961,7 +32968,7 @@ process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer(
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -32986,15 +32993,16 @@ process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer(
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 60.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauMediumAbsOrRelChargedIsolationDiscriminator = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -33123,10 +33131,10 @@ process.hltHpsPFTauTightAbsoluteChargedIsolationDiscriminator = cms.EDProducer( 
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.357 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 0.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "NotUsed" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -33136,7 +33144,7 @@ process.hltHpsPFTauTightAbsoluteChargedIsolationDiscriminator = cms.EDProducer( 
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 0.33333 ),
+    rhoConeSize = cms.double( 0.357 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -33161,15 +33169,16 @@ process.hltHpsPFTauTightAbsoluteChargedIsolationDiscriminator = cms.EDProducer( 
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 0.33333 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 0.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauTightRelativeChargedIsolationDiscriminator = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -33215,10 +33224,10 @@ process.hltHpsPFTauTightRelativeChargedIsolationDiscriminator = cms.EDProducer( 
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -33228,7 +33237,7 @@ process.hltHpsPFTauTightRelativeChargedIsolationDiscriminator = cms.EDProducer( 
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -33253,15 +33262,16 @@ process.hltHpsPFTauTightRelativeChargedIsolationDiscriminator = cms.EDProducer( 
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 70.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauTightAbsOrRelChargedIsolationDiscriminator = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -33390,10 +33400,10 @@ process.hltHpsPFTauTightOutOfSignalConePhotonsDiscriminator = cms.EDProducer( "P
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -33403,7 +33413,7 @@ process.hltHpsPFTauTightOutOfSignalConePhotonsDiscriminator = cms.EDProducer( "P
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( True ),
@@ -33428,15 +33438,16 @@ process.hltHpsPFTauTightOutOfSignalConePhotonsDiscriminator = cms.EDProducer( "P
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsSelectedPFTausTrackFindingLooseChargedIsolationTightOOSCPhotons = cms.EDFilter( "PFTauSelector",
     discriminators = cms.VPSet( 
@@ -37169,6 +37180,7 @@ process.hltParticleFlowReg = cms.EDProducer( "PFProducer",
     calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
     goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
+    vetoEndcap = cms.bool( False ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
     goodPixelTrackDeadHcal_chi2n = cms.double( 2.0 ),
@@ -37574,10 +37586,10 @@ process.hltPFTauMediumAbsoluteChargedIsolationDiscriminatorReg = cms.EDProducer(
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.357 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 0.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "NotUsed" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -37587,7 +37599,7 @@ process.hltPFTauMediumAbsoluteChargedIsolationDiscriminatorReg = cms.EDProducer(
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 0.33333 ),
+    rhoConeSize = cms.double( 0.357 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -37612,15 +37624,16 @@ process.hltPFTauMediumAbsoluteChargedIsolationDiscriminatorReg = cms.EDProducer(
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 0.33333 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 0.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -37666,10 +37679,10 @@ process.hltPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProducer(
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -37679,7 +37692,7 @@ process.hltPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProducer(
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -37704,15 +37717,16 @@ process.hltPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProducer(
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 60.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumAbsOrRelChargedIsolationDiscriminatorReg = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -37829,10 +37843,10 @@ process.hltPFTauTightOutOfSignalConePhotonsDiscriminatorReg = cms.EDProducer( "P
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -37842,7 +37856,7 @@ process.hltPFTauTightOutOfSignalConePhotonsDiscriminatorReg = cms.EDProducer( "P
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( True ),
@@ -37867,15 +37881,16 @@ process.hltPFTauTightOutOfSignalConePhotonsDiscriminatorReg = cms.EDProducer( "P
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumChargedIsolationAndTightOOSCPhotonsDiscriminatorReg = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -37992,10 +38007,10 @@ process.hltPFTauTightAbsoluteChargedIsolationDiscriminatorReg = cms.EDProducer( 
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.357 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 0.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "NotUsed" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -38005,7 +38020,7 @@ process.hltPFTauTightAbsoluteChargedIsolationDiscriminatorReg = cms.EDProducer( 
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 0.33333 ),
+    rhoConeSize = cms.double( 0.357 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -38030,15 +38045,16 @@ process.hltPFTauTightAbsoluteChargedIsolationDiscriminatorReg = cms.EDProducer( 
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 0.33333 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 0.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -38084,10 +38100,10 @@ process.hltPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( 
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -38097,7 +38113,7 @@ process.hltPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( 
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -38122,15 +38138,16 @@ process.hltPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( 
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 70.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauTightAbsOrRelChargedIsolationDiscriminatorReg = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -38853,10 +38870,10 @@ process.hltHpsPFTauTightAbsoluteChargedIsolationDiscriminatorReg = cms.EDProduce
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.357 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 0.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "NotUsed" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -38866,7 +38883,7 @@ process.hltHpsPFTauTightAbsoluteChargedIsolationDiscriminatorReg = cms.EDProduce
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 0.33333 ),
+    rhoConeSize = cms.double( 0.357 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -38891,15 +38908,16 @@ process.hltHpsPFTauTightAbsoluteChargedIsolationDiscriminatorReg = cms.EDProduce
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 0.33333 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 0.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -38945,10 +38963,10 @@ process.hltHpsPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProduce
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -38958,7 +38976,7 @@ process.hltHpsPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProduce
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -38983,15 +39001,16 @@ process.hltHpsPFTauTightRelativeChargedIsolationDiscriminatorReg = cms.EDProduce
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 70.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauTightAbsOrRelChargedIsolationDiscriminatorReg = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -39108,10 +39127,10 @@ process.hltHpsPFTauMediumAbsoluteChargedIsolationDiscriminatorReg = cms.EDProduc
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.357 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 0.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "NotUsed" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -39121,7 +39140,7 @@ process.hltHpsPFTauMediumAbsoluteChargedIsolationDiscriminatorReg = cms.EDProduc
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 0.33333 ),
+    rhoConeSize = cms.double( 0.357 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -39146,15 +39165,16 @@ process.hltHpsPFTauMediumAbsoluteChargedIsolationDiscriminatorReg = cms.EDProduc
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 0.33333 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 0.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -39200,10 +39220,10 @@ process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProduc
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -39213,7 +39233,7 @@ process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProduc
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -39238,15 +39258,16 @@ process.hltHpsPFTauMediumRelativeChargedIsolationDiscriminatorReg = cms.EDProduc
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 60.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauMediumAbsOrRelChargedIsolationDiscriminatorReg = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -39308,10 +39329,10 @@ process.hltHpsPFTauTightOutOfSignalConePhotonsDiscriminatorReg = cms.EDProducer(
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -39321,7 +39342,7 @@ process.hltHpsPFTauTightOutOfSignalConePhotonsDiscriminatorReg = cms.EDProducer(
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( True ),
@@ -39346,15 +39367,16 @@ process.hltHpsPFTauTightOutOfSignalConePhotonsDiscriminatorReg = cms.EDProducer(
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowReg" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltHpsPFTauMediumChargedIsolationAndTightOOSCPhotonsDiscriminatorReg = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -53471,13 +53493,13 @@ process.hltDeepBLifetimeTagInfosPF = cms.EDProducer( "CandIPProducer",
     minimumTransverseMomentum = cms.double( 1.0 ),
     primaryVertex = cms.InputTag( "hltVerticesPFFilter" ),
     maximumLongitudinalImpactParameter = cms.double( 17.0 ),
-    jets = cms.InputTag( "hltPFJetForBtag" ),
+    computeGhostTrack = cms.bool( True ),
     maxDeltaR = cms.double( 0.4 ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     jetDirectionUsingGhostTrack = cms.bool( False ),
     minimumNumberOfPixelHits = cms.int32( 2 ),
     jetDirectionUsingTracks = cms.bool( False ),
-    computeGhostTrack = cms.bool( True ),
+    jets = cms.InputTag( "hltPFJetForBtag" ),
     useTrackQuality = cms.bool( False ),
     ghostTrackPriorDeltaR = cms.double( 0.03 ),
     maximumChiSquared = cms.double( 5.0 ),
@@ -60083,10 +60105,10 @@ process.hltPFTauMediumAbsoluteChargedIsolationDiscriminator = cms.EDProducer( "P
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAllCaloForMuons" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -60096,7 +60118,7 @@ process.hltPFTauMediumAbsoluteChargedIsolationDiscriminator = cms.EDProducer( "P
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -60121,15 +60143,16 @@ process.hltPFTauMediumAbsoluteChargedIsolationDiscriminator = cms.EDProducer( "P
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -60175,10 +60198,10 @@ process.hltPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer( "P
     minTauPtForNoIso = cms.double( -99.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -60188,7 +60211,7 @@ process.hltPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer( "P
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -60213,15 +60236,16 @@ process.hltPFTauMediumRelativeChargedIsolationDiscriminator = cms.EDProducer( "P
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 60.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumAbsOrRelChargedIsolationDiscriminator = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -77154,6 +77178,7 @@ process.hltPixelOnlyParticleFlow = cms.EDProducer( "PFProducer",
     calibHF_eta_step = cms.vdouble( 0.0, 2.9, 3.0, 3.2, 4.2, 4.4, 4.6, 4.8, 5.2, 5.4 ),
     goodTrackDeadHcal_layers = cms.uint32( 4 ),
     goodPixelTrackDeadHcal_dxy = cms.double( 0.02 ),
+    vetoEndcap = cms.bool( False ),
     usePFNuclearInteractions = cms.bool( False ),
     GedElectronValueMap = cms.InputTag( "gedGsfElectronsTmp" ),
     goodPixelTrackDeadHcal_chi2n = cms.double( 2.0 ),
@@ -83832,10 +83857,10 @@ process.hltPFTauMediumHighPtRelaxedIsoAbsoluteIsolationDiscriminator = cms.EDPro
     minTauPtForNoIso = cms.double( 500.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( True ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -83845,7 +83870,7 @@ process.hltPFTauMediumHighPtRelaxedIsoAbsoluteIsolationDiscriminator = cms.EDPro
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( False ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -83870,15 +83895,16 @@ process.hltPFTauMediumHighPtRelaxedIsoAbsoluteIsolationDiscriminator = cms.EDPro
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 0.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumHighPtRelaxedIsoRelativeIsolationDiscriminator = cms.EDProducer( "PFRecoTauDiscriminationByIsolation",
     applyRhoCorrection = cms.bool( False ),
@@ -83923,10 +83949,10 @@ process.hltPFTauMediumHighPtRelaxedIsoRelativeIsolationDiscriminator = cms.EDPro
     minTauPtForNoIso = cms.double( 500.0 ),
     vertexSrc = cms.InputTag( "NotUsed" ),
     applySumPtCut = cms.bool( False ),
-    rhoConeSize = cms.double( 0.5 ),
+    customOuterCone = cms.double( -1.0 ),
     ApplyDiscriminationByTrackerIsolation = cms.bool( True ),
     storeRawPhotonSumPt_outsideSignalCone = cms.bool( False ),
-    rhoUEOffsetCorrection = cms.double( 1.0 ),
+    enableHGCalWorkaround = cms.bool( False ),
     rhoProducer = cms.InputTag( "hltFixedGridRhoFastjetAll" ),
     maxRelPhotonSumPt_outsideSignalCone = cms.double( 0.1 ),
     deltaBetaFactor = cms.string( "0.38" ),
@@ -83936,7 +83962,7 @@ process.hltPFTauMediumHighPtRelaxedIsoRelativeIsolationDiscriminator = cms.EDPro
     Prediscriminants = cms.PSet(  BooleanOperator = cms.string( "and" ) ),
     applyOccupancyCut = cms.bool( False ),
     applyDeltaBetaCorrection = cms.bool( False ),
-    WeightECALIsolation = cms.double( 1.0 ),
+    rhoConeSize = cms.double( 0.5 ),
     applyRelativeSumPtCut = cms.bool( True ),
     storeRawPUsumPt = cms.bool( False ),
     applyPhotonPtSumOutsideSignalConeCut = cms.bool( False ),
@@ -83961,15 +83987,16 @@ process.hltPFTauMediumHighPtRelaxedIsoRelativeIsolationDiscriminator = cms.EDPro
         selection = cms.string( "decayMode() = 10" )
       )
     ),
+    WeightECALIsolation = cms.double( 1.0 ),
     deltaBetaPUTrackPtCutOverride_val = cms.double( 0.5 ),
     ApplyDiscriminationByECALIsolation = cms.bool( False ),
     isoConeSizeForDeltaBeta = cms.double( 0.3 ),
     storeRawSumPt = cms.bool( False ),
-    verbosity = cms.int32( 0 ),
+    rhoUEOffsetCorrection = cms.double( 1.0 ),
     storeRawFootprintCorrection = cms.bool( False ),
     relativeSumPtOffset = cms.double( 200.0 ),
-    customOuterCone = cms.double( -1.0 ),
-    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" )
+    particleFlowSrc = cms.InputTag( "hltParticleFlowForTaus" ),
+    verbosity = cms.int32( 0 )
 )
 process.hltPFTauMediumHighPtRelaxedIsoAbsOrRelIsolationDiscriminator = cms.EDProducer( "PFTauDiscriminatorLogicalAndProducer",
     Prediscriminants = cms.PSet( 
@@ -88344,13 +88371,13 @@ process.hltDeepBLifetimeTagInfosPFAK8 = cms.EDProducer( "CandIPProducer",
     minimumTransverseMomentum = cms.double( 1.0 ),
     primaryVertex = cms.InputTag( "hltVerticesPFFilter" ),
     maximumLongitudinalImpactParameter = cms.double( 17.0 ),
-    jets = cms.InputTag( "hltPFJetForBtagAK8" ),
+    computeGhostTrack = cms.bool( True ),
     maxDeltaR = cms.double( 0.4 ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     jetDirectionUsingGhostTrack = cms.bool( False ),
     minimumNumberOfPixelHits = cms.int32( 2 ),
     jetDirectionUsingTracks = cms.bool( False ),
-    computeGhostTrack = cms.bool( True ),
+    jets = cms.InputTag( "hltPFJetForBtagAK8" ),
     useTrackQuality = cms.bool( False ),
     ghostTrackPriorDeltaR = cms.double( 0.03 ),
     maximumChiSquared = cms.double( 5.0 ),
@@ -88567,13 +88594,13 @@ process.hltBoostedDBLifetimeTagInfosPFAK8 = cms.EDProducer( "CandIPProducer",
     minimumTransverseMomentum = cms.double( 1.0 ),
     primaryVertex = cms.InputTag( "hltVerticesPFFilter" ),
     maximumLongitudinalImpactParameter = cms.double( 17.0 ),
-    jets = cms.InputTag( "hltPFJetForDBtagAK8" ),
+    computeGhostTrack = cms.bool( True ),
     maxDeltaR = cms.double( 0.4 ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     jetDirectionUsingGhostTrack = cms.bool( False ),
     minimumNumberOfPixelHits = cms.int32( 2 ),
     jetDirectionUsingTracks = cms.bool( False ),
-    computeGhostTrack = cms.bool( True ),
+    jets = cms.InputTag( "hltPFJetForDBtagAK8" ),
     useTrackQuality = cms.bool( False ),
     ghostTrackPriorDeltaR = cms.double( 0.03 ),
     maximumChiSquared = cms.double( 5.0 ),
@@ -94037,7 +94064,6 @@ process.options = cms.untracked.PSet(
     wantSummary = cms.untracked.bool( True ),
     numberOfThreads = cms.untracked.uint32( 4 ),
     numberOfStreams = cms.untracked.uint32( 0 ),
-    sizeOfStackForThreadsInKB = cms.untracked.uint32( 10*1024 )
 )
 
 # override the GlobalTag, connection string and pfnPrefix
@@ -94046,11 +94072,12 @@ if 'GlobalTag' in process.__dict__:
     process.GlobalTag = customiseGlobalTag(process.GlobalTag, globaltag = 'auto:run3_hlt_GRun')
 
 if 'MessageLogger' in process.__dict__:
-    process.MessageLogger.TriggerSummaryProducerAOD=cms.untracked.PSet()
-    process.MessageLogger.L1GtTrigReport=cms.untracked.PSet()
-    process.MessageLogger.L1TGlobalSummary=cms.untracked.PSet()
-    process.MessageLogger.HLTrigReport=cms.untracked.PSet()
-    process.MessageLogger.FastReport=cms.untracked.PSet()
+    process.MessageLogger.TriggerSummaryProducerAOD = cms.untracked.PSet()
+    process.MessageLogger.L1GtTrigReport = cms.untracked.PSet()
+    process.MessageLogger.L1TGlobalSummary = cms.untracked.PSet()
+    process.MessageLogger.HLTrigReport = cms.untracked.PSet()
+    process.MessageLogger.FastReport = cms.untracked.PSet()
+    process.MessageLogger.ThroughputService = cms.untracked.PSet()
 
 # add specific customizations
 _customInfo = {}
