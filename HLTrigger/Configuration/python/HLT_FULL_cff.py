@@ -1,13 +1,13 @@
 # hltGetConfiguration --cff --data /dev/CMSSW_11_3_0/HLT --type FULL
 
-# /dev/CMSSW_11_3_0/HLT/V17 (CMSSW_11_3_0_pre4)
+# /dev/CMSSW_11_3_0/HLT/V19 (CMSSW_11_3_0_pre5)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/HLT/V17')
+  tableName = cms.string('/dev/CMSSW_11_3_0/HLT/V19')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -34842,8 +34842,7 @@ fragment.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
         coolingFactor = cms.double( 0.6 ),
         Tpurge = cms.double( 2.0 ),
         Tmin = cms.double( 2.4 ),
-        uniquetrkweight = cms.double( 0.9 ),
-        use_vdt = cms.untracked.bool( True )
+        uniquetrkweight = cms.double( 0.9 )
       ),
       algorithm = cms.string( "DA_vect" )
     )
@@ -51896,8 +51895,7 @@ fragment.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
         coolingFactor = cms.double( 0.6 ),
         Tpurge = cms.double( 2.0 ),
         Tmin = cms.double( 2.4 ),
-        uniquetrkweight = cms.double( 0.9 ),
-        use_vdt = cms.untracked.bool( True )
+        uniquetrkweight = cms.double( 0.9 )
       ),
       algorithm = cms.string( "DA_vect" )
     )
@@ -88899,8 +88897,7 @@ fragment.hltVerticesL3PFBjets = cms.EDProducer( "PrimaryVertexProducer",
         coolingFactor = cms.double( 0.6 ),
         Tpurge = cms.double( 2.0 ),
         Tmin = cms.double( 2.4 ),
-        uniquetrkweight = cms.double( 0.9 ),
-        use_vdt = cms.untracked.bool( True )
+        uniquetrkweight = cms.double( 0.9 )
       ),
       algorithm = cms.string( "DA_vect" )
     )
@@ -106147,8 +106144,7 @@ fragment.hltVerticesPFPPOnAA = cms.EDProducer( "PrimaryVertexProducer",
         coolingFactor = cms.double( 0.6 ),
         Tpurge = cms.double( 2.0 ),
         Tmin = cms.double( 2.4 ),
-        uniquetrkweight = cms.double( 0.9 ),
-        use_vdt = cms.untracked.bool( True )
+        uniquetrkweight = cms.double( 0.9 )
       ),
       algorithm = cms.string( "DA_vect" )
     )
