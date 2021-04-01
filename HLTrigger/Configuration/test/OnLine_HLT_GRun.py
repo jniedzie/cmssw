@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_11_3_0/GRun --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_11_3_0/GRun/V12 (CMSSW_11_3_0_pre4)
+# /dev/CMSSW_11_3_0/GRun/V13 (CMSSW_11_3_0_pre5)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTGRun" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V12')
+  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V13')
 )
 
 process.transferSystem = cms.PSet( 
@@ -33688,8 +33688,7 @@ process.hltVerticesPF = cms.EDProducer( "PrimaryVertexProducer",
         coolingFactor = cms.double( 0.6 ),
         Tpurge = cms.double( 2.0 ),
         Tmin = cms.double( 2.4 ),
-        uniquetrkweight = cms.double( 0.9 ),
-        use_vdt = cms.untracked.bool( True )
+        uniquetrkweight = cms.double( 0.9 )
       ),
       algorithm = cms.string( "DA_vect" )
     )
@@ -50334,8 +50333,7 @@ process.hltVerticesL3 = cms.EDProducer( "PrimaryVertexProducer",
         coolingFactor = cms.double( 0.6 ),
         Tpurge = cms.double( 2.0 ),
         Tmin = cms.double( 2.4 ),
-        uniquetrkweight = cms.double( 0.9 ),
-        use_vdt = cms.untracked.bool( True )
+        uniquetrkweight = cms.double( 0.9 )
       ),
       algorithm = cms.string( "DA_vect" )
     )
