@@ -1,13 +1,13 @@
-# hltGetConfiguration --cff --data /dev/CMSSW_11_3_0/GRun --type GRun
+# hltGetConfiguration --cff --data /dev/CMSSW_12_0_0/GRun --type GRun
 
-# /dev/CMSSW_11_3_0/GRun/V13 (CMSSW_11_3_0_pre5)
+# /dev/CMSSW_12_0_0/GRun/V1 (CMSSW_12_0_0_pre1)
 
 import FWCore.ParameterSet.Config as cms
 
 fragment = cms.ProcessFragment( "HLT" )
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_11_3_0/GRun/V13')
+  tableName = cms.string('/dev/CMSSW_12_0_0/GRun/V1')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -6217,10 +6217,8 @@ fragment.hltESPMuonTransientTrackingRecHitBuilder = cms.ESProducer( "MuonTransie
   ComponentName = cms.string( "hltESPMuonTransientTrackingRecHitBuilder" )
 )
 fragment.hltESPPixelCPEGeneric = cms.ESProducer( "PixelCPEGenericESProducer",
-  DoLorentz = cms.bool( False ),
-  useLAAlignmentOffsets = cms.bool( False ),
-  Upgrade = cms.bool( False ),
   DoCosmics = cms.bool( False ),
+  Upgrade = cms.bool( False ),
   eff_charge_cut_highX = cms.double( 1.0 ),
   eff_charge_cut_highY = cms.double( 1.0 ),
   inflate_all_errors_no_trk_angle = cms.bool( False ),
@@ -6236,26 +6234,29 @@ fragment.hltESPPixelCPEGeneric = cms.ESProducer( "PixelCPEGenericESProducer",
   ClusterProbComputationFlag = cms.int32( 0 ),
   Alpha2Order = cms.bool( True ),
   appendToDataLabel = cms.string( "" ),
-  lAWidthFPix = cms.double( 0.0 ),
+  useLAFromDB = cms.bool( True ),
   SmallPitch = cms.bool( False ),
+  lAWidthFPix = cms.double( 0.0 ),
   LoadTemplatesFromDB = cms.bool( True ),
   NoTemplateErrorsWhenNoTrkAngles = cms.bool( False ),
   EdgeClusterErrorX = cms.double( 50.0 ),
   EdgeClusterErrorY = cms.double( 85.0 ),
   lAOffset = cms.double( 0.0 ),
+  doLorentzFromAlignment = cms.bool( False ),
   ComponentName = cms.string( "hltESPPixelCPEGeneric" ),
   MagneticFieldRecord = cms.ESInputTag( "" ),
   IrradiationBiasCorrection = cms.bool( True )
 )
 fragment.hltESPPixelCPETemplateReco = cms.ESProducer( "PixelCPETemplateRecoESProducer",
-  DoLorentz = cms.bool( True ),
   barrelTemplateID = cms.int32( 0 ),
   appendToDataLabel = cms.string( "" ),
   lAOffset = cms.double( 0.0 ),
-  lAWidthFPix = cms.double( 0.0 ),
+  doLorentzFromAlignment = cms.bool( False ),
+  useLAFromDB = cms.bool( True ),
   ComponentName = cms.string( "hltESPPixelCPETemplateReco" ),
   directoryWithTemplates = cms.int32( 0 ),
   useLAWidthFromDB = cms.bool( True ),
+  lAWidthFPix = cms.double( 0.0 ),
   lAWidthBPix = cms.double( 0.0 ),
   ClusterProbComputationFlag = cms.int32( 0 ),
   LoadTemplatesFromDB = cms.bool( True ),
@@ -7691,6 +7692,7 @@ fragment.hltMuonCSCDigis = cms.EDProducer( "CSCDCCUnpacker",
     VisualFEDInspect = cms.untracked.bool( False ),
     FormatedEventDump = cms.untracked.bool( False ),
     useGEMs = cms.bool( False ),
+    useCSCShowers = cms.bool( False ),
     UseFormatStatus = cms.bool( True ),
     UseSelectiveUnpacking = cms.bool( True ),
     VisualFEDShort = cms.untracked.bool( False )
@@ -7721,7 +7723,6 @@ fragment.hltCsc2DRecHits = cms.EDProducer( "CSCRecHitDProducer",
     NoiseLevel_ME32 = cms.double( 9.0 ),
     NoiseLevel_ME31 = cms.double( 9.0 ),
     ConstSyst_ME1b = cms.double( 0.007 ),
-    CSCStripClusterSize = cms.untracked.int32( 3 ),
     CSCStripPeakThreshold = cms.double( 10.0 ),
     readBadChannels = cms.bool( False ),
     NoiseLevel_ME12 = cms.double( 9.0 ),
@@ -8072,7 +8073,6 @@ fragment.hltSiPixelDigis = cms.EDProducer( "SiPixelRawToDigi",
     IncludeErrors = cms.bool( True ),
     ErrorList = cms.vint32( 29 ),
     Regions = cms.PSet(  ),
-    Timing = cms.untracked.bool( False ),
     CablingMapLabel = cms.string( "" ),
     UserErrorList = cms.vint32(  )
 )
@@ -13555,10 +13555,12 @@ fragment.hltDiMu5Ele3CaloIdLTrackIdLElectronlegEtFilter = cms.EDFilter( "HLTEgam
     ncandcut = cms.int32( 2 )
 )
 fragment.hltEgammaClusterShape = cms.EDProducer( "EgammaHLTClusterShapeProducer",
+    isIeta = cms.bool( True ),
+    multThresEE = cms.double( 1.25 ),
     recoEcalCandidateProducer = cms.InputTag( "hltEgammaCandidates" ),
     ecalRechitEB = cms.InputTag( 'hltRechitInRegionsECAL','EcalRecHitsEB' ),
     ecalRechitEE = cms.InputTag( 'hltRechitInRegionsECAL','EcalRecHitsEE' ),
-    isIeta = cms.bool( True )
+    multThresEB = cms.double( 1.0 )
 )
 fragment.hltDiMu5Ele3CaloIdLTrackIdLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
     thrOverE2EE = cms.vdouble( -1.0 ),
@@ -16710,10 +16712,12 @@ fragment.hltDiEG25HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
     rhoScale = cms.double( 1.0 )
 )
 fragment.hltEgammaClusterShapeUnseeded = cms.EDProducer( "EgammaHLTClusterShapeProducer",
+    isIeta = cms.bool( True ),
+    multThresEE = cms.double( 1.25 ),
     recoEcalCandidateProducer = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     ecalRechitEB = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEB' ),
     ecalRechitEE = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEE' ),
-    isIeta = cms.bool( True )
+    multThresEB = cms.double( 1.0 )
 )
 fragment.hltDiEG25CaloIdLClusterShapeUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
     thrOverE2EE = cms.vdouble( -1.0 ),
@@ -35048,7 +35052,6 @@ fragment.hltSiPixelDigisRegL1TauSeeded = cms.EDProducer( "SiPixelRawToDigi",
       beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
       deltaPhi = cms.vdouble( 0.5 )
     ),
-    Timing = cms.untracked.bool( False ),
     CablingMapLabel = cms.string( "" ),
     UserErrorList = cms.vint32(  )
 )
@@ -40756,7 +40759,6 @@ fragment.hltSiPixelDigisRegForTau = cms.EDProducer( "SiPixelRawToDigi",
       beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
       deltaPhi = cms.vdouble( 0.5 )
     ),
-    Timing = cms.untracked.bool( False ),
     CablingMapLabel = cms.string( "" ),
     UserErrorList = cms.vint32(  )
 )
@@ -48833,7 +48835,6 @@ fragment.hltSiPixelDigisRegForBTag = cms.EDProducer( "SiPixelRawToDigi",
       beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
       deltaPhi = cms.vdouble( 0.5 )
     ),
-    Timing = cms.untracked.bool( False ),
     CablingMapLabel = cms.string( "" ),
     UserErrorList = cms.vint32(  )
 )
