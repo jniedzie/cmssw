@@ -2,8 +2,6 @@ import FWCore.ParameterSet.Config as cms
 
 process = cms.Process("GeometryXMLWriter")
 
-process.load('Configuration.Geometry.GeometryExtended_cff')
-
 process.source = cms.Source("EmptyIOVSource",
                             lastValue = cms.uint64(1),
                             timetype = cms.string('runnumber'),
@@ -11,8 +9,16 @@ process.source = cms.Source("EmptyIOVSource",
                             interval = cms.uint64(1)
                             )
 
-process.BigXMLWriter = cms.EDAnalyzer("OutputDDToDDL",
-                              rotNumSeed = cms.int32(0),
+process.DDDetectorESProducer = cms.ESSource("DDDetectorESProducer",
+                                            confGeomXMLFiles = cms.FileInPath('Geometry/CMSCommonData/data/dd4hep/cmsExtendedGeometry2021.xml'),
+                                            appendToDataLabel = cms.string('make-payload')
+                                           )
+
+process.DDCompactViewESProducer = cms.ESProducer("DDCompactViewESProducer",
+                                                  appendToDataLabel = cms.string('make-payload')
+                                                )
+
+process.BigXMLWriter = cms.EDAnalyzer("OutputDD4hepToDDL",
                               fileName = cms.untracked.string("./geSingleBigFile.xml")
                               )
 
