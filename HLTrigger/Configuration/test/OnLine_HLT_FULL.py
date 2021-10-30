@@ -1,13 +1,13 @@
-# hltGetConfiguration --full --data /dev/CMSSW_12_1_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
+# hltGetConfiguration --full --data /dev/CMSSW_12_2_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_12_1_0/HLT/V23 (CMSSW_12_1_0_pre4)
+# /dev/CMSSW_12_2_0/HLT/V2 (CMSSW_12_2_0_pre1)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_12_1_0/HLT/V23')
+  tableName = cms.string('/dev/CMSSW_12_2_0/HLT/V2')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6923,11 +6923,6 @@ process.VolumeBasedMagneticFieldESProducer = cms.ESProducer( "VolumeBasedMagneti
   debugBuilder = cms.untracked.bool( False ),
   valueOverride = cms.int32( -1 )
 )
-process.XMLIdealGeometryESSource_CTPPS = cms.ESProducer( "XMLIdealGeometryESProducer",
-  rootDDName = cms.string( "cms:CMSE" ),
-  label = cms.string( "CTPPS" ),
-  appendToDataLabel = cms.string( "XMLIdealGeometryESSource_CTPPS" )
-)
 process.ZdcGeometryFromDBEP = cms.ESProducer( "ZdcGeometryFromDBEP",
   applyAlignment = cms.bool( False )
 )
@@ -6950,8 +6945,8 @@ process.ctppsGeometryESModule = cms.ESProducer( "CTPPSGeometryESModule",
   buildMisalignedGeometry = cms.bool( False ),
   isRun2 = cms.bool( False ),
   dbTag = cms.string( "" ),
-  compactViewTag = cms.string( "XMLIdealGeometryESSource_CTPPS" ),
-  fromPreprocessedDB = cms.untracked.bool( False ),
+  compactViewTag = cms.string( "" ),
+  fromPreprocessedDB = cms.untracked.bool( True ),
   fromDD4hep = cms.untracked.bool( False ),
   appendToDataLabel = cms.string( "" )
 )
@@ -33575,7 +33570,9 @@ process.hltPFTau30TrackLooseChargedIso = cms.EDFilter( "HLT1PFTau",
 process.hltL1JetsHLTPFTauTrackLooseChargedIsolationMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackFindingLooseChargedIsolation" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau30LooseChargedIsolationL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -33614,14 +33611,16 @@ process.hltPreEle24eta2p1WPTightGsfLooseChargedIsoPFTauHPS30eta2p1CrossL1 = cms.
     L1GtReadoutRecordTag = cms.InputTag( "hltGtStage2Digis" )
 )
 process.hltStripTrackerHVOn = cms.EDFilter( "DetectorStateFilter",
-    DetectorType = cms.untracked.string( "sistrip" ),
     DebugOn = cms.untracked.bool( False ),
-    DcsStatusLabel = cms.untracked.InputTag( "hltScalersRawToDigi" )
+    DetectorType = cms.untracked.string( "sistrip" ),
+    DcsStatusLabel = cms.untracked.InputTag( "hltScalersRawToDigi" ),
+    DCSRecordLabel = cms.untracked.InputTag( "onlineMetaDataDigis" )
 )
 process.hltPixelTrackerHVOn = cms.EDFilter( "DetectorStateFilter",
-    DetectorType = cms.untracked.string( "pixel" ),
     DebugOn = cms.untracked.bool( False ),
-    DcsStatusLabel = cms.untracked.InputTag( "hltScalersRawToDigi" )
+    DetectorType = cms.untracked.string( "pixel" ),
+    DcsStatusLabel = cms.untracked.InputTag( "hltScalersRawToDigi" ),
+    DCSRecordLabel = cms.untracked.InputTag( "onlineMetaDataDigis" )
 )
 process.hltHpsTauPFJetsRecoTauChargedHadronsWithNeutrals = cms.EDProducer( "PFRecoTauChargedHadronProducer",
     ranking = cms.VPSet( 
@@ -34372,7 +34371,9 @@ process.hltHpsPFTau30TrackLooseChargedIso = cms.EDFilter( "HLT1PFTau",
 process.hltHpsL1JetsHLTPFTauTrackLooseChargedIsolationMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingLooseChargedIsolation" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30LooseChargedIsolationL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -34641,7 +34642,9 @@ process.hltHpsPFTau30TrackMediumChargedIso = cms.EDFilter( "HLT1PFTau",
 process.hltHpsL1JetsHLTPFTauTrackMediumChargedIsolationMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingMediumChargedIsolation" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30MediumChargedIsolationL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -34910,7 +34913,9 @@ process.hltHpsPFTau30TrackTightChargedIso = cms.EDFilter( "HLT1PFTau",
 process.hltHpsL1JetsHLTPFTauTrackTightChargedIsolationMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingTightChargedIsolation" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30TightChargedIsolationL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -35073,7 +35078,9 @@ process.hltHpsPFTau30TrackLooseChargedIsoTightOOSCPhotons = cms.EDFilter( "HLT1P
 process.hltHpsL1JetsHLTPFTauTrackLooseChargedIsolationTightOOSCPhotonsMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingLooseChargedIsolationTightOOSCPhotons" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30LooseChargedIsolationTightOOSCPhotonsL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -35143,7 +35150,9 @@ process.hltHpsPFTau30TrackMediumChargedIsoTightOOSCPhotons = cms.EDFilter( "HLT1
 process.hltHpsL1JetsHLTPFTauTrackMediumChargedIsolationTightOOSCPhotonsMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingMediumChargedIsolationTightOOSCPhotons" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30MediumChargedIsolationTightOOSCPhotonsL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -35213,7 +35222,9 @@ process.hltHpsPFTau30TrackTightChargedIsoTightOOSCPhotons = cms.EDFilter( "HLT1P
 process.hltHpsL1JetsHLTPFTauTrackTightChargedIsolationTightOOSCPhotonsMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORLooseIsoEGXXerIsoTauYYerdRMin0p3" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingTightChargedIsolationTightOOSCPhotons" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30TightChargedIsolationTightOOSCPhotonsL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36163,7 +36174,9 @@ process.hltPFTau27TrackLooseChargedIsoAgainstMuon = cms.EDFilter( "HLT1PFTau",
 process.hltL1JetsHLTPFTauTrackLooseChargedIsolationAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackFindingLooseChargedIsolationAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau27LooseChargedIsolationAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36289,7 +36302,9 @@ process.hltHpsPFTau27TrackLooseChargedIsoAgainstMuon = cms.EDFilter( "HLT1PFTau"
 process.hltHpsL1JetsHLTPFTauTrackLooseChargedIsolationAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingLooseChargedIsolationAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau27LooseChargedIsolationAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36371,7 +36386,9 @@ process.hltHpsPFTau27TrackMediumChargedIsoAgainstMuon = cms.EDFilter( "HLT1PFTau
 process.hltHpsL1JetsHLTPFTauTrackMediumChargedIsolationAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingMediumChargedIsolationAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau27MediumChargedIsolationAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36453,7 +36470,9 @@ process.hltHpsPFTau27TrackTightChargedIsoAgainstMuon = cms.EDFilter( "HLT1PFTau"
 process.hltHpsL1JetsHLTPFTauTrackTightChargedIsolationAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingTightChargedIsolationAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau27TightChargedIsolationAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36526,7 +36545,9 @@ process.hltHpsPFTau27TrackLooseChargedIsoTightOOSCPhotonsAgainstMuon = cms.EDFil
 process.hltHpsL1JetsHLTPFTauTrackLooseChargedIsolationTightOOSCPhotonsAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingLooseChargedIsolationTightOOSCPhotonsAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau27LooseChargedIsolationTightOOSCPhotonsAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36599,7 +36620,9 @@ process.hltHpsPFTau27TrackMediumChargedIsoTightOOSCPhotonsAgainstMuon = cms.EDFi
 process.hltHpsL1JetsHLTPFTauTrackMediumChargedIsolationTightOOSCPhotonsAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingMediumChargedIsolationTightOOSCPhotonsAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau27MediumChargedIsolationTightOOSCPhotonsAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -36672,7 +36695,9 @@ process.hltHpsPFTau27TrackTightChargedIsoTightOOSCPhotonsAgainstMuon = cms.EDFil
 process.hltHpsL1JetsHLTPFTauTrackTightChargedIsolationTightOOSCPhotonsAgainstMuonMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigORMu18erTauXXer2p1" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackFindingTightChargedIsolationTightOOSCPhotonsAgainstMuon" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau27TightChargedIsolationTightOOSCPhotonsAgainstMuonL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -39376,7 +39401,9 @@ process.hltSelectedPFTausTrackPt1MediumChargedIsolationReg = cms.EDFilter( "PFTa
 process.hltL1JetsHLTPFTauTrackPt1MediumChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1MediumChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau35TrackPt1MediumChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -39540,7 +39567,9 @@ process.hltSelectedPFTausTrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg = 
 process.hltL1JetsHLTPFTauTrackPt1MediumChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau35TrackPt1MediumChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -39797,7 +39826,9 @@ process.hltSelectedPFTausTrackPt1TightChargedIsolationReg = cms.EDFilter( "PFTau
 process.hltL1JetsHLTPFTauTrackPt1TightChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1TightChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau35TrackPt1TightChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -39868,7 +39899,9 @@ process.hltSelectedPFTausTrackPt1TightChargedIsolationAndTightOOSCPhotonsReg = c
 process.hltL1JetsHLTPFTauTrackPt1TightChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1TightChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau35TrackPt1TightChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -40660,7 +40693,9 @@ process.hltHpsSelectedPFTausTrackPt1TightChargedIsolationReg = cms.EDFilter( "PF
 process.hltHpsL1JetsHLTPFTauTrackPt1TightChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1TightChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau35TrackPt1TightChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -41026,7 +41061,9 @@ process.hltHpsSelectedPFTausTrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg
 process.hltHpsL1JetsHLTPFTauTrackPt1MediumChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau35TrackPt1MediumChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -41097,7 +41134,9 @@ process.hltHpsSelectedPFTausTrackPt1TightChargedIsolationAndTightOOSCPhotonsReg 
 process.hltHpsL1JetsHLTPFTauTrackPt1TightChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1TightChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau35TrackPt1TightChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -41152,7 +41191,9 @@ process.hltHpsSelectedPFTausTrackPt1MediumChargedIsolationReg = cms.EDFilter( "P
 process.hltHpsL1JetsHLTPFTauTrackPt1MediumChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sBigOrMuXXerIsoTauYYer" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1MediumChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau35TrackPt1MediumChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -41354,7 +41395,9 @@ process.hltHpsSinglePFTau30TrackPt1Reg = cms.EDFilter( "HLT1PFTau",
 process.hltHpsL1JetsHLTPFTauTrackPt1MediumChargedIsolationMatchForMu22Tau28Reg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sMu22erIsoTau28er" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1MediumChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsSelectedPFTau30TrackPt1MediumChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -81342,6 +81385,22 @@ process.hltPixelOnlyPFMETProducer = cms.EDProducer( "PFMETProducer",
     applyWeight = cms.bool( False ),
     srcWeights = cms.InputTag( "" )
 )
+process.hltEgammaEleGsfTrackIsoPixelOnly = cms.EDProducer( "EgammaHLTElectronTrackIsolationProducers",
+    electronProducer = cms.InputTag( "hltEgammaGsfElectrons" ),
+    trackProducer = cms.InputTag( "hltPixelTracksZetaClean" ),
+    recoEcalCandidateProducer = cms.InputTag( "hltEgammaCandidates" ),
+    beamSpotProducer = cms.InputTag( "hltOnlineBeamSpot" ),
+    egTrkIsoPtMin = cms.double( 1.0 ),
+    egTrkIsoConeSize = cms.double( 0.2 ),
+    egTrkIsoZSpan = cms.double( 0.15 ),
+    egTrkIsoRSpan = cms.double( 999999.0 ),
+    egTrkIsoVetoConeSizeBarrel = cms.double( 0.03 ),
+    egTrkIsoVetoConeSizeEndcap = cms.double( 0.03 ),
+    egTrkIsoStripBarrel = cms.double( 0.01 ),
+    egTrkIsoStripEndcap = cms.double( 0.01 ),
+    useGsfTrack = cms.bool( True ),
+    useSCRefs = cms.bool( True )
+)
 process.hltDisplacedmumuVtxNoMatchingProducer = cms.EDProducer( "HLTDisplacedmumuVtxProducer",
     Src = cms.InputTag( "hltIterL3MuonCandidatesNoVtx" ),
     PreviousCandTag = cms.InputTag( "hltDoubleMu3L3FilteredNoVtx" ),
@@ -91871,7 +91930,9 @@ process.hltPFTau50TrackPt30MediumAbsOrRelIso1Prong = cms.EDFilter( "HLT1PFTau",
 process.hltL1JetsHLTPFTau50Track30MediumChargedIsolationMatchMu22IsoTau40 = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sMu22erIsoTau40er" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt30MediumAbsOrRelIsolation1Prong" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau50MediumChargedIsolationL1HLTMatchedMu22IsoTau40 = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -91903,7 +91964,9 @@ process.hltPreMediumChargedIsoPFTau50Trk30eta2p11prMET90 = cms.EDFilter( "HLTPre
 process.hltL1JetsHLTPFTau50Track30MediumChargedIsolationMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sIsoTau40erETMHF90To120" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt30MediumAbsOrRelIsolation1Prong" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau50MediumChargedIsolationL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -91979,7 +92042,9 @@ process.hltPreMediumChargedIsoPFTau50Trk30eta2p11pr = cms.EDFilter( "HLTPrescale
 process.hltL1JetsHLTPFTau50Track30MediumChargedIsolationMatchQuadJetIsoTau = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sQuadJet36IsoTau52" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt30MediumAbsOrRelIsolation1Prong" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau50MediumChargedIsolationL1HLTMatchedQuadIsoTau = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -92284,7 +92349,9 @@ process.hltPFTau180TrackPt50LooseAbsOrRelMediumHighPtRelaxedIso1Prong = cms.EDFi
 process.hltL1JetsHLTPFTauTrackMediumChargedIsolationMatch1Prong = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sSingleTau" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt50AbsOrRelMediumHighPtRelaxedIsoIsolation1Prong" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau180MediumChargedIsolationL1HLTMatched1Prong = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -92317,7 +92384,9 @@ process.hltPFTau180TrackPt50LooseAbsOrRelMediumHighPtRelaxedIsoIso = cms.EDFilte
 process.hltL1JetsHLTSinglePFTauTrackMediumChargedIsolationMatch = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sSingleTau" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt50AbsOrRelMediumHighPtRelaxedIsoIsolation" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltSelectedPFTau180MediumChargedIsolationL1HLTMatched = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93180,7 +93249,9 @@ process.hltDoublePFTau35TrackPt1MediumChargedIsolationReg = cms.EDFilter( "HLT1P
 process.hltL1JetsHLTDoublePFTauTrackPt1MediumChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1MediumChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltDoublePFTau35TrackPt1MediumChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93222,7 +93293,9 @@ process.hltDoublePFTau35TrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg = c
 process.hltL1JetsHLTDoublePFTauTrackPt1MediumChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltDoublePFTau35TrackPt1MediumChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93264,7 +93337,9 @@ process.hltDoublePFTau35TrackPt1TightChargedIsolationReg = cms.EDFilter( "HLT1PF
 process.hltL1JetsHLTDoublePFTauTrackPt1TightChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1TightChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltDoublePFTau35TrackPt1TightChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93306,7 +93381,9 @@ process.hltDoublePFTau35TrackPt1TightChargedIsolationAndTightOOSCPhotonsReg = cm
 process.hltL1JetsHLTDoublePFTauTrackPt1TightChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltSelectedPFTausTrackPt1TightChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltDoublePFTau35TrackPt1TightChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93383,7 +93460,9 @@ process.hltHpsDoublePFTau30TrackPt1MediumChargedIsolationReg = cms.EDFilter( "HL
 process.hltHpsL1JetsHLTDoublePFTau30TrackPt1MediumChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauMaxMass" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1MediumChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsDoublePFTau30TrackPt1MediumChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93449,7 +93528,9 @@ process.hltHpsDoublePFTau35TrackPt1TightChargedIsolationReg = cms.EDFilter( "HLT
 process.hltHpsL1JetsHLTDoublePFTauTrackPt1TightChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1TightChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsDoublePFTau35TrackPt1TightChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93491,7 +93572,9 @@ process.hltHpsDoublePFTau35TrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg 
 process.hltHpsL1JetsHLTDoublePFTauTrackPt1MediumChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1MediumChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsDoublePFTau35TrackPt1MediumChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93533,7 +93616,9 @@ process.hltHpsDoublePFTau35TrackPt1MediumChargedIsolationReg = cms.EDFilter( "HL
 process.hltHpsL1JetsHLTDoublePFTauTrackPt1MediumChargedIsolationMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1MediumChargedIsolationReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsDoublePFTau35TrackPt1MediumChargedIsolationL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -93575,7 +93660,9 @@ process.hltHpsDoublePFTau35TrackPt1TightChargedIsolationAndTightOOSCPhotonsReg =
 process.hltHpsL1JetsHLTDoublePFTauTrackPt1TightChargedIsolationAndTightOOSCPhotonsMatchReg = cms.EDProducer( "L1THLTTauMatching",
     L1TauTrigger = cms.InputTag( "hltL1sDoubleTauBigOR" ),
     JetSrc = cms.InputTag( "hltHpsSelectedPFTausTrackPt1TightChargedIsolationAndTightOOSCPhotonsReg" ),
-    EtMin = cms.double( 0.0 )
+    EtMin = cms.double( 0.0 ),
+    ReduceTauContent = cms.bool( True ),
+    KeepOriginalVertex = cms.bool( False )
 )
 process.hltHpsDoublePFTau35TrackPt1TightChargedIsolationAndTightOOSCPhotonsL1HLTMatchedReg = cms.EDFilter( "HLT1PFTau",
     saveTags = cms.bool( True ),
@@ -124774,7 +124861,7 @@ process.hltFEDSelectorL1 = cms.EDProducer( "EvFFEDSelector",
     fedList = cms.vuint32( 1404 )
 )
 process.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
-    pfJetCollection = cms.InputTag( "hltAK4PixelOnlyPFJets" ),
+    pfJetCollection = cms.InputTag( 'hltAK4PixelOnlyPFJets','','@currentProcess' ),
     pfJetTagCollection = cms.InputTag( 'hltCombinedSecondaryVertexBJetTagsPF','','@currentProcess' ),
     pfCandidateCollection = cms.InputTag( 'hltPixelOnlyParticleFlow','','@currentProcess' ),
     vertexCollection = cms.InputTag( 'hltPixelVertices','','@currentProcess' ),
@@ -124784,20 +124871,20 @@ process.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
     pfJetEtaCut = cms.double( 3.0 ),
     pfCandidatePtCut = cms.double( 0.6 ),
     pfCandidateEtaCut = cms.double( 3.0 ),
-    mantissaPrecision = cms.int32( 23 ),
+    mantissaPrecision = cms.int32( 10 ),
     doJetTags = cms.bool( True ),
     doCandidates = cms.bool( True ),
     doMet = cms.bool( True )
 )
 process.hltScoutingMuonPacker = cms.EDProducer( "HLTScoutingMuonProducer",
-    ChargedCandidates = cms.InputTag( 'hltIterL3MuonCandidatesScoutingNoVtx','','@currentProcess' ),
+    ChargedCandidates = cms.InputTag( 'hltIterL3MuonCandidatesNoVtx','','@currentProcess' ),
     displacedvertexCollection = cms.InputTag( 'hltDisplacedmumuVtxNoMatchingProducer','','@currentProcess' ),
-    InputMuons = cms.InputTag( "hltIterL3MuonsScoutingNoVtx" ),
-    InputLinks = cms.InputTag( 'hltL3MuonsIterL3LinksScoutingNoVtx','','@currentProcess' ),
-    Tracks = cms.InputTag( "hltIterL3MuonAndMuonFromL1MergedScoutingNoVtx" ),
-    EcalPFClusterIsoMap = cms.InputTag( 'hltMuonEcalMFPFClusterIsoForMuonsScoutingNoVtx','','@currentProcess' ),
-    HcalPFClusterIsoMap = cms.InputTag( 'hltMuonHcalPFClusterIsoForMuonsScoutingNoVtx','','@currentProcess' ),
-    TrackIsoMap = cms.InputTag( 'hltMuonTkRelIsolationCut0p09MapScoutingNoVtx','combinedRelativeIsoDeposits','@currentProcess' ),
+    InputMuons = cms.InputTag( "hltIterL3MuonsNoVtx" ),
+    InputLinks = cms.InputTag( 'hltL3MuonsIterL3LinksNoVtx','','@currentProcess' ),
+    Tracks = cms.InputTag( "hltIterL3MuonAndMuonFromL1MergedNoVtx" ),
+    EcalPFClusterIsoMap = cms.InputTag( 'hltMuonEcalMFPFClusterIsoForMuonsNoVtx','','@currentProcess' ),
+    HcalPFClusterIsoMap = cms.InputTag( 'hltMuonHcalPFClusterIsoForMuonsNoVtx','','@currentProcess' ),
+    TrackIsoMap = cms.InputTag( 'hltMuonTkRelIsolationCut0p09MapNoVtx','combinedRelativeIsoDeposits','@currentProcess' ),
     muonPtCut = cms.double( 0.0 ),
     muonEtaCut = cms.double( 2.4 ),
     minVtxProbCut = cms.double( 0.001 )
@@ -124813,7 +124900,7 @@ process.hltScoutingEgammaPacker = cms.EDProducer( "HLTScoutingEgammaProducer",
     MissingHitsMap = cms.InputTag( 'hltEgammaGsfTrackVars','MissingHits','@currentProcess' ),
     OneOEMinusOneOPMap = cms.InputTag( 'hltEgammaGsfTrackVars','OneOESuperMinusOneOP','@currentProcess' ),
     EcalPFClusterIsoMap = cms.InputTag( 'hltEgammaEcalPFClusterIso','','@currentProcess' ),
-    EleGsfTrackIsoMap = cms.InputTag( 'hltEgammaEleGsfTrackIso','','@currentProcess' ),
+    EleGsfTrackIsoMap = cms.InputTag( 'hltEgammaEleGsfTrackIsoPixelOnly','','@currentProcess' ),
     HcalPFClusterIsoMap = cms.InputTag( 'hltEgammaHcalPFClusterIso','','@currentProcess' ),
     egammaPtCut = cms.double( 2.0 ),
     egammaEtaCut = cms.double( 2.5 ),
@@ -130318,7 +130405,9 @@ process.HLTAK4PixelOnlyPFJetsReconstructionSequence = cms.Sequence( process.HLTL
 process.HLTAK4PixelOnlyPFCorrectorProducersSequence = cms.Sequence( process.hltAK4PixelOnlyPFFastJetCorrector + process.hltAK4PixelOnlyPFRelativeCorrector + process.hltAK4PixelOnlyPFAbsoluteCorrector + process.hltAK4PixelOnlyPFResidualCorrector + process.hltAK4PixelOnlyPFCorrector )
 process.HLTAK4PixelOnlyPFJetsCorrectionSequence = cms.Sequence( process.hltFixedGridRhoFastjetPixelOnlyAll + process.HLTAK4PixelOnlyPFCorrectorProducersSequence + process.hltAK4PixelOnlyPFJetsCorrected + process.hltAK4PixelOnlyPFJetsLooseIDCorrected + process.hltAK4PixelOnlyPFJetsTightIDCorrected )
 process.HLTAK4PixelOnlyPFJetsSequence = cms.Sequence( process.HLTPreAK4PFJetsRecoSequence + process.HLTAK4PixelOnlyPFJetsReconstructionSequence + process.HLTAK4PixelOnlyPFJetsCorrectionSequence )
-process.HLTPixelOnlyPFScoutingSequence = cms.Sequence( process.HLTAK4PixelOnlyPFJetsSequence + process.hltPixelOnlyPFMETProducer + process.HLTMuIsolationSequence + process.HLTDoFullUnpackingEgammaEcalSequence + process.HLTPFClusteringForEgamma + process.hltEgammaCandidates + process.hltEgammaClusterShape + process.HLTDoLocalHcalSequence + process.HLTFastJetForEgamma + process.hltEgammaHoverE + process.hltEgammaEcalPFClusterIso + process.HLTPFHcalClustering + process.hltEgammaHcalPFClusterIso + process.HLTElePixelMatchSequence + process.HLTGsfElectronSequence + process.HLTTrackReconstructionForIsoElectronIter02 + process.hltEgammaEleGsfTrackIso )
+process.HLTTrackReconstructionForPixelOnlyPFNoMu = cms.Sequence( process.HLTDoLocalPixelSequence + process.HLTRecopixelvertexingSequence )
+process.HLTTrackReconstructionForIsoElectronPixelOnly = cms.Sequence( process.HLTPreAK4PFJetsRecoSequence + process.HLTTrackReconstructionForPixelOnlyPFNoMu + process.hltPixelTracksZetaClean )
+process.HLTPixelOnlyPFScoutingSequence = cms.Sequence( process.HLTAK4PixelOnlyPFJetsSequence + process.hltPixelOnlyPFMETProducer + process.HLTMuIsolationSequence + process.HLTDoFullUnpackingEgammaEcalSequence + process.HLTPFClusteringForEgamma + process.hltEgammaCandidates + process.hltEgammaClusterShape + process.HLTDoLocalHcalSequence + process.HLTFastJetForEgamma + process.hltEgammaHoverE + process.hltEgammaEcalPFClusterIso + process.HLTPFHcalClustering + process.hltEgammaHcalPFClusterIso + process.HLTElePixelMatchSequence + process.HLTGsfElectronSequence + process.HLTTrackReconstructionForIsoElectronPixelOnly + process.hltEgammaEleGsfTrackIsoPixelOnly )
 process.HLTRecopixelvertexingForHighMultSequence = cms.Sequence( process.hltPixelTracksForHighMultFilter + process.hltPixelTracksForHighMultFitter + process.hltPixelTracksTrackingRegionsForHighMult + process.hltPixelLayerQuadruplets + process.hltPixelTracksHitDoubletsForHighMult + process.hltPixelTracksHitQuadrupletsForHighMult + process.hltPixelTracksForHighMult + process.hltPixelVerticesForHighMult )
 process.HLTDoHIEcalClusWithCleaningSequence = cms.Sequence( process.hltIslandBasicClustersHI + process.hltHiIslandSuperClustersHI + process.hltHiCorrectedIslandBarrelSuperClustersHI + process.hltHiCorrectedIslandEndcapSuperClustersHI + process.hltCleanedHiCorrectedIslandBarrelSuperClustersHI + process.hltRecoHIEcalWithCleaningCandidate )
 process.HLTPhoton20SequenceLooseHOverE = cms.Sequence( process.HLTDoFullUnpackingEgammaEcalSequence + process.HLTPFClusteringForEgamma + process.hltEgammaCandidates + process.hltEGL1SingleEG10Filter + process.hltEG20EtFilterLooseHoverE + process.HLTDoLocalHcalSequence + process.HLTFastJetForEgamma + process.hltEgammaHoverE + process.hltEG20HEFilterLooseHoverE )
