@@ -1,13 +1,13 @@
 # hltGetConfiguration --full --data /dev/CMSSW_12_2_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_12_2_0/HLT/V7 (CMSSW_12_2_0_pre2)
+# /dev/CMSSW_12_2_0/HLT/V8 (CMSSW_12_2_0_pre2)
 
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_12_2_0/HLT/V7')
+  tableName = cms.string('/dev/CMSSW_12_2_0/HLT/V8')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6691,6 +6691,13 @@ process.EcalLaserCorrectionService = cms.ESProducer( "EcalLaserCorrectionService
 )
 process.EcalPreshowerGeometryFromDBEP = cms.ESProducer( "EcalPreshowerGeometryFromDBEP",
   applyAlignment = cms.bool( True )
+)
+process.GEMGeometryESModule = cms.ESProducer( "GEMGeometryESModule",
+  fromDDD = cms.bool( False ),
+  fromDD4hep = cms.bool( False ),
+  applyAlignment = cms.bool( False ),
+  alignmentsLabel = cms.string( "" ),
+  appendToDataLabel = cms.string( "" )
 )
 process.GlobalParameters = cms.ESProducer( "StableParametersTrivialProducer",
   TotalBxInEvent = cms.int32( 5 ),
