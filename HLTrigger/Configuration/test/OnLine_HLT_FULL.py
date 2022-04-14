@@ -1,6 +1,6 @@
 # hltGetConfiguration --full --data /dev/CMSSW_12_3_0/HLT --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_12_3_0/HLT/V87 (CMSSW_12_3_0)
+# /dev/CMSSW_12_3_0/HLT/V89 (CMSSW_12_3_0)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ from HeterogeneousCore.CUDACore.SwitchProducerCUDA import SwitchProducerCUDA
 process = cms.Process( "HLTFULL" )
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_12_3_0/HLT/V87')
+  tableName = cms.string('/dev/CMSSW_12_3_0/HLT/V89')
 )
 
 process.transferSystem = cms.PSet( 
@@ -5357,12 +5357,10 @@ process.GlobalTag = cms.ESSource( "PoolDBESSource",
     snapshotTime = cms.string( "" ),
     toGet = cms.VPSet( 
       cms.PSet(  record = cms.string( "BeamSpotOnlineLegacyObjectsRcd" ),
-        refreshTime = cms.uint64( 2 ),
-        tag = cms.string( "BeamSpotOnlineLegacy" )
+        refreshTime = cms.uint64( 2 )
       ),
       cms.PSet(  record = cms.string( "BeamSpotOnlineHLTObjectsRcd" ),
-        refreshTime = cms.uint64( 2 ),
-        tag = cms.string( "BeamSpotOnlineHLT" )
+        refreshTime = cms.uint64( 2 )
       )
     ),
     DumpStat = cms.untracked.bool( False ),
@@ -8440,10 +8438,10 @@ process.hltRpcRecHits = cms.EDProducer( "RPCRecHitProducer",
 )
 process.hltMuonGEMDigis = cms.EDProducer( "GEMRawToDigiModule",
     InputLabel = cms.InputTag( "rawDataCollector" ),
-    useDBEMap = cms.bool( False ),
+    useDBEMap = cms.bool( True ),
     keepDAQStatus = cms.bool( False ),
     readMultiBX = cms.bool( False ),
-    ge21Off = cms.bool( False ),
+    ge21Off = cms.bool( True ),
     fedIdStart = cms.uint32( 1467 ),
     fedIdEnd = cms.uint32( 1478 )
 )
