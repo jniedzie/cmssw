@@ -1,6 +1,6 @@
-# hltGetConfiguration --cff --data /dev/CMSSW_12_4_0/GRun --type GRun
+# hltGetConfiguration --cff --data /frozen/2022/2e34/v1.1/HLT --type 2022v11
 
-# /dev/CMSSW_12_4_0/GRun/V13 (CMSSW_12_4_0_pre4)
+# /frozen/2022/2e34/v1.1/HLT/V2 (CMSSW_12_4_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_12_4_0/GRun/V13')
+  tableName = cms.string('/frozen/2022/2e34/v1.1/HLT/V2')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -82803,10 +82803,10 @@ if 'hltGetConditions' in fragment.__dict__ and 'HLTriggerFirstPath' in fragment.
 
 # add specific customizations
 from HLTrigger.Configuration.customizeHLTforALL import customizeHLTforAll
-fragment = customizeHLTforAll(fragment,"GRun")
+fragment = customizeHLTforAll(fragment,"2022v11")
 
 from HLTrigger.Configuration.customizeHLTforCMSSW import customizeHLTforCMSSW
-fragment = customizeHLTforCMSSW(fragment,"GRun")
+fragment = customizeHLTforCMSSW(fragment,"2022v11")
 
 # Eras-based customisations
 from HLTrigger.Configuration.Eras import modifyHLTforEras
