@@ -1,6 +1,6 @@
-# hltGetConfiguration --cff --data /dev/CMSSW_12_3_0/HLT --type FULL
+# hltGetConfiguration --cff --data /dev/CMSSW_12_4_0/HLT --type FULL
 
-# /dev/CMSSW_12_3_0/HLT/V106 (CMSSW_12_3_0)
+# /dev/CMSSW_12_4_0/HLT/V24 (CMSSW_12_4_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_12_3_0/HLT/V106')
+  tableName = cms.string('/dev/CMSSW_12_4_0/HLT/V24')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -10473,7 +10473,8 @@ fragment.hltIterL3MuonTracks = cms.EDProducer( "HLTMuonTrackSelector",
     copyTrajectories = cms.untracked.bool( False )
 )
 fragment.hltIterL3MuonCandidates = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltIterL3Muons" )
+    InputObjects = cms.InputTag( "hltIterL3Muons" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltIter0PFLowPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProducer",
     InputCollection = cms.InputTag( "hltPixelTracks" ),
@@ -12736,7 +12737,6 @@ fragment.hltParticleFlowSuperClusterECALL1Seeded = cms.EDProducer( "PFECALSuperC
     thresh_PFClusterEndcap = cms.double( 0.5 ),
     ESAssociation = cms.InputTag( "hltParticleFlowClusterECALL1Seeded" ),
     PFBasicClusterCollectionPreshower = cms.string( "hltParticleFlowBasicClusterECALPreshower" ),
-    use_preshower = cms.bool( True ),
     verbose = cms.untracked.bool( False ),
     thresh_SCEt = cms.double( 4.0 ),
     etawidth_SuperClusterEndcap = cms.double( 0.04 ),
@@ -15060,7 +15060,8 @@ fragment.hltIterL3MuonsOpenMu = cms.EDProducer( "MuonIdProducer",
     arbitrateTrackerMuons = cms.bool( True )
 )
 fragment.hltIterL3MuonCandidatesOpenMu = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltIterL3MuonsOpenMu" )
+    InputObjects = cms.InputTag( "hltIterL3MuonsOpenMu" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltL1fForIterL3L1TripleMuOpen53p52UpsilonMuonL1Filtered0 = cms.EDFilter( "HLTMuonL1TFilter",
     saveTags = cms.bool( True ),
@@ -15410,7 +15411,6 @@ fragment.hltParticleFlowSuperClusterECALUnseeded = cms.EDProducer( "PFECALSuperC
     thresh_PFClusterEndcap = cms.double( 0.5 ),
     ESAssociation = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
     PFBasicClusterCollectionPreshower = cms.string( "hltParticleFlowBasicClusterECALPreshower" ),
-    use_preshower = cms.bool( True ),
     verbose = cms.untracked.bool( False ),
     thresh_SCEt = cms.double( 4.0 ),
     etawidth_SuperClusterEndcap = cms.double( 0.04 ),
@@ -17798,7 +17798,8 @@ fragment.hltGlbTrkMuons = cms.EDProducer( "MuonIdProducer",
     arbitrateTrackerMuons = cms.bool( False )
 )
 fragment.hltGlbTrkMuonCands = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltGlbTrkMuons" )
+    InputObjects = cms.InputTag( "hltGlbTrkMuons" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltDiMuonGlbFiltered37TrkFiltered27 = cms.EDFilter( "HLTDiMuonGlbTrkFilter",
     saveTags = cms.bool( True ),
@@ -19003,7 +19004,8 @@ fragment.hltGlbTrkMuonsLowPtIter01Merge = cms.EDProducer( "MuonIdProducer",
     arbitrateTrackerMuons = cms.bool( False )
 )
 fragment.hltGlbTrkMuonLowPtIter01MergeCands = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltGlbTrkMuonsLowPtIter01Merge" )
+    InputObjects = cms.InputTag( "hltGlbTrkMuonsLowPtIter01Merge" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltdstau3mumuontrkFltr = cms.EDFilter( "HLTMuonTrkFilter",
     saveTags = cms.bool( True ),
@@ -35566,7 +35568,8 @@ fragment.hltHighPtTkMuons = cms.EDProducer( "MuonIdProducer",
     arbitrateTrackerMuons = cms.bool( False )
 )
 fragment.hltHighPtTkMuonCands = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltHighPtTkMuons" )
+    InputObjects = cms.InputTag( "hltHighPtTkMuons" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltL3fL1sMu25f0TkFiltered100Q = cms.EDFilter( "HLTMuonTrkL1TFilter",
     saveTags = cms.bool( True ),
@@ -39661,10 +39664,11 @@ fragment.hltDeDxEstimatorProducer = cms.EDProducer( "DeDxEstimatorProducer",
     ShapeTest = cms.bool( False ),
     UseCalibration = cms.bool( False ),
     calibrationPath = cms.string( "" ),
-    Reccord = cms.string( "SiStripDeDxMip_3D_Rcd" ),
+    Record = cms.string( "SiStripDeDxMip_3D_Rcd" ),
     ProbabilityMode = cms.string( "Accumulation" ),
     fraction = cms.double( 0.4 ),
-    exponent = cms.double( -2.0 )
+    exponent = cms.double( -2.0 ),
+    truncate = cms.bool( True )
 )
 fragment.hltTrk50Filter = cms.EDFilter( "HLTDeDxFilter",
     saveTags = cms.bool( True ),
@@ -60955,7 +60959,8 @@ fragment.hltIterL3MuonsNoVtx = cms.EDProducer( "MuonIdProducer",
     arbitrateTrackerMuons = cms.bool( True )
 )
 fragment.hltIterL3MuonCandidatesNoVtx = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltIterL3MuonsNoVtx" )
+    InputObjects = cms.InputTag( "hltIterL3MuonsNoVtx" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltL3pfL1sDoubleMu155ORTripleMu444L1f0L2pf0TwoMuL3PreFiltered5NoVtx = cms.EDFilter( "HLTMuonL3PreFilter",
     saveTags = cms.bool( True ),
@@ -61345,7 +61350,8 @@ fragment.hltGlbTrkMuonsNoVtx = cms.EDProducer( "MuonIdProducer",
     arbitrateTrackerMuons = cms.bool( False )
 )
 fragment.hltGlbTrkMuonCandsNoVtx = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltGlbTrkMuonsNoVtx" )
+    InputObjects = cms.InputTag( "hltGlbTrkMuonsNoVtx" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltTripleTrkMuFiltered5NoVtx = cms.EDFilter( "HLTMuonTrkL1TFilter",
     saveTags = cms.bool( True ),
@@ -65021,6 +65027,7 @@ fragment.hltEG60R9Id90CaloIdLIsoLDisplacedIdFilter = cms.EDFilter( "HLTDisplaced
     sMaj_max = cms.double( 1.5 ),
     seedTimeMin = cms.double( -999.0 ),
     seedTimeMax = cms.double( 999.0 ),
+    useTrackVeto = cms.bool( True ),
     maxTrackCut = cms.int32( 0 ),
     trackPtCut = cms.double( 5.0 ),
     trackdRCut = cms.double( 0.2 )
@@ -66600,7 +66607,8 @@ fragment.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
     doJetTags = cms.bool( True ),
     doCandidates = cms.bool( True ),
     doMet = cms.bool( True ),
-    doTrackRelVars = cms.bool( True ),
+    doTrackVars = cms.bool( True ),
+    relativeTrackVars = cms.bool( True ),
     doCandIndsForJets = cms.bool( False )
 )
 fragment.hltScoutingMuonPacker = cms.EDProducer( "HLTScoutingMuonProducer",
@@ -66635,6 +66643,7 @@ fragment.hltScoutingEgammaPacker = cms.EDProducer( "HLTScoutingEgammaProducer",
     saveRecHitTiming = cms.bool( False ),
     mantissaPrecision = cms.int32( 10 ),
     rechitMatrixSize = cms.int32( 15 ),
+    rechitZeroSuppression = cms.bool( True ),
     ecalRechitEB = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEB' ),
     ecalRechitEE = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEE' )
 )
@@ -92683,7 +92692,8 @@ fragment.hltIterL3MuonTracksPPOnAA = cms.EDProducer( "HLTMuonTrackSelector",
     copyTrajectories = cms.untracked.bool( False )
 )
 fragment.hltIterL3MuonCandidatesPPOnAA = cms.EDProducer( "L3MuonCandidateProducerFromMuons",
-    InputObjects = cms.InputTag( "hltIterL3MuonsPPOnAA" )
+    InputObjects = cms.InputTag( "hltIterL3MuonsPPOnAA" ),
+    DisplacedReconstruction = cms.bool( False )
 )
 fragment.hltJetsForCoreTracking = cms.EDFilter( "CandPtrSelector",
     src = cms.InputTag( "hltPuAK4CaloJetsCorrectedIDPassed" ),
@@ -95998,7 +96008,6 @@ fragment.hltParticleFlowSuperClusterECALPPOnAA = cms.EDProducer( "PFECALSuperClu
     thresh_PFClusterEndcap = cms.double( 0.5 ),
     ESAssociation = cms.InputTag( "hltParticleFlowClusterECALPPOnAA" ),
     PFBasicClusterCollectionPreshower = cms.string( "hltParticleFlowBasicClusterECALPreshower" ),
-    use_preshower = cms.bool( True ),
     verbose = cms.untracked.bool( False ),
     thresh_SCEt = cms.double( 4.0 ),
     etawidth_SuperClusterEndcap = cms.double( 0.04 ),
