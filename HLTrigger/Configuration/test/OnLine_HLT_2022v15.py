@@ -1,6 +1,6 @@
-# hltGetConfiguration --full --data /frozen/2022/2e34/v1.5/HLT --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
+# hltGetConfiguration --full --data /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
 
-# /frozen/2022/2e34/v1.5/HLT/V1 (CMSSW_12_4_0)
+# /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT/V2 (CMSSW_12_5_2)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLT2022v15" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/HLT/V1')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT/V2')
 )
 
 process.transferSystem = cms.PSet( 
@@ -7175,22 +7175,22 @@ process.hltEcalUncalibRecHitGPU = cms.EDProducer( "EcalUncalibRecHitProducerGPU"
     outOfTimeThresholdGain61mEE = cms.double( 1000.0 ),
     amplitudeThresholdEB = cms.double( 10.0 ),
     amplitudeThresholdEE = cms.double( 10.0 ),
-    maxNumberHitsEB = cms.uint32( 61200 ),
-    maxNumberHitsEE = cms.uint32( 14648 ),
     kernelMinimizeThreads = cms.untracked.vuint32( 32, 1, 1 ),
     shouldRunTimingComputation = cms.bool( True )
 )
 process.hltEcalUncalibRecHitSoA = cms.EDProducer( "EcalCPUUncalibRecHitProducer",
     recHitsInLabelEB = cms.InputTag( 'hltEcalUncalibRecHitGPU','EcalUncalibRecHitsEB' ),
-    recHitsInLabelEE = cms.InputTag( 'hltEcalUncalibRecHitGPU','EcalUncalibRecHitsEE' ),
     recHitsOutLabelEB = cms.string( "EcalUncalibRecHitsEB" ),
-    recHitsOutLabelEE = cms.string( "EcalUncalibRecHitsEE" ),
-    containsTimingInformation = cms.bool( True )
+    containsTimingInformation = cms.bool( True ),
+    isPhase2 = cms.bool( False ),
+    recHitsInLabelEE = cms.InputTag( 'hltEcalUncalibRecHitGPU','EcalUncalibRecHitsEE' ),
+    recHitsOutLabelEE = cms.string( "EcalUncalibRecHitsEE" )
 )
 process.hltEcalUncalibRecHitFromSoA = cms.EDProducer( "EcalUncalibRecHitConvertGPU2CPUFormat",
     recHitsLabelGPUEB = cms.InputTag( 'hltEcalUncalibRecHitSoA','EcalUncalibRecHitsEB' ),
-    recHitsLabelGPUEE = cms.InputTag( 'hltEcalUncalibRecHitSoA','EcalUncalibRecHitsEE' ),
     recHitsLabelCPUEB = cms.string( "EcalUncalibRecHitsEB" ),
+    isPhase2 = cms.bool( False ),
+    recHitsLabelGPUEE = cms.InputTag( 'hltEcalUncalibRecHitSoA','EcalUncalibRecHitsEE' ),
     recHitsLabelCPUEE = cms.string( "EcalUncalibRecHitsEE" )
 )
 process.hltEcalRecHit = cms.EDProducer( "EcalRecHitProducer",
@@ -7397,7 +7397,6 @@ process.hltHbherecoLegacy = cms.EDProducer( "HBHEPhase1Reconstructor",
     pulseShapeParametersQIE11 = cms.PSet(  )
 )
 process.hltHbherecoGPU = cms.EDProducer( "HBHERecHitProducerGPU",
-    maxChannels = cms.uint32( 10000 ),
     maxTimeSamples = cms.uint32( 10 ),
     kprep1dChannelsPerBlock = cms.uint32( 32 ),
     digisLabelF01HE = cms.InputTag( "hltHcalDigisGPU" ),
@@ -8052,7 +8051,9 @@ process.hltMuonCSCDigis = cms.EDProducer( "CSCDCCUnpacker",
     FormatedEventDump = cms.untracked.bool( False ),
     SuppressZeroLCT = cms.untracked.bool( True ),
     DisableMappingCheck = cms.untracked.bool( False ),
-    B904Setup = cms.untracked.bool( False )
+    B904Setup = cms.untracked.bool( False ),
+    B904vmecrate = cms.untracked.int32( 1 ),
+    B904dmb = cms.untracked.int32( 3 )
 )
 process.hltCsc2DRecHits = cms.EDProducer( "CSCRecHitDProducer",
     CSCStripPeakThreshold = cms.double( 10.0 ),
@@ -8515,6 +8516,7 @@ process.hltSiPixelClustersLegacy = cms.EDProducer( "SiPixelClusterProducer",
     ClusterThreshold_L1 = cms.int32( 4000 ),
     ClusterThreshold = cms.int32( 4000 ),
     ElectronPerADCGain = cms.double( 135.0 ),
+    DropDuplicates = cms.bool( True ),
     Phase2Calibration = cms.bool( False ),
     Phase2ReadoutMode = cms.int32( -1 ),
     Phase2DigiBaseline = cms.double( 1200.0 ),
@@ -8524,7 +8526,6 @@ process.hltSiPixelClustersGPU = cms.EDProducer( "SiPixelRawToClusterCUDA",
     isRun2 = cms.bool( False ),
     IncludeErrors = cms.bool( True ),
     UseQualityInfo = cms.bool( False ),
-    MaxFEDWords = cms.uint32( 400000 ),
     clusterThreshold_layer1 = cms.int32( 4000 ),
     clusterThreshold_otherLayers = cms.int32( 4000 ),
     InputLabel = cms.InputTag( "rawDataCollector" ),
@@ -12385,7 +12386,6 @@ process.hltParticleFlowSuperClusterECALL1Seeded = cms.EDProducer( "PFECALSuperCl
     PFBasicClusterCollectionEndcap = cms.string( "hltParticleFlowBasicClusterECALEndcap" ),
     PFClusters = cms.InputTag( "hltParticleFlowClusterECALL1Seeded" ),
     thresh_PFClusterSeedBarrel = cms.double( 1.0 ),
-    ClusteringType = cms.string( "Mustache" ),
     EnergyWeight = cms.string( "Raw" ),
     BeamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     thresh_PFClusterSeedEndcap = cms.double( 1.0 ),
@@ -12396,7 +12396,8 @@ process.hltParticleFlowSuperClusterECALL1Seeded = cms.EDProducer( "PFECALSuperCl
     barrelRecHits = cms.InputTag( 'ecalRecHit','EcalRecHitsEE' ),
     endcapRecHits = cms.InputTag( 'ecalRecHit','EcalRecHitsEB' ),
     PFSuperClusterCollectionEndcapWithPreshower = cms.string( "hltParticleFlowSuperClusterECALEndcapWithPreshower" ),
-    dropUnseedable = cms.bool( False )
+    dropUnseedable = cms.bool( False ),
+    ClusteringType = cms.string( "Mustache" )
 )
 process.hltEgammaCandidates = cms.EDProducer( "EgammaHLTRecoEcalCandidateProducers",
     scHybridBarrelProducer = cms.InputTag( 'hltParticleFlowSuperClusterECALL1Seeded','hltParticleFlowSuperClusterECALBarrel' ),
@@ -12426,6 +12427,8 @@ process.hltDiMu5Ele3CaloIdLTrackIdLElectronlegEtFilter = cms.EDFilter( "HLTEgamm
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 2.0 ),
     etcutEE = cms.double( 2.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEgammaClusterShape = cms.EDProducer( "EgammaHLTClusterShapeProducer",
@@ -13153,6 +13156,8 @@ process.hltDiMu3DiEle7p5CaloIdLTrackIdLElectronlegEtFilter = cms.EDFilter( "HLTE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 7.0 ),
     etcutEE = cms.double( 7.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiMu3DiEle7p5CaloIdLTrackIdLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -14939,6 +14944,8 @@ process.hltEG25EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 25.0 ),
     etcutEE = cms.double( 25.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG25HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -15062,7 +15069,6 @@ process.hltParticleFlowSuperClusterECALUnseeded = cms.EDProducer( "PFECALSuperCl
     PFBasicClusterCollectionEndcap = cms.string( "hltParticleFlowBasicClusterECALEndcap" ),
     PFClusters = cms.InputTag( "hltParticleFlowClusterECALUnseeded" ),
     thresh_PFClusterSeedBarrel = cms.double( 1.0 ),
-    ClusteringType = cms.string( "Mustache" ),
     EnergyWeight = cms.string( "Raw" ),
     BeamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     thresh_PFClusterSeedEndcap = cms.double( 1.0 ),
@@ -15073,7 +15079,8 @@ process.hltParticleFlowSuperClusterECALUnseeded = cms.EDProducer( "PFECALSuperCl
     barrelRecHits = cms.InputTag( 'ecalRecHit','EcalRecHitsEE' ),
     endcapRecHits = cms.InputTag( 'ecalRecHit','EcalRecHitsEB' ),
     PFSuperClusterCollectionEndcapWithPreshower = cms.string( "hltParticleFlowSuperClusterECALEndcapWithPreshower" ),
-    dropUnseedable = cms.bool( False )
+    dropUnseedable = cms.bool( False ),
+    ClusteringType = cms.string( "Mustache" )
 )
 process.hltEgammaCandidatesUnseeded = cms.EDProducer( "EgammaHLTRecoEcalCandidateProducers",
     scHybridBarrelProducer = cms.InputTag( 'hltParticleFlowSuperClusterECALUnseeded','hltParticleFlowSuperClusterECALBarrel' ),
@@ -15092,6 +15099,8 @@ process.hltDiEG25EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 25.0 ),
     etcutEE = cms.double( 25.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEgammaHoverEUnseeded = cms.EDProducer( "EgammaHLTHcalVarProducerFromRecHit",
@@ -15490,6 +15499,8 @@ process.hltEG27EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 27.0 ),
     etcutEE = cms.double( 27.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG27HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -15587,6 +15598,8 @@ process.hltDiEG27EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 27.0 ),
     etcutEE = cms.double( 27.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEG27HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -15688,6 +15701,8 @@ process.hltEG33EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 33.0 ),
     etcutEE = cms.double( 33.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG33HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -15785,6 +15800,8 @@ process.hltDiEG33EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 33.0 ),
     etcutEE = cms.double( 33.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEG33HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -15915,6 +15932,8 @@ process.hltDoubleEG24L1EGEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 24.0 ),
     etcutEE = cms.double( 24.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltDoubleEle24erWPTightClusterShapeFilterForTau = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -16274,6 +16293,8 @@ process.hltEG8EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEG8HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -16677,6 +16698,8 @@ process.hltEG37EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 37.0 ),
     etcutEE = cms.double( 37.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG37HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -16805,6 +16828,8 @@ process.hltEG27EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 27.0 ),
     etcutEE = cms.double( 27.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG27HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -18044,6 +18069,8 @@ process.hltEG4EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 4.0 ),
     etcutEE = cms.double( 4.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG4HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -19804,6 +19831,8 @@ process.hltEG70EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 70.0 ),
     etcutEE = cms.double( 70.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG70HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -19834,6 +19863,8 @@ process.hltDiEG70EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 70.0 ),
     etcutEE = cms.double( 70.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEG70HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -19868,6 +19899,8 @@ process.hltEG85EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 85.0 ),
     etcutEE = cms.double( 85.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG85HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -19898,6 +19931,8 @@ process.hltDiEG85EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 85.0 ),
     etcutEE = cms.double( 85.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEG85HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -19961,6 +19996,8 @@ process.hltEG15L1SingleEGLowETOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 15.0 ),
     etcutEE = cms.double( 15.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle15WPLoose1ClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -20226,6 +20263,8 @@ process.hltEG20L1SingleEGLowETOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 20.0 ),
     etcutEE = cms.double( 20.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle20WPLoose1ClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -20520,6 +20559,8 @@ process.hltEG27L1SingleAndDoubleEGEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 27.0 ),
     etcutEE = cms.double( 27.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle27L1DoubleEGWPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -20640,6 +20681,8 @@ process.hltDiEG27L1SingleAndDoubleEGEtFilter = cms.EDFilter( "HLTEgammaEtFilter"
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 27.0 ),
     etcutEE = cms.double( 27.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEle27L1DoubleEGWPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -20793,6 +20836,8 @@ process.hltEG27L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 27.0 ),
     etcutEE = cms.double( 27.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle27WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -21080,6 +21125,8 @@ process.hltEG28L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 28.0 ),
     etcutEE = cms.double( 28.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle28WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -21367,6 +21414,8 @@ process.hltEG30L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 30.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle30WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -21654,6 +21703,8 @@ process.hltEG32L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 32.0 ),
     etcutEE = cms.double( 32.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle32WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -21941,6 +21992,8 @@ process.hltEG35L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 35.0 ),
     etcutEE = cms.double( 35.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle35noerWPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -22257,6 +22310,8 @@ process.hltSingleEle35WPTightGsfL1EGMTEtFilter = cms.EDFilter( "HLTEgammaEtFilte
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 36.0 ),
     etcutEE = cms.double( 36.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltSingleEle35WPTightGsfL1EGMTClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -22566,6 +22621,8 @@ process.hltEG38L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 38.0 ),
     etcutEE = cms.double( 38.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle38noerWPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -22853,6 +22910,8 @@ process.hltEG40L1SingleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 40.0 ),
     etcutEE = cms.double( 40.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle40noerWPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -23140,6 +23199,8 @@ process.hltEG32L1SingleAndDoubleEGEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 32.0 ),
     etcutEE = cms.double( 32.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle32L1DoubleEGWPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -23456,6 +23517,8 @@ process.hltEG24L1EGandTauEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 24.0 ),
     etcutEE = cms.double( 24.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle24erWPTightClusterShapeFilterForTau = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -37042,6 +37105,8 @@ process.hltEG300EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 300.0 ),
     etcutEE = cms.double( 300.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltL1sSingleMu3IorSingleMu5IorSingleMu7 = cms.EDFilter( "HLTL1TSeed",
@@ -37279,6 +37344,8 @@ process.hltMu8DiEle12CaloIdLTrackIdLElectronlegEtFilter = cms.EDFilter( "HLTEgam
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 12.0 ),
     etcutEE = cms.double( 12.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltMu8DiEle12CaloIdLTrackIdLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -37556,6 +37623,8 @@ process.hltMu8Ele8EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu8Ele8HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -37855,6 +37924,8 @@ process.hltMu8TrkIsoVVLEle23CaloIdLTrackIdLIsoVLElectronlegEtFilter = cms.EDFilt
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 23.0 ),
     etcutEE = cms.double( 23.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu8TrkIsoVVLEle23CaloIdLTrackIdLIsoVLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -39654,6 +39725,8 @@ process.hltEle23Ele12CaloIdLTrackIdLIsoVLEtLeg1Filter = cms.EDFilter( "HLTEgamma
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 23.0 ),
     etcutEE = cms.double( 23.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle23Ele12CaloIdLTrackIdLIsoVLEtLeg2Filter = cms.EDFilter( "HLTEgammaEtFilter",
@@ -39662,6 +39735,8 @@ process.hltEle23Ele12CaloIdLTrackIdLIsoVLEtLeg2Filter = cms.EDFilter( "HLTEgamma
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 12.0 ),
     etcutEE = cms.double( 12.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEle23Ele12CaloIdLTrackIdLIsoVLClusterShapeLeg1Filter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -40214,6 +40289,8 @@ process.hltMu23TrkIsoVVLEle12CaloIdLTrackIdLIsoVLElectronlegEtFilter = cms.EDFil
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 12.0 ),
     etcutEE = cms.double( 12.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu23TrkIsoVVLEle12CaloIdLTrackIdLIsoVLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -40555,6 +40632,8 @@ process.hltMu12TrkIsoVVLEle23CaloIdLTrackIdLIsoVLElectronlegEtFilter = cms.EDFil
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 23.0 ),
     etcutEE = cms.double( 23.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu12TrkIsoVVLEle23CaloIdLTrackIdLIsoVLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -40814,6 +40893,8 @@ process.hltEG20L1EG15EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 20.0 ),
     etcutEE = cms.double( 20.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG20L1EG10OR15HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -40877,6 +40958,8 @@ process.hltEG33L1EG26EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 33.0 ),
     etcutEE = cms.double( 33.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG33L1EG26HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -40940,6 +41023,8 @@ process.hltEG50EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 50.0 ),
     etcutEE = cms.double( 50.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG50HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41003,6 +41088,8 @@ process.hltEG75EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 75.0 ),
     etcutEE = cms.double( 75.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG75HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41037,6 +41124,8 @@ process.hltEG90EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 90.0 ),
     etcutEE = cms.double( 90.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG90HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41071,6 +41160,8 @@ process.hltEG120EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 120.0 ),
     etcutEE = cms.double( 120.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG120HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41105,6 +41196,8 @@ process.hltEG150EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 150.0 ),
     etcutEE = cms.double( 150.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG150HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41139,6 +41232,8 @@ process.hltEG175EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 175.0 ),
     etcutEE = cms.double( 175.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG175HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41173,6 +41268,8 @@ process.hltEG200EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 200.0 ),
     etcutEE = cms.double( 200.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG200HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41236,6 +41333,8 @@ process.hltEG30EBTightIDTightIsoEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 9999999.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG30EBTightIDTightIsoClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41426,6 +41525,8 @@ process.hltEG110EBTightIDTightIsoEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 110.0 ),
     etcutEE = cms.double( 9999999.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG110EBTightIDTightIsoClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41570,6 +41671,8 @@ process.hltEG100EBHE10EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 100.0 ),
     etcutEE = cms.double( 9999999.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG100EBHE10HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41604,6 +41707,8 @@ process.hltEG50R9Id90HE10IsoMEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 50.0 ),
     etcutEE = cms.double( 50.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG50R9Id90HE10IsoMHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41726,6 +41831,8 @@ process.hltEG75R9Id90HE10IsoMEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 75.0 ),
     etcutEE = cms.double( 75.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG75R9Id90HE10IsoMHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41848,6 +41955,8 @@ process.hltEG90R9Id90HE10IsoMEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 90.0 ),
     etcutEE = cms.double( 90.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG90R9Id90HE10IsoMHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -41970,6 +42079,8 @@ process.hltEG120R9Id90HE10IsoMEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 120.0 ),
     etcutEE = cms.double( 120.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG120R9Id90HE10IsoMHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -42092,6 +42203,8 @@ process.hltEG165R9Id90HE10IsoMEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 165.0 ),
     etcutEE = cms.double( 165.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG165R9Id90HE10IsoMHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -42214,6 +42327,8 @@ process.hltEG30L1SingleAndDoubleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilter"
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 30.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG30LR9Id50b80eR9IdFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -42551,6 +42666,8 @@ process.hltEG35R9Id90HE10IsoMEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 35.0 ),
     etcutEE = cms.double( 35.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG35R9Id90HE10IsoMHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -48213,6 +48330,8 @@ process.hltMu43NoFiltersNoVtxPhoton43CaloIdLEtFilter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 43.0 ),
     etcutEE = cms.double( 43.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu43NoFiltersNoVtxPhoton43CaloIdLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -48312,6 +48431,8 @@ process.hltMu48NoFiltersNoVtxPhoton48CaloIdLEtFilter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 48.0 ),
     etcutEE = cms.double( 48.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu48NoFiltersNoVtxPhoton48CaloIdLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -48411,6 +48532,8 @@ process.hltMu38NoFiltersNoVtxPhoton38CaloIdLEtFilter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 38.0 ),
     etcutEE = cms.double( 38.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu38NoFiltersNoVtxPhoton38CaloIdLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -48596,6 +48719,7 @@ process.hltSiPixelClustersRegForDisplaced = cms.EDProducer( "SiPixelClusterProdu
     ClusterThreshold_L1 = cms.int32( 4000 ),
     ClusterThreshold = cms.int32( 4000 ),
     ElectronPerADCGain = cms.double( 135.0 ),
+    DropDuplicates = cms.bool( True ),
     Phase2Calibration = cms.bool( False ),
     Phase2ReadoutMode = cms.int32( -1 ),
     Phase2DigiBaseline = cms.double( 1200.0 ),
@@ -50336,6 +50460,8 @@ process.hltEG30L1IsoEGerJetC34drMin0p3EtFilter = cms.EDFilter( "HLTEgammaEtFilte
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 30.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle30erJetC34WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -50679,6 +50805,8 @@ process.hltEG28L1IsoEG28erHTT100EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 28.0 ),
     etcutEE = cms.double( 28.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle28erHTT100WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -50984,6 +51112,8 @@ process.hltEle28HighEtaSC20EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 28.0 ),
     etcutEE = cms.double( 28.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle28HighEtaSC20ClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -51191,6 +51321,8 @@ process.hltDiEG20EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 20.0 ),
     etcutEE = cms.double( 20.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEle28HighEtaSC20ClusterShapeUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -51423,6 +51555,8 @@ process.hltEG15EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 15.0 ),
     etcutEE = cms.double( 15.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle15VVVLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -51733,6 +51867,8 @@ process.hltEG50IsoVVVLEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 50.0 ),
     etcutEE = cms.double( 50.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle50VVVLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -54101,6 +54237,8 @@ process.hltDiMu4Ele9CaloIdLTrackIdLElectronlegEtFilter = cms.EDFilter( "HLTEgamm
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 9.0 ),
     etcutEE = cms.double( 9.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltDiMu4Ele9CaloIdLTrackIdLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -54376,6 +54514,8 @@ process.hltDiMu9Ele9CaloIdLTrackIdLElectronlegEtFilter = cms.EDFilter( "HLTEgamm
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 9.0 ),
     etcutEE = cms.double( 9.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltDiMu9Ele9CaloIdLTrackIdLElectronlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -56318,6 +56458,8 @@ process.hltMu17Photon30IsoCaloIdPhotonlegEtFilter = cms.EDFilter( "HLTEgammaEtFi
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 30.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu17Photon30IsoCaloIdPhotonlegClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -56447,6 +56589,8 @@ process.hltEle8CaloIdLTrackIdLIsoVLEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle8CaloIdLTrackIdLIsoVLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -56702,6 +56846,8 @@ process.hltEle12CaloIdLTrackIdLIsoVLEtFilter = cms.EDFilter( "HLTEgammaEtFilter"
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 12.0 ),
     etcutEE = cms.double( 12.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle12CaloIdLTrackIdLIsoVLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -56945,6 +57091,8 @@ process.hltEle23CaloIdLTrackIdLIsoVLJet30EtFilter = cms.EDFilter( "HLTEgammaEtFi
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 23.0 ),
     etcutEE = cms.double( 23.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle23CaloIdLTrackIdLIsoVLJet30ClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -57171,6 +57319,8 @@ process.hltEle8EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle8HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -57331,6 +57481,8 @@ process.hltEle17EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 17.0 ),
     etcutEE = cms.double( 17.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle17HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -57491,6 +57643,8 @@ process.hltEle23EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 23.0 ),
     etcutEE = cms.double( 23.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle23HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -57651,6 +57805,8 @@ process.hltEle50EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 50.0 ),
     etcutEE = cms.double( 50.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle50CaloIdVTClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -57805,6 +57961,8 @@ process.hltEG115EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 115.0 ),
     etcutEE = cms.double( 115.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG115CaloIdVTClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -57928,6 +58086,8 @@ process.hltEG135EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 135.0 ),
     etcutEE = cms.double( 135.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG135CaloIdVTClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -58595,6 +58755,8 @@ process.hltEG60EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 60.0 ),
     etcutEE = cms.double( 60.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG60HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -58937,6 +59099,8 @@ process.hltEG30L1SingleAndDoubleEGWithTauWithJetEtFilter = cms.EDFilter( "HLTEga
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 30.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEgammaHToverET = cms.EDProducer( "EgammaHLTHcalVarProducerFromRecHit",
@@ -60379,6 +60543,8 @@ process.hltScoutingEgammaPacker = cms.EDProducer( "HLTScoutingEgammaProducer",
     egammaPtCut = cms.double( 2.0 ),
     egammaEtaCut = cms.double( 2.5 ),
     egammaHoverECut = cms.double( 1.0 ),
+    egammaSigmaIEtaIEtaCut = cms.vdouble( 99999.0, 99999.0 ),
+    absEtaBinUpperEdges = cms.vdouble( 1.479, 5.0 ),
     saveRecHitTiming = cms.bool( False ),
     mantissaPrecision = cms.int32( 10 ),
     rechitMatrixSize = cms.int32( 10 ),
@@ -60437,6 +60603,8 @@ process.hltEG20EtFilterLooseHoverE = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 20.0 ),
     etcutEE = cms.double( 20.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG20HEFilterLooseHoverE = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -60471,6 +60639,8 @@ process.hltEG30EtFilterLooseHoverE = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 30.0 ),
     etcutEE = cms.double( 30.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG30HEFilterLooseHoverE = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -61402,6 +61572,8 @@ process.hltEG10EtL1SingleEG5EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 10.0 ),
     etcutEE = cms.double( 10.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG10R9Id50b80eR9IdFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -61712,6 +61884,8 @@ process.hltEG5L1SingleEG5WithJetAndTauEtFilter = cms.EDFilter( "HLTEgammaEtFilte
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 5.0 ),
     etcutEE = cms.double( 5.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG5HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -61809,6 +61983,8 @@ process.hltDiEG5EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 5.0 ),
     etcutEE = cms.double( 5.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEG5HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -61910,6 +62086,8 @@ process.hltEG5L1SingleEG5EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 5.0 ),
     etcutEE = cms.double( 5.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle5WPTightClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -62197,6 +62375,8 @@ process.hltEle15Ele10CaloIdLTrackIdLIsoVLEtLeg1Filter = cms.EDFilter( "HLTEgamma
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 15.0 ),
     etcutEE = cms.double( 15.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle15Ele10CaloIdLTrackIdLIsoVLEtLeg2Filter = cms.EDFilter( "HLTEgammaEtFilter",
@@ -62205,6 +62385,8 @@ process.hltEle15Ele10CaloIdLTrackIdLIsoVLEtLeg2Filter = cms.EDFilter( "HLTEgamma
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 10.0 ),
     etcutEE = cms.double( 10.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEle15Ele10CaloIdLTrackIdLIsoVLClusterShapeLeg1Filter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -66483,6 +66665,8 @@ process.hltEle16Ele12Ele8CaloIdLTrackIdLEtLeg1Filter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 16.0 ),
     etcutEE = cms.double( 16.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEle16Ele12Ele8CaloIdLTrackIdLEtLeg2Filter = cms.EDFilter( "HLTEgammaEtFilter",
@@ -66491,6 +66675,8 @@ process.hltEle16Ele12Ele8CaloIdLTrackIdLEtLeg2Filter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 12.0 ),
     etcutEE = cms.double( 12.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEle16Ele12Ele8CaloIdLTrackIdLEtLeg3Filter = cms.EDFilter( "HLTEgammaEtFilter",
@@ -66499,6 +66685,8 @@ process.hltEle16Ele12Ele8CaloIdLTrackIdLEtLeg3Filter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 3 )
 )
 process.hltEle16Ele12Ele8CaloIdLTrackIdLClusterShapeLeg1Filter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -67105,6 +67293,8 @@ process.hltEG75R9Id90HE10IsoMEBOnlyEtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 75.0 ),
     etcutEE = cms.double( 999999.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG75R9Id90HE10IsoMEBOnlyHEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -74706,6 +74896,8 @@ process.hltMu20NoFiltersNoVtxPhoton20CaloIdLEtFilter = cms.EDFilter( "HLTEgammaE
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 20.0 ),
     etcutEE = cms.double( 20.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltMu20NoFiltersNoVtxPhoton20CaloIdLClusterShapeFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -77923,6 +78115,8 @@ process.hltEG10EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 10.0 ),
     etcutEE = cms.double( 10.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG10HEFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -77995,6 +78189,8 @@ process.hltDiEG10EtUnseededFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     etcutEB = cms.double( 10.0 ),
     etcutEE = cms.double( 10.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDiEG10HEUnseededFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -78412,6 +78608,8 @@ process.hltDoubleEle4eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 4.0 ),
     etcutEE = cms.double( 4.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltEgammaElectronPixelSeedsForBParking = cms.EDProducer( "ElectronNHitSeedProducer",
@@ -78824,6 +79022,8 @@ process.hltDoubleEle4p5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 4.5 ),
     etcutEE = cms.double( 4.5 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle4p5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -79025,6 +79225,8 @@ process.hltDoubleEle5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 5.0 ),
     etcutEE = cms.double( 5.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -79226,6 +79428,8 @@ process.hltDoubleEle5p5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 5.5 ),
     etcutEE = cms.double( 5.5 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle5p5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -79427,6 +79631,8 @@ process.hltDoubleEle6eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 6.0 ),
     etcutEE = cms.double( 6.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle6eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -79628,6 +79834,8 @@ process.hltDoubleEle6p5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 6.5 ),
     etcutEE = cms.double( 6.5 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle6p5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -79829,6 +80037,8 @@ process.hltDoubleEle7eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 7.0 ),
     etcutEE = cms.double( 7.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle7eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -80030,6 +80240,8 @@ process.hltDoubleEle7p5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 7.5 ),
     etcutEE = cms.double( 7.5 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle7p5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -80231,6 +80443,8 @@ process.hltDoubleEle8eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle8eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -80432,6 +80646,8 @@ process.hltDoubleEle8p5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.5 ),
     etcutEE = cms.double( 8.5 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle8p5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -80633,6 +80849,8 @@ process.hltDoubleEle9eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 9.0 ),
     etcutEE = cms.double( 9.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle9eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -80834,6 +81052,8 @@ process.hltDoubleEle9p5eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 9.5 ),
     etcutEE = cms.double( 9.5 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle9p5eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -81035,6 +81255,8 @@ process.hltDoubleEle10eta1p22mMax6EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 10.0 ),
     etcutEE = cms.double( 10.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 2 )
 )
 process.hltDoubleEle10eta1p22mMax6PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -81236,6 +81458,8 @@ process.hltSingleEle8EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltSingleEle8PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -81454,6 +81678,8 @@ process.hltSingleEle8SingleEGL1EtFilter = cms.EDFilter( "HLTEgammaEtFilter",
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 8.0 ),
     etcutEE = cms.double( 8.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltSingleEle8SingleEGL1PixelMatchFilter = cms.EDFilter( "HLTElectronPixelMatchFilter",
@@ -81919,6 +82145,8 @@ process.hltEG20EBL1SingleAndDoubleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilte
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 20.0 ),
     etcutEE = cms.double( 9999999.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG20R9Id50b80eR9IdFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -82387,6 +82615,8 @@ process.hltEG22EBL1SingleAndDoubleEGOrEtFilter = cms.EDFilter( "HLTEgammaEtFilte
     l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     etcutEB = cms.double( 22.0 ),
     etcutEE = cms.double( 9999999.0 ),
+    minEtaCut = cms.double( -9999.0 ),
+    maxEtaCut = cms.double( 9999.0 ),
     ncandcut = cms.int32( 1 )
 )
 process.hltEG22R9Id50b80eR9IdFilter = cms.EDFilter( "HLTEgammaGenericFilter",
@@ -82770,7 +83000,8 @@ process.hltCTPPSPixelLocalTracks = cms.EDProducer( "CTPPSPixelLocalTrackProducer
     numberOfPlanesPerPot = cms.int32( 6 ),
     roadRadius = cms.double( 1.0 ),
     minRoadSize = cms.int32( 3 ),
-    maxRoadSize = cms.int32( 20 )
+    maxRoadSize = cms.int32( 20 ),
+    roadRadiusBadPot = cms.double( 0.5 )
 )
 process.hltPPSExpCalFilter = cms.EDFilter( "HLTPPSCalFilter",
     pixelLocalTrackInputTag = cms.InputTag( "hltCTPPSPixelLocalTracks" ),
