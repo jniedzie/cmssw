@@ -1,4 +1,4 @@
-# hltGetConfiguration --cff --data /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT --type 2022v15
+# hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT --cff --data --type 2022v15
 
 # /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT/V2 (CMSSW_12_5_2)
 
