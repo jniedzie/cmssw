@@ -1,6 +1,6 @@
-# hltGetConfiguration /dev/CMSSW_12_5_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
+# hltGetConfiguration /dev/CMSSW_12_6_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_12_5_0/GRun/V17 (CMSSW_12_5_2)
+# /dev/CMSSW_12_6_0/GRun/V11 (CMSSW_12_6_0_pre5)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLTGRun" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_12_5_0/GRun/V17')
+  tableName = cms.string('/dev/CMSSW_12_6_0/GRun/V11')
 )
 
 process.transferSystem = cms.PSet( 
@@ -5036,37 +5036,6 @@ process.ParametrizedMagneticFieldProducer = cms.ESProducer( "AutoParametrizedMag
   label = cms.untracked.string( "ParabolicMf" ),
   valueOverride = cms.int32( -1 )
 )
-process.PixelCPEFastESProducer = cms.ESProducer( "PixelCPEFastESProducer",
-  LoadTemplatesFromDB = cms.bool( True ),
-  Alpha2Order = cms.bool( True ),
-  ClusterProbComputationFlag = cms.int32( 0 ),
-  useLAWidthFromDB = cms.bool( True ),
-  lAOffset = cms.double( 0.0 ),
-  lAWidthBPix = cms.double( 0.0 ),
-  lAWidthFPix = cms.double( 0.0 ),
-  doLorentzFromAlignment = cms.bool( False ),
-  useLAFromDB = cms.bool( True ),
-  xerr_barrel_l1 = cms.vdouble( 0.00115, 0.0012, 8.8E-4 ),
-  yerr_barrel_l1 = cms.vdouble( 0.00375, 0.0023, 0.0025, 0.0025, 0.0023, 0.0023, 0.0021, 0.0021, 0.0024 ),
-  xerr_barrel_ln = cms.vdouble( 0.00115, 0.0012, 8.8E-4 ),
-  yerr_barrel_ln = cms.vdouble( 0.00375, 0.0023, 0.0025, 0.0025, 0.0023, 0.0023, 0.0021, 0.0021, 0.0024 ),
-  xerr_endcap = cms.vdouble( 0.002, 0.002 ),
-  yerr_endcap = cms.vdouble( 0.0021 ),
-  xerr_barrel_l1_def = cms.double( 0.0103 ),
-  yerr_barrel_l1_def = cms.double( 0.0021 ),
-  xerr_barrel_ln_def = cms.double( 0.0103 ),
-  yerr_barrel_ln_def = cms.double( 0.0021 ),
-  xerr_endcap_def = cms.double( 0.002 ),
-  yerr_endcap_def = cms.double( 7.5E-4 ),
-  isPhase2 = cms.bool( False ),
-  EdgeClusterErrorX = cms.double( 50.0 ),
-  EdgeClusterErrorY = cms.double( 85.0 ),
-  UseErrorsFromTemplates = cms.bool( True ),
-  TruncatePixelCharge = cms.bool( True ),
-  ComponentName = cms.string( "PixelCPEFast" ),
-  MagneticFieldRecord = cms.ESInputTag( "","" ),
-  appendToDataLabel = cms.string( "" )
-)
 process.PropagatorWithMaterialForLoopers = cms.ESProducer( "PropagatorWithMaterialESProducer",
   SimpleMagneticField = cms.string( "ParabolicMf" ),
   MaxDPhi = cms.double( 4.0 ),
@@ -6430,6 +6399,37 @@ process.hltESPMuonDetLayerGeometryESProducer = cms.ESProducer( "MuonDetLayerGeom
 process.hltESPMuonTransientTrackingRecHitBuilder = cms.ESProducer( "MuonTransientTrackingRecHitBuilderESProducer",
   ComponentName = cms.string( "hltESPMuonTransientTrackingRecHitBuilder" )
 )
+process.hltESPPixelCPEFast = cms.ESProducer( "PixelCPEFastESProducer",
+  LoadTemplatesFromDB = cms.bool( True ),
+  Alpha2Order = cms.bool( True ),
+  ClusterProbComputationFlag = cms.int32( 0 ),
+  useLAWidthFromDB = cms.bool( True ),
+  lAOffset = cms.double( 0.0 ),
+  lAWidthBPix = cms.double( 0.0 ),
+  lAWidthFPix = cms.double( 0.0 ),
+  doLorentzFromAlignment = cms.bool( False ),
+  useLAFromDB = cms.bool( True ),
+  xerr_barrel_l1 = cms.vdouble( 0.00115, 0.0012, 8.8E-4 ),
+  yerr_barrel_l1 = cms.vdouble( 0.00375, 0.0023, 0.0025, 0.0025, 0.0023, 0.0023, 0.0021, 0.0021, 0.0024 ),
+  xerr_barrel_ln = cms.vdouble( 0.00115, 0.0012, 8.8E-4 ),
+  yerr_barrel_ln = cms.vdouble( 0.00375, 0.0023, 0.0025, 0.0025, 0.0023, 0.0023, 0.0021, 0.0021, 0.0024 ),
+  xerr_endcap = cms.vdouble( 0.002, 0.002 ),
+  yerr_endcap = cms.vdouble( 0.0021 ),
+  xerr_barrel_l1_def = cms.double( 0.0103 ),
+  yerr_barrel_l1_def = cms.double( 0.0021 ),
+  xerr_barrel_ln_def = cms.double( 0.0103 ),
+  yerr_barrel_ln_def = cms.double( 0.0021 ),
+  xerr_endcap_def = cms.double( 0.002 ),
+  yerr_endcap_def = cms.double( 7.5E-4 ),
+  isPhase2 = cms.bool( False ),
+  EdgeClusterErrorX = cms.double( 50.0 ),
+  EdgeClusterErrorY = cms.double( 85.0 ),
+  UseErrorsFromTemplates = cms.bool( True ),
+  TruncatePixelCharge = cms.bool( True ),
+  ComponentName = cms.string( "hltESPPixelCPEFast" ),
+  MagneticFieldRecord = cms.ESInputTag( "","" ),
+  appendToDataLabel = cms.string( "" )
+)
 process.hltESPPixelCPEGeneric = cms.ESProducer( "PixelCPEGenericESProducer",
   LoadTemplatesFromDB = cms.bool( True ),
   Alpha2Order = cms.bool( True ),
@@ -6908,7 +6908,8 @@ process.siPixelGainCalibrationForHLTGPU = cms.ESProducer( "SiPixelGainCalibratio
   appendToDataLabel = cms.string( "" )
 )
 process.siPixelQualityESProducer = cms.ESProducer( "SiPixelQualityESProducer",
-  siPixelQualityLabel = cms.string( "" )
+  siPixelQualityLabel = cms.string( "" ),
+  siPixelQualityLabel_RawToDigi = cms.string( "" )
 )
 process.siPixelROCsStatusAndMappingWrapperESProducer = cms.ESProducer( "SiPixelROCsStatusAndMappingWrapperESProducer",
   ComponentName = cms.string( "" ),
@@ -7021,6 +7022,7 @@ process.MessageLogger = cms.Service( "MessageLogger",
         limit = cms.untracked.int32( 10000000 )
       ),
       threshold = cms.untracked.string( "INFO" ),
+      enableStatistics = cms.untracked.bool( False )
     ),
     suppressError = cms.untracked.vstring( 'hltL3TkTracksFromL2IOHit',
       'hltL3TkTracksFromL2OIHit',
@@ -8625,14 +8627,14 @@ process.hltSiPixelClustersCache = cms.EDProducer( "SiPixelClusterShapeCacheProdu
 process.hltSiPixelRecHitsFromLegacy = cms.EDProducer( "SiPixelRecHitSoAFromLegacy",
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     src = cms.InputTag( "hltSiPixelClusters" ),
-    CPE = cms.string( "PixelCPEFast" ),
+    CPE = cms.string( "hltESPPixelCPEFast" ),
     convertToLegacy = cms.bool( True ),
     isPhase2 = cms.bool( False )
 )
 process.hltSiPixelRecHitsGPU = cms.EDProducer( "SiPixelRecHitCUDA",
     beamSpot = cms.InputTag( "hltOnlineBeamSpotToGPU" ),
     src = cms.InputTag( "hltSiPixelClustersGPU" ),
-    CPE = cms.string( "PixelCPEFast" )
+    CPE = cms.string( "hltESPPixelCPEFast" )
 )
 process.hltSiPixelRecHitsFromGPU = cms.EDProducer( "SiPixelRecHitFromCUDA",
     pixelRecHitSrc = cms.InputTag( "hltSiPixelRecHitsGPU" ),
@@ -64121,7 +64123,7 @@ process.hltSiPixelClustersCacheCPUOnly = cms.EDProducer( "SiPixelClusterShapeCac
 process.hltSiPixelRecHitsFromLegacyCPUOnly = cms.EDProducer( "SiPixelRecHitSoAFromLegacy",
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     src = cms.InputTag( "hltSiPixelClustersLegacy" ),
-    CPE = cms.string( "PixelCPEFast" ),
+    CPE = cms.string( "hltESPPixelCPEFast" ),
     convertToLegacy = cms.bool( True ),
     isPhase2 = cms.bool( False )
 )

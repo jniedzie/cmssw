@@ -1,4 +1,4 @@
-# hltGetConfiguration --full --data /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
+# hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT --full --data --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
 
 # /frozen/2022/2e34/v1.5/CMSSW_12_5_X/HLT/V2 (CMSSW_12_5_2)
 
