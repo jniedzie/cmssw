@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT --cff --data --type 2022v15
 
-# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V3 (CMSSW_13_0_0_pre1)
+# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V4 (CMSSW_13_0_0_pre1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V3')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V4')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -6161,7 +6161,7 @@ fragment.hltESPPixelCPEFast = cms.ESProducer( "PixelCPEFastESProducer",
   EdgeClusterErrorY = cms.double( 85.0 ),
   UseErrorsFromTemplates = cms.bool( True ),
   TruncatePixelCharge = cms.bool( True ),
-  ComponentName = cms.string( "PixelCPEFast" ),
+  ComponentName = cms.string( "hltESPPixelCPEFast" ),
   MagneticFieldRecord = cms.ESInputTag( "","" ),
   appendToDataLabel = cms.string( "" )
 )
