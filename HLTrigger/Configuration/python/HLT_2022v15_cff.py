@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT --cff --data --type 2022v15
 
-# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V9 (CMSSW_13_0_0_pre3)
+# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V10 (CMSSW_13_0_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V9')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V10')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -16186,9 +16186,9 @@ fragment.hltDoubleEle8DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltAK4PFJets = cms.EDProducer( "FastjetJetProducer",
     useMassDropTagger = cms.bool( False ),
@@ -17124,9 +17124,9 @@ fragment.hltDiMuonGlb37Trk27DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltL1sDoubleMuForBs = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -18821,9 +18821,9 @@ fragment.hltDoubleMu4Mass3p8DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltL1sDoubleMu0er1p5OSIorDoubleMu0er1p4OSIorDoubleMu4OSIorDoubleMu4p5OS = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -27500,6 +27500,7 @@ fragment.hltHpsPFTauDeepTauProducerForVBFIsoTau = cms.EDProducer( "DeepTauId",
       'inner:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_inner.pb',
       'outer:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_outer.pb' ),
     mem_mapped = cms.bool( False ),
+    year = cms.uint32( 2017 ),
     version = cms.uint32( 2 ),
     sub_version = cms.uint32( 1 ),
     debug_level = cms.int32( 0 ),
@@ -29558,9 +29559,9 @@ fragment.hltDiMuon178RelTrkIsoVVLFilteredDzFiltered0p2 = cms.EDFilter( "HLT2Muon
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu19TrkIsoVVLMu9TrkIsoVVLDZ = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -29576,9 +29577,9 @@ fragment.hltDiMuon199RelTrkIsoVVLFilteredDzFiltered0p2 = cms.EDFilter( "HLT2Muon
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu17TrkIsoVVLMu8TrkIsoVVLDZMass8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -29909,9 +29910,9 @@ fragment.hltDiMuonGlb25Trk0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu30TkMu0Psi = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -29991,9 +29992,9 @@ fragment.hltDiMuonGlb30Trk0DzPsiFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu30TkMu0Upsilon = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -30030,9 +30031,9 @@ fragment.hltDiMuonGlb30TrkUpsilon0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ"
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltL1sSingleMu16IorSingleMu18IorSingleMu20IorSingleMu16erlorSingleMu18erlorSingleMu20erlorSingleMu22erlorSingleMu25 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -30167,9 +30168,9 @@ fragment.hltDiMuonGlb20Trk0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu25TkMu0Phi = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -30249,9 +30250,9 @@ fragment.hltDiMuonGlb25PhiTrk0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltL1sSingleMu15DQorSingleMu7 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -37231,9 +37232,9 @@ fragment.hltMu8Ele12DZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 2 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 2 )
+    checkSC = cms.bool( False )
 )
 fragment.hltEle12Ele12DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     saveTags = cms.bool( True ),
@@ -37246,9 +37247,9 @@ fragment.hltEle12Ele12DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreMu8DiEle12CaloIdLTrackIdL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -37522,9 +37523,9 @@ fragment.hltMu8Ele8CaloIdMTrackIdMDZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu8Ele8CaloIdMTrackIdMMass8PFHT350 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -37877,9 +37878,9 @@ fragment.hltMu8TrkIsoVVLEle23CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2P
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu8TrkIsoVVLEle23CaloIdLTrackIdLIsoVLDZPFDiJet30 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -39887,9 +39888,9 @@ fragment.hltEle23Ele12CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2PhotonPh
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreEle23Ele12CaloIdLTrackIdLIsoVL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -40242,9 +40243,9 @@ fragment.hltMu23TrkIsoVVLEle12CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMu23TrkIsoVVLEle12CaloIdLTrackIdLIsoVL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -40589,9 +40590,9 @@ fragment.hltMu12TrkIsoVVLEle23CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltL1sSingleEG15er2p5 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -45580,9 +45581,9 @@ fragment.hltTripleMu533TripleDZ0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 3 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 3 )
+    checkSC = cms.bool( False )
 )
 fragment.hltTripleMu533Mass3p8toInfFilter = cms.EDFilter( "HLTMuonDimuonL3Filter",
     saveTags = cms.bool( True ),
@@ -45729,9 +45730,9 @@ fragment.hltTripleMu555TripleDZ0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 3 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 3 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreTripleMu12105 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -45926,9 +45927,9 @@ fragment.hltDiMuonForTau3MuDzFiltered0p3 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.3 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltTau3MuTriMuon1filter = cms.EDFilter( "HLT1Muon",
     saveTags = cms.bool( True ),
@@ -46203,9 +46204,9 @@ fragment.hltDoubleMuon3Mass3p8to60DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltMET40 = cms.EDFilter( "HLT1CaloMET",
     saveTags = cms.bool( True ),
@@ -53904,9 +53905,9 @@ fragment.hltDoubleMu4DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltEle9DoubleMu4Mass3p8Filtered = cms.EDFilter( "HLTMuonDimuonL3Filter",
     saveTags = cms.bool( True ),
@@ -54124,9 +54125,9 @@ fragment.hltMu4Ele9DZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 2 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 2 )
+    checkSC = cms.bool( False )
 )
 fragment.hltL1sDoubleMu7EG7 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -54401,9 +54402,9 @@ fragment.hltMu9Ele9DZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 2 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 2 )
+    checkSC = cms.bool( False )
 )
 fragment.hltDoubleMu9DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     saveTags = cms.bool( True ),
@@ -54415,9 +54416,9 @@ fragment.hltDoubleMu9DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreDiMu9Ele9CaloIdLTrackIdL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -62537,9 +62538,9 @@ fragment.hltEle15Ele10CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2PhotonPh
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreMCIsoMu = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -62781,9 +62782,9 @@ fragment.hltDiMuonRelTrkIsoVVLFilteredDzFiltered0p2 = cms.EDFilter( "HLT2MuonMuo
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 fragment.hltPreMCDoubleMuNoFiltersNoVtx = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -69017,6 +69018,7 @@ fragment.hltHpsPFTauDeepTauProducer = cms.EDProducer( "DeepTauId",
       'inner:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_inner.pb',
       'outer:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_outer.pb' ),
     mem_mapped = cms.bool( False ),
+    year = cms.uint32( 2017 ),
     version = cms.uint32( 2 ),
     sub_version = cms.uint32( 1 ),
     debug_level = cms.int32( 0 ),
@@ -81612,9 +81614,9 @@ fragment.hltDoubleEle4eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle4p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81631,9 +81633,9 @@ fragment.hltDoubleEle4p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81650,9 +81652,9 @@ fragment.hltDoubleEle5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle5p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81669,9 +81671,9 @@ fragment.hltDoubleEle5p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle6eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81688,9 +81690,9 @@ fragment.hltDoubleEle6eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle6p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81707,9 +81709,9 @@ fragment.hltDoubleEle6p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle7eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81726,9 +81728,9 @@ fragment.hltDoubleEle7eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle7p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81745,9 +81747,9 @@ fragment.hltDoubleEle7p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle8eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81764,9 +81766,9 @@ fragment.hltDoubleEle8eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle8p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81783,9 +81785,9 @@ fragment.hltDoubleEle8p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle9eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81802,9 +81804,9 @@ fragment.hltDoubleEle9eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle9p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81821,9 +81823,9 @@ fragment.hltDoubleEle9p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltPreDoubleEle10eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81840,9 +81842,9 @@ fragment.hltDoubleEle10eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 fragment.hltL1sDoubleEGIsoeta1p5 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
