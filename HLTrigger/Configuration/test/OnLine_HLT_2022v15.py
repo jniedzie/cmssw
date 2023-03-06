@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT --full --data --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
 
-# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V10 (CMSSW_13_0_0_pre4)
+# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V11 (CMSSW_13_0_0)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLT2022v15" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V10')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V11')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6766,6 +6766,7 @@ process.hltESPTrajectorySmootherRK = cms.ESProducer( "KFTrajectorySmootherESProd
 process.hltOnlineBeamSpotESProducer = cms.ESProducer( "OnlineBeamSpotESProducer",
   timeThreshold = cms.int32( 48 ),
   sigmaZThreshold = cms.double( 2.0 ),
+  sigmaXYThreshold = cms.double( 4.0 ),
   appendToDataLabel = cms.string( "" )
 )
 process.hltPixelTracksCleanerBySharedHits = cms.ESProducer( "PixelTrackCleanerBySharedHitsESProducer",
