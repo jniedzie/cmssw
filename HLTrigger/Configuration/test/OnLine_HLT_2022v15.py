@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT --full --data --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
 
-# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V9 (CMSSW_13_0_0_pre3)
+# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V11 (CMSSW_13_0_0)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLT2022v15" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V9')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V11')
 )
 
 process.transferSystem = cms.PSet( 
@@ -5062,9 +5062,6 @@ process.SteppingHelixPropagatorAny = cms.ESProducer( "SteppingHelixPropagatorESP
   useMagVolumes = cms.bool( True ),
   returnTangentPlane = cms.bool( True )
 )
-process.TrackerAdditionalParametersPerDetESModule = cms.ESProducer( "TrackerAdditionalParametersPerDetESModule",
-  appendToDataLabel = cms.string( "" )
-)
 process.TrackerDigiGeometryESModule = cms.ESProducer( "TrackerDigiGeometryESModule",
   appendToDataLabel = cms.string( "" ),
   fromDDD = cms.bool( False ),
@@ -6769,6 +6766,7 @@ process.hltESPTrajectorySmootherRK = cms.ESProducer( "KFTrajectorySmootherESProd
 process.hltOnlineBeamSpotESProducer = cms.ESProducer( "OnlineBeamSpotESProducer",
   timeThreshold = cms.int32( 48 ),
   sigmaZThreshold = cms.double( 2.0 ),
+  sigmaXYThreshold = cms.double( 4.0 ),
   appendToDataLabel = cms.string( "" )
 )
 process.hltPixelTracksCleanerBySharedHits = cms.ESProducer( "PixelTrackCleanerBySharedHitsESProducer",
@@ -16454,9 +16452,9 @@ process.hltDoubleEle8DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltAK4PFJets = cms.EDProducer( "FastjetJetProducer",
     useMassDropTagger = cms.bool( False ),
@@ -17392,9 +17390,9 @@ process.hltDiMuonGlb37Trk27DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltL1sDoubleMuForBs = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -19089,9 +19087,9 @@ process.hltDoubleMu4Mass3p8DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltL1sDoubleMu0er1p5OSIorDoubleMu0er1p4OSIorDoubleMu4OSIorDoubleMu4p5OS = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -27768,6 +27766,7 @@ process.hltHpsPFTauDeepTauProducerForVBFIsoTau = cms.EDProducer( "DeepTauId",
       'inner:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_inner.pb',
       'outer:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_outer.pb' ),
     mem_mapped = cms.bool( False ),
+    year = cms.uint32( 2017 ),
     version = cms.uint32( 2 ),
     sub_version = cms.uint32( 1 ),
     debug_level = cms.int32( 0 ),
@@ -29826,9 +29825,9 @@ process.hltDiMuon178RelTrkIsoVVLFilteredDzFiltered0p2 = cms.EDFilter( "HLT2MuonM
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu19TrkIsoVVLMu9TrkIsoVVLDZ = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -29844,9 +29843,9 @@ process.hltDiMuon199RelTrkIsoVVLFilteredDzFiltered0p2 = cms.EDFilter( "HLT2MuonM
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu17TrkIsoVVLMu8TrkIsoVVLDZMass8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -30177,9 +30176,9 @@ process.hltDiMuonGlb25Trk0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu30TkMu0Psi = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -30259,9 +30258,9 @@ process.hltDiMuonGlb30Trk0DzPsiFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu30TkMu0Upsilon = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -30298,9 +30297,9 @@ process.hltDiMuonGlb30TrkUpsilon0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltL1sSingleMu16IorSingleMu18IorSingleMu20IorSingleMu16erlorSingleMu18erlorSingleMu20erlorSingleMu22erlorSingleMu25 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -30435,9 +30434,9 @@ process.hltDiMuonGlb20Trk0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu25TkMu0Phi = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -30517,9 +30516,9 @@ process.hltDiMuonGlb25PhiTrk0DzFiltered0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltL1sSingleMu15DQorSingleMu7 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -37499,9 +37498,9 @@ process.hltMu8Ele12DZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 2 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 2 )
+    checkSC = cms.bool( False )
 )
 process.hltEle12Ele12DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     saveTags = cms.bool( True ),
@@ -37514,9 +37513,9 @@ process.hltEle12Ele12DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreMu8DiEle12CaloIdLTrackIdL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -37790,9 +37789,9 @@ process.hltMu8Ele8CaloIdMTrackIdMDZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu8Ele8CaloIdMTrackIdMMass8PFHT350 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -38145,9 +38144,9 @@ process.hltMu8TrkIsoVVLEle23CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2Ph
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu8TrkIsoVVLEle23CaloIdLTrackIdLIsoVLDZPFDiJet30 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -40155,9 +40154,9 @@ process.hltEle23Ele12CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2PhotonPho
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreEle23Ele12CaloIdLTrackIdLIsoVL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -40510,9 +40509,9 @@ process.hltMu23TrkIsoVVLEle12CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2M
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMu23TrkIsoVVLEle12CaloIdLTrackIdLIsoVL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -40857,9 +40856,9 @@ process.hltMu12TrkIsoVVLEle23CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2P
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltL1sSingleEG15er2p5 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -45848,9 +45847,9 @@ process.hltTripleMu533TripleDZ0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 3 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 3 )
+    checkSC = cms.bool( False )
 )
 process.hltTripleMu533Mass3p8toInfFilter = cms.EDFilter( "HLTMuonDimuonL3Filter",
     saveTags = cms.bool( True ),
@@ -45997,9 +45996,9 @@ process.hltTripleMu555TripleDZ0p2 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 3 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 3 )
+    checkSC = cms.bool( False )
 )
 process.hltPreTripleMu12105 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -46194,9 +46193,9 @@ process.hltDiMuonForTau3MuDzFiltered0p3 = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.3 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltTau3MuTriMuon1filter = cms.EDFilter( "HLT1Muon",
     saveTags = cms.bool( True ),
@@ -46471,9 +46470,9 @@ process.hltDoubleMuon3Mass3p8to60DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltMET40 = cms.EDFilter( "HLT1CaloMET",
     saveTags = cms.bool( True ),
@@ -54172,9 +54171,9 @@ process.hltDoubleMu4DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltEle9DoubleMu4Mass3p8Filtered = cms.EDFilter( "HLTMuonDimuonL3Filter",
     saveTags = cms.bool( True ),
@@ -54392,9 +54391,9 @@ process.hltMu4Ele9DZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 2 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 2 )
+    checkSC = cms.bool( False )
 )
 process.hltL1sDoubleMu7EG7 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -54669,9 +54668,9 @@ process.hltMu9Ele9DZFilter = cms.EDFilter( "HLT2MuonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 2 ),
     MinPixHitsForDZ = cms.int32( 1 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 2 )
+    checkSC = cms.bool( False )
 )
 process.hltDoubleMu9DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     saveTags = cms.bool( True ),
@@ -54683,9 +54682,9 @@ process.hltDoubleMu9DZFilter = cms.EDFilter( "HLT2MuonMuonDZ",
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreDiMu9Ele9CaloIdLTrackIdL = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -62805,9 +62804,9 @@ process.hltEle15Ele10CaloIdLTrackIdLIsoVLDZFilter = cms.EDFilter( "HLT2PhotonPho
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreMCIsoMu = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -63049,9 +63048,9 @@ process.hltDiMuonRelTrkIsoVVLFilteredDzFiltered0p2 = cms.EDFilter( "HLT2MuonMuon
     triggerType2 = cms.int32( 83 ),
     MinDR = cms.double( 0.001 ),
     MaxDZ = cms.double( 0.2 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( False ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( False )
 )
 process.hltPreMCDoubleMuNoFiltersNoVtx = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -69285,6 +69284,7 @@ process.hltHpsPFTauDeepTauProducer = cms.EDProducer( "DeepTauId",
       'inner:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_inner.pb',
       'outer:RecoTauTag/TrainingFiles/data/DeepTauId/deepTau_2017v2p6_e6_outer.pb' ),
     mem_mapped = cms.bool( False ),
+    year = cms.uint32( 2017 ),
     version = cms.uint32( 2 ),
     sub_version = cms.uint32( 1 ),
     debug_level = cms.int32( 0 ),
@@ -81880,9 +81880,9 @@ process.hltDoubleEle4eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle4p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81899,9 +81899,9 @@ process.hltDoubleEle4p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81918,9 +81918,9 @@ process.hltDoubleEle5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle5p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81937,9 +81937,9 @@ process.hltDoubleEle5p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle6eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81956,9 +81956,9 @@ process.hltDoubleEle6eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle6p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81975,9 +81975,9 @@ process.hltDoubleEle6p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle7eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -81994,9 +81994,9 @@ process.hltDoubleEle7eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle7p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -82013,9 +82013,9 @@ process.hltDoubleEle7p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle8eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -82032,9 +82032,9 @@ process.hltDoubleEle8eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle8p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -82051,9 +82051,9 @@ process.hltDoubleEle8p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle9eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -82070,9 +82070,9 @@ process.hltDoubleEle9eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle9p5eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -82089,9 +82089,9 @@ process.hltDoubleEle9p5eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ"
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltPreDoubleEle10eta1p22mMax6dz0p8 = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
@@ -82108,9 +82108,9 @@ process.hltDoubleEle10eta1p22mMax6DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
     triggerType2 = cms.int32( 81 ),
     MinDR = cms.double( -1.0 ),
     MaxDZ = cms.double( 0.8 ),
+    MinN = cms.int32( 1 ),
     MinPixHitsForDZ = cms.int32( 0 ),
-    checkSC = cms.bool( True ),
-    MinN = cms.int32( 1 )
+    checkSC = cms.bool( True )
 )
 process.hltL1sDoubleEGIsoeta1p5 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
