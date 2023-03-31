@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT --full --data --type 2022v15 --unprescale --process HLT2022v15 --globaltag auto:run3_hlt_2022v15 --input file:RelVal_Raw_2022v15_DATA.root
 
-# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V10 (CMSSW_13_0_0_pre4)
+# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V13 (CMSSW_13_0_1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLT2022v15" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V10')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V13')
 )
 
 process.transferSystem = cms.PSet( 
@@ -6766,6 +6766,7 @@ process.hltESPTrajectorySmootherRK = cms.ESProducer( "KFTrajectorySmootherESProd
 process.hltOnlineBeamSpotESProducer = cms.ESProducer( "OnlineBeamSpotESProducer",
   timeThreshold = cms.int32( 48 ),
   sigmaZThreshold = cms.double( 2.0 ),
+  sigmaXYThreshold = cms.double( 4.0 ),
   appendToDataLabel = cms.string( "" )
 )
 process.hltPixelTracksCleanerBySharedHits = cms.ESProducer( "PixelTrackCleanerBySharedHitsESProducer",
@@ -50328,6 +50329,7 @@ process.hltPFMETVBF110 = cms.EDFilter( "HLT1PFMET",
 process.hltL1TPFJetsMatching = cms.EDProducer( "L1TPFJetsMatching",
     L1JetTrigger = cms.InputTag( "hltL1DiJetVBF" ),
     JetSrc = cms.InputTag( "hltAK4PFJetsTightIDCorrected" ),
+    matchingMode = cms.string( "VBF" ),
     pt1Min = cms.double( 110.0 ),
     pt2Min = cms.double( 35.0 ),
     pt3Min = cms.double( 110.0 ),
@@ -67159,6 +67161,7 @@ process.hltHpsDoublePFTau20TrackDeepTauDitauWPAgainstMuon = cms.EDFilter( "HLT1P
 process.hltVBFL1TLooseIDPFJetsMatching = cms.EDProducer( "L1TPFJetsMatching",
     L1JetTrigger = cms.InputTag( "hltL1VBFDiJetOR" ),
     JetSrc = cms.InputTag( "hltAK4PFJetsLooseIDCorrected" ),
+    matchingMode = cms.string( "VBF" ),
     pt1Min = cms.double( 115.0 ),
     pt2Min = cms.double( 40.0 ),
     pt3Min = cms.double( 110.0 ),
@@ -72544,6 +72547,7 @@ process.hltRealDijetFilter = cms.EDFilter( "HLTPFJetVBFFilter",
 process.hltVBFIsoTauL1TLooseIDPFJetsMatching = cms.EDProducer( "L1TPFJetsMatching",
     L1JetTrigger = cms.InputTag( "hltL1VBFDiJetIsoTau" ),
     JetSrc = cms.InputTag( "hltAK4PFJetsLooseIDCorrected" ),
+    matchingMode = cms.string( "VBF" ),
     pt1Min = cms.double( 40.0 ),
     pt2Min = cms.double( 40.0 ),
     pt3Min = cms.double( 40.0 ),
@@ -72562,7 +72566,7 @@ process.hltVBFLooseIDPFDummyFilter = cms.EDFilter( "HLT1PFJet",
     MaxEta = cms.double( -1.0 ),
     MinN = cms.int32( 2 )
 )
-process.hltPFDiJetCorrCheckerWithMediumDiTau = cms.EDProducer( "HLTPFDiJetCorrCheckerWithDiTau",
+process.hltPFDiJetCorrCheckerWithMediumDiTau = cms.EDProducer( "HLTDiPFJetPlusTausCandidatePFJetProducer",
     pfJetSrc = cms.InputTag( 'hltVBFIsoTauL1TLooseIDPFJetsMatching','TwoJets' ),
     tauSrc = cms.InputTag( "hltHpsDoublePFTau20MediumDitauWPDeepTauNoMatch" ),
     extraTauPtCut = cms.double( 45.0 ),
