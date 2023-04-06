@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT --cff --data --type 2022v15
 
-# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V11 (CMSSW_13_0_0)
+# /frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V13 (CMSSW_13_0_1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V11')
+  tableName = cms.string('/frozen/2022/2e34/v1.5/CMSSW_13_0_X/HLT/V13')
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -50064,6 +50064,7 @@ fragment.hltPFMETVBF110 = cms.EDFilter( "HLT1PFMET",
 fragment.hltL1TPFJetsMatching = cms.EDProducer( "L1TPFJetsMatching",
     L1JetTrigger = cms.InputTag( "hltL1DiJetVBF" ),
     JetSrc = cms.InputTag( "hltAK4PFJetsTightIDCorrected" ),
+    matchingMode = cms.string( "VBF" ),
     pt1Min = cms.double( 110.0 ),
     pt2Min = cms.double( 35.0 ),
     pt3Min = cms.double( 110.0 ),
@@ -66895,6 +66896,7 @@ fragment.hltHpsDoublePFTau20TrackDeepTauDitauWPAgainstMuon = cms.EDFilter( "HLT1
 fragment.hltVBFL1TLooseIDPFJetsMatching = cms.EDProducer( "L1TPFJetsMatching",
     L1JetTrigger = cms.InputTag( "hltL1VBFDiJetOR" ),
     JetSrc = cms.InputTag( "hltAK4PFJetsLooseIDCorrected" ),
+    matchingMode = cms.string( "VBF" ),
     pt1Min = cms.double( 115.0 ),
     pt2Min = cms.double( 40.0 ),
     pt3Min = cms.double( 110.0 ),
@@ -72280,6 +72282,7 @@ fragment.hltRealDijetFilter = cms.EDFilter( "HLTPFJetVBFFilter",
 fragment.hltVBFIsoTauL1TLooseIDPFJetsMatching = cms.EDProducer( "L1TPFJetsMatching",
     L1JetTrigger = cms.InputTag( "hltL1VBFDiJetIsoTau" ),
     JetSrc = cms.InputTag( "hltAK4PFJetsLooseIDCorrected" ),
+    matchingMode = cms.string( "VBF" ),
     pt1Min = cms.double( 40.0 ),
     pt2Min = cms.double( 40.0 ),
     pt3Min = cms.double( 40.0 ),
@@ -72298,7 +72301,7 @@ fragment.hltVBFLooseIDPFDummyFilter = cms.EDFilter( "HLT1PFJet",
     MaxEta = cms.double( -1.0 ),
     MinN = cms.int32( 2 )
 )
-fragment.hltPFDiJetCorrCheckerWithMediumDiTau = cms.EDProducer( "HLTPFDiJetCorrCheckerWithDiTau",
+fragment.hltPFDiJetCorrCheckerWithMediumDiTau = cms.EDProducer( "HLTDiPFJetPlusTausCandidatePFJetProducer",
     pfJetSrc = cms.InputTag( 'hltVBFIsoTauL1TLooseIDPFJetsMatching','TwoJets' ),
     tauSrc = cms.InputTag( "hltHpsDoublePFTau20MediumDitauWPDeepTauNoMatch" ),
     extraTauPtCut = cms.double( 45.0 ),
