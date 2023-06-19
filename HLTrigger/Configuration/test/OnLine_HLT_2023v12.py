@@ -1,18 +1,18 @@
-# hltGetConfiguration /dev/CMSSW_13_0_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
+# hltGetConfiguration /frozen/2023/2e34/v1.2/HLT --full --data --type 2023v12 --unprescale --process HLT2023v12 --globaltag auto:run3_hlt_2023v12 --input file:RelVal_Raw_2023v12_DATA.root
 
-# /dev/CMSSW_13_0_0/GRun/V130 (CMSSW_13_0_2)
+# /frozen/2023/2e34/v1.2/HLT/V1 (CMSSW_13_0_2)
 
 import FWCore.ParameterSet.Config as cms
 
 from HeterogeneousCore.CUDACore.SwitchProducerCUDA import SwitchProducerCUDA
 from HeterogeneousCore.CUDACore.ProcessAcceleratorCUDA import ProcessAcceleratorCUDA
 
-process = cms.Process( "HLTGRun" )
+process = cms.Process( "HLT2023v12" )
 
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_13_0_0/GRun/V130')
+  tableName = cms.string('/frozen/2023/2e34/v1.2/HLT/V1')
 )
 
 process.transferSystem = cms.PSet( 
@@ -88664,7 +88664,7 @@ process.schedule = cms.Schedule( *(process.HLTriggerFirstPath, process.Status_On
 # source module (EDM inputs)
 process.source = cms.Source( "PoolSource",
     fileNames = cms.untracked.vstring(
-        'file:RelVal_Raw_GRun_DATA.root',
+        'file:RelVal_Raw_2023v12_DATA.root',
     ),
     inputCommands = cms.untracked.vstring(
         'keep *'
@@ -88684,7 +88684,7 @@ process.options.numberOfStreams = 0
 # override the GlobalTag, connection string and pfnPrefix
 if 'GlobalTag' in process.__dict__:
     from Configuration.AlCa.GlobalTag import GlobalTag as customiseGlobalTag
-    process.GlobalTag = customiseGlobalTag(process.GlobalTag, globaltag = 'auto:run3_hlt_GRun')
+    process.GlobalTag = customiseGlobalTag(process.GlobalTag, globaltag = 'auto:run3_hlt_2023v12')
 
 # show summaries from trigger analysers used at HLT
 if 'MessageLogger' in process.__dict__:
@@ -88697,23 +88697,23 @@ if 'MessageLogger' in process.__dict__:
 
 # add specific customizations
 _customInfo = {}
-_customInfo['menuType'  ]= "GRun"
+_customInfo['menuType'  ]= "2023v12"
 _customInfo['globalTags']= {}
-_customInfo['globalTags'][True ] = "auto:run3_hlt_GRun"
-_customInfo['globalTags'][False] = "auto:run3_mc_GRun"
+_customInfo['globalTags'][True ] = "auto:run3_hlt_2023v12"
+_customInfo['globalTags'][False] = "auto:run3_mc_2023v12"
 _customInfo['inputFiles']={}
-_customInfo['inputFiles'][True]  = "file:RelVal_Raw_GRun_DATA.root"
-_customInfo['inputFiles'][False] = "file:RelVal_Raw_GRun_MC.root"
+_customInfo['inputFiles'][True]  = "file:RelVal_Raw_2023v12_DATA.root"
+_customInfo['inputFiles'][False] = "file:RelVal_Raw_2023v12_MC.root"
 _customInfo['maxEvents' ]=  100
-_customInfo['globalTag' ]= "auto:run3_hlt_GRun"
-_customInfo['inputFile' ]=  ['file:RelVal_Raw_GRun_DATA.root']
+_customInfo['globalTag' ]= "auto:run3_hlt_2023v12"
+_customInfo['inputFile' ]=  ['file:RelVal_Raw_2023v12_DATA.root']
 _customInfo['realData'  ]=  True
 
 from HLTrigger.Configuration.customizeHLTforALL import customizeHLTforAll
-process = customizeHLTforAll(process,"GRun",_customInfo)
+process = customizeHLTforAll(process,"2023v12",_customInfo)
 
 from HLTrigger.Configuration.customizeHLTforCMSSW import customizeHLTforCMSSW
-process = customizeHLTforCMSSW(process,"GRun")
+process = customizeHLTforCMSSW(process,"2023v12")
 
 # Eras-based customisations
 from HLTrigger.Configuration.Eras import modifyHLTforEras
