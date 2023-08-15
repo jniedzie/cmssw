@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_13_0_0/HLT --full --data --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_13_0_0/HLT/V168 (CMSSW_13_0_2)
+# /dev/CMSSW_13_0_0/HLT/V169 (CMSSW_13_0_2)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLTFULL" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_13_0_0/HLT/V168')
+  tableName = cms.string('/dev/CMSSW_13_0_0/HLT/V169')
 )
 
 process.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -111929,6 +111929,7 @@ process.hltOutputHLTMonitor = cms.OutputModule( "PoolOutputModule",
       'keep *_hltDeepCombinedSecondaryVertexBJetTagsPF_*_*',
       'keep *_hltDeepSecondaryVertexTagInfosPF_*_*',
       'keep *_hltDisplacedhltIter4PFlowTrackSelectionHighPurity_*_*',
+      'keep *_hltDoubletRecoveryPFlowTrackSelectionHighPurity_*_*',
       'keep *_hltEcalRecHit_*_*',
       'keep *_hltEgammaGsfTracks_*_*',
       'keep *_hltElectronsVertex_*_*',
