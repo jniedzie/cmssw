@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2023/2e34/v1.2/CMSSW_13_2_X/HLT --cff --data --type 2023v12
 
-# /frozen/2023/2e34/v1.2/CMSSW_13_2_X/HLT/V6 (CMSSW_13_2_0)
+# /frozen/2023/2e34/v1.2/CMSSW_13_2_X/HLT/V7 (CMSSW_13_2_1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2023/2e34/v1.2/CMSSW_13_2_X/HLT/V6')
+  tableName = cms.string('/frozen/2023/2e34/v1.2/CMSSW_13_2_X/HLT/V7')
 )
 
 fragment.transferSystem = cms.PSet( 
