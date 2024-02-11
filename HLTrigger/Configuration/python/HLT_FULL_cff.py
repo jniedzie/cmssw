@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/HLT --cff --data --type FULL
 
-# /dev/CMSSW_14_0_0/HLT/V10 (CMSSW_14_0_0_pre3)
+# /dev/CMSSW_14_0_0/HLT/V12 (CMSSW_14_0_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/HLT/V10')
+  tableName = cms.string('/dev/CMSSW_14_0_0/HLT/V12')
 )
 
 fragment.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -12167,7 +12167,7 @@ fragment.hltGtStage2ObjectMap = cms.EDProducer( "L1TGlobalProducer",
     AlgorithmTriggersUnprescaled = cms.bool( True ),
     RequireMenuToMatchAlgoBlkInput = cms.bool( True ),
     AlgorithmTriggersUnmasked = cms.bool( True ),
-    AXOL1TLModelVersion = cms.string( "" ),
+    AXOL1TLModelVersion = cms.string( "GTADModel_v3" ),
     useMuonShowers = cms.bool( True ),
     resetPSCountersEachLumiSec = cms.bool( True ),
     semiRandomInitialPSCounters = cms.bool( False ),
@@ -61767,36 +61767,6 @@ fragment.hltEle28HighEtaSC20HEFilterUnseeded = cms.EDFilter( "HLTEgammaGenericFi
     effectiveAreas = cms.vdouble( 0.0, 0.0 ),
     absEtaLowEdges = cms.vdouble( 0.0, 1.479 ),
     l1EGCand = cms.InputTag( "hltEgammaCandidatesUnseeded" )
-)
-fragment.hltParticleFlowClusterHFForEgammaUnseeded = cms.EDProducer( "PFClusterProducer",
-    recHitsSource = cms.InputTag( "hltParticleFlowRecHitHF" ),
-    usePFThresholdsFromDB = cms.bool( True ),
-    recHitCleaners = cms.VPSet( 
-    ),
-    seedCleaners = cms.VPSet( 
-    ),
-    seedFinder = cms.PSet( 
-      thresholdsByDetector = cms.VPSet( 
-        cms.PSet(  seedingThresholdPt = cms.double( 0.0 ),
-          seedingThreshold = cms.double( 1.4 ),
-          detector = cms.string( "HF_EM" )
-        ),
-        cms.PSet(  seedingThresholdPt = cms.double( 0.0 ),
-          seedingThreshold = cms.double( 1.4 ),
-          detector = cms.string( "HF_HAD" )
-        )
-      ),
-      algoName = cms.string( "LocalMaximumSeedFinder" ),
-      nNeighbours = cms.int32( 0 )
-    ),
-    initialClusteringStep = cms.PSet( 
-      thresholdsByDetector = cms.VPSet( 
-      ),
-      algoName = cms.string( "Basic2DClusterForEachSeed" )
-    ),
-    pfClusterBuilder = cms.PSet(  ),
-    positionReCalc = cms.PSet(  ),
-    energyCorrector = cms.PSet(  )
 )
 fragment.hltEle28HighEtaSC20HcalIsoFilterUnseeded = cms.EDFilter( "HLTEgammaGenericFilter",
     saveTags = cms.bool( True ),
@@ -122821,8 +122791,7 @@ fragment.HLTL3NoFiltersNoVtxmuonrecoNocandSequence = cms.Sequence( fragment.HLTL
 fragment.HLTL3NoFiltersNoVtxmuonrecoSequence = cms.Sequence( fragment.HLTL3NoFiltersNoVtxmuonrecoNocandSequence + fragment.hltL3NoFiltersNoVtxMuonCandidates )
 fragment.HLTEle30erJetC34WPTightGsfSequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTPFClusteringForEgamma + fragment.hltEgammaCandidates + fragment.hltEGL1IsoEG30erJetC34drMin0p3Filter + fragment.hltEG30L1IsoEGerJetC34drMin0p3EtFilter + fragment.hltEgammaClusterShape + fragment.hltEle30erJetC34WPTightClusterShapeFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTFastJetForEgamma + fragment.hltEgammaHoverE + fragment.hltEle30erJetC34WPTightHEFilter + fragment.hltEgammaEcalPFClusterIso + fragment.hltEle30erJetC34WPTightEcalIsoFilter + fragment.HLTPFHcalClustering + fragment.hltEgammaHcalPFClusterIso + fragment.hltEle30erJetC34WPTightHcalIsoFilter + fragment.HLTElePixelMatchSequence + fragment.hltEle30erJetC34WPTightPixelMatchFilter + fragment.hltEle30erJetC34WPTightPMS2Filter + fragment.HLTGsfElectronSequence + fragment.hltEle30erJetC34WPTightGsfOneOEMinusOneOPFilter + fragment.hltEle30erJetC34WPTightGsfMissingHitsFilter + fragment.hltEle30erJetC34WPTightGsfDetaFilter + fragment.hltEle30erJetC34WPTightGsfDphiFilter + fragment.HLTTrackReconstructionForIsoElectronIter02 + fragment.hltEgammaEleGsfTrackIso + fragment.hltEle30erJetC34WPTightGsfTrackIsoFilter )
 fragment.HLTEle28erHTT100WPTightGsfSequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTPFClusteringForEgamma + fragment.hltEgammaCandidates + fragment.hltEGL1IsoEG28erHTT100Filter + fragment.hltEG28L1IsoEG28erHTT100EtFilter + fragment.hltEgammaClusterShape + fragment.hltEle28erHTT100WPTightClusterShapeFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTFastJetForEgamma + fragment.hltEgammaHoverE + fragment.hltEle28erHTT100WPTightHEFilter + fragment.hltEgammaEcalPFClusterIso + fragment.hltEle28erHTT100WPTightEcalIsoFilter + fragment.HLTPFHcalClustering + fragment.hltEgammaHcalPFClusterIso + fragment.hltEle28erHTT100WPTightHcalIsoFilter + fragment.HLTElePixelMatchSequence + fragment.hltEle28erHTT100WPTightPixelMatchFilter + fragment.hltEle28erHTT100WPTightPMS2Filter + fragment.HLTGsfElectronSequence + fragment.hltEle28erHTT100WPTightGsfOneOEMinusOneOPFilter + fragment.hltEle28erHTT100WPTightGsfMissingHitsFilter + fragment.hltEle28erHTT100WPTightGsfDetaFilter + fragment.hltEle28erHTT100WPTightGsfDphiFilter + fragment.HLTTrackReconstructionForIsoElectronIter02 + fragment.hltEgammaEleGsfTrackIso + fragment.hltEle28erHTT100WPTightGsfTrackIsoFilter )
-fragment.HLTPFHcalClusteringForEgammaUnseeded = cms.Sequence( fragment.hltParticleFlowRecHitHBHE + fragment.hltParticleFlowRecHitHF + fragment.hltParticleFlowClusterHBHE + fragment.hltParticleFlowClusterHCAL + fragment.hltParticleFlowClusterHFForEgammaUnseeded )
-fragment.HLTEle28HighEtaSC20Mass55Sequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTPFClusteringForEgamma + fragment.hltEgammaCandidates + fragment.hltEGL1SingleEGOrFilter + fragment.hltEle28HighEtaSC20EtFilter + fragment.hltEgammaClusterShape + fragment.hltEle28HighEtaSC20ClusterShapeFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTFastJetForEgamma + fragment.hltEgammaHoverE + fragment.hltEle28HighEtaSC20HEFilter + fragment.hltEgammaEcalPFClusterIso + fragment.hltEle28HighEtaSC20EcalIsoFilter + fragment.HLTPFHcalClustering + fragment.hltEgammaHcalPFClusterIso + fragment.hltEle28HighEtaSC20HcalIsoFilter + fragment.HLTElePixelMatchSequence + fragment.hltEle28HighEtaSC20PixelMatchFilter + fragment.HLTGsfElectronSequence + fragment.hltEle28HighEtaSC20OneOEMinusOneOPFilter + fragment.hltEle28HighEtaSC20DetaFilter + fragment.hltEle28HighEtaSC20DphiFilter + fragment.HLTTrackReconstructionForIsoElectronIter02 + fragment.hltEgammaEleGsfTrackIso + fragment.hltEle28HighEtaSC20TrackIsoFilter + fragment.HLTPFClusteringForEgammaUnseeded + fragment.hltEgammaCandidatesUnseeded + fragment.hltEgammaCandidatesWrapperUnseeded + fragment.hltDiEG20EtUnseededFilter + fragment.hltEgammaClusterShapeUnseeded + fragment.hltEle28HighEtaSC20ClusterShapeUnseededFilter + fragment.hltEgammaEcalPFClusterIsoUnseeded + fragment.hltEle28HighEtaSC20EcalIsoFilterUnseeded + fragment.hltEgammaHoverEUnseeded + fragment.hltEle28HighEtaSC20HEFilterUnseeded + fragment.HLTPFHcalClusteringForEgammaUnseeded + fragment.hltEgammaHcalPFClusterIsoUnseeded + fragment.hltEle28HighEtaSC20HcalIsoFilterUnseeded + fragment.hltHighEtaSC20Selector + fragment.hltHighEtaSC20SelectorFilter + fragment.hltEle28HighEtaSC20Mass55Filter )
+fragment.HLTEle28HighEtaSC20Mass55Sequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTPFClusteringForEgamma + fragment.hltEgammaCandidates + fragment.hltEGL1SingleEGOrFilter + fragment.hltEle28HighEtaSC20EtFilter + fragment.hltEgammaClusterShape + fragment.hltEle28HighEtaSC20ClusterShapeFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTFastJetForEgamma + fragment.hltEgammaHoverE + fragment.hltEle28HighEtaSC20HEFilter + fragment.hltEgammaEcalPFClusterIso + fragment.hltEle28HighEtaSC20EcalIsoFilter + fragment.HLTPFHcalClustering + fragment.hltEgammaHcalPFClusterIso + fragment.hltEle28HighEtaSC20HcalIsoFilter + fragment.HLTElePixelMatchSequence + fragment.hltEle28HighEtaSC20PixelMatchFilter + fragment.HLTGsfElectronSequence + fragment.hltEle28HighEtaSC20OneOEMinusOneOPFilter + fragment.hltEle28HighEtaSC20DetaFilter + fragment.hltEle28HighEtaSC20DphiFilter + fragment.HLTTrackReconstructionForIsoElectronIter02 + fragment.hltEgammaEleGsfTrackIso + fragment.hltEle28HighEtaSC20TrackIsoFilter + fragment.HLTPFClusteringForEgammaUnseeded + fragment.hltEgammaCandidatesUnseeded + fragment.hltEgammaCandidatesWrapperUnseeded + fragment.hltDiEG20EtUnseededFilter + fragment.hltEgammaClusterShapeUnseeded + fragment.hltEle28HighEtaSC20ClusterShapeUnseededFilter + fragment.hltEgammaEcalPFClusterIsoUnseeded + fragment.hltEle28HighEtaSC20EcalIsoFilterUnseeded + fragment.hltEgammaHoverEUnseeded + fragment.hltEle28HighEtaSC20HEFilterUnseeded + fragment.hltEgammaHcalPFClusterIsoUnseeded + fragment.hltEle28HighEtaSC20HcalIsoFilterUnseeded + fragment.hltHighEtaSC20Selector + fragment.hltHighEtaSC20SelectorFilter + fragment.hltEle28HighEtaSC20Mass55Filter )
 fragment.HLTEle15VVVLGsfSequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTPFClusteringForEgamma + fragment.hltEgammaCandidates + fragment.hltEGL1SingleEG5OpenFilter + fragment.hltEG15EtFilter + fragment.hltEgammaClusterShape + fragment.hltEle15VVVLClusterShapeFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTFastJetForEgamma + fragment.hltEgammaHoverE + fragment.hltEle15VVVLHEFilter + fragment.hltEgammaEcalPFClusterIsoR02 + fragment.hltEle15VVVLEcalIsoFilter + fragment.HLTPFHcalClustering + fragment.hltEgammaHcalPFClusterIsoR02 + fragment.hltEle15VVVLHcalIsoFilter + fragment.HLTElePixelMatchSequence + fragment.hltEle15VVVLPixelMatchFilter + fragment.HLTGsfElectronSequence + fragment.hltEle15VVVLGsfOneOEMinusOneOPFilter + fragment.hltEle15VVVLGsfChi2Filter + fragment.hltEle15VVVLGsfMissingHitsFilter + fragment.hltEle15VVVLGsfDetaFilter + fragment.hltEle15VVVLGsfDphiFilter + fragment.HLTTrackReconstructionForIsoElectronIter02 + fragment.hltEgammaEleGsfTrackIso + fragment.hltEle15VVVLGsfTrackIsoFilter )
 fragment.HLTEle50VVVLGsfSequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTPFClusteringForEgamma + fragment.hltEgammaCandidates + fragment.hltEGL1SingleEG5OpenFilter + fragment.hltEG50IsoVVVLEtFilter + fragment.hltEgammaClusterShape + fragment.hltEle50VVVLClusterShapeFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTFastJetForEgamma + fragment.hltEgammaHoverE + fragment.hltEle50VVVLHEFilter + fragment.hltEgammaEcalPFClusterIsoR02 + fragment.hltEle50VVVLEcalIsoFilter + fragment.HLTPFHcalClustering + fragment.hltEgammaHcalPFClusterIsoR02 + fragment.hltEle50VVVLHcalIsoFilter + fragment.HLTElePixelMatchSequence + fragment.hltEle50VVVLPixelMatchFilter + fragment.HLTGsfElectronSequence + fragment.hltEle50VVVLGsfOneOEMinusOneOPFilter + fragment.hltEle50VVVLGsfChi2Filter + fragment.hltEle50VVVLGsfMissingHitsFilter + fragment.hltEle50VVVLGsfDetaFilter + fragment.hltEle50VVVLGsfDphiFilter + fragment.HLTTrackReconstructionForIsoElectronIter02 + fragment.hltEgammaEleGsfTrackIso + fragment.hltEle50VVVLGsfTrackIsoFilter )
 fragment.HLTMuVVVLCombinedIsolationR02Sequence = cms.Sequence( fragment.HLTDoFullUnpackingEgammaEcalSequence + fragment.HLTDoLocalHcalSequence + fragment.hltTowerMakerForAll + fragment.hltFixedGridRhoFastjetAllCaloForMuonsWithCaloTowers + fragment.hltL3CaloMuonCorrectedVVVLIsolations + fragment.HLTTrackReconstructionForIsoL3MuonIter02 + fragment.hltL3MuonCombRelIsolationVVVL )
