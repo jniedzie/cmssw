@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/HLT --cff --data --type FULL
 
-# /dev/CMSSW_14_0_0/HLT/V14 (CMSSW_14_0_0_pre3)
+# /dev/CMSSW_14_0_0/HLT/V15 (CMSSW_14_0_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/HLT/V14')
+  tableName = cms.string('/dev/CMSSW_14_0_0/HLT/V15')
 )
 
 fragment.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -75221,7 +75221,7 @@ fragment.hltPFJetTwoC30PFBTagPNet2BTagMean0p50 = cms.EDFilter( "HLTSumPFJetTag",
 )
 fragment.hltL1sTripleJet957565VBFIorHTTIorDoubleJetCIorSingleJetorQuadJet95756520 = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
-    L1SeedsLogicalExpression = cms.string( "L1_TripleJet_95_75_65_DoubleJet_75_65_er2p5 OR L1_TripleJet_100_80_70_DoubleJet_80_70_er2p5 OR L1_SingleJet180 OR L1_SingleJet200 OR L1_DoubleJet_110_35_DoubleJet35_Mass_Min620 OR L1_QuadJet_95_75_65_20_DoubleJet_75_65_er2p5_Jet20_FWD3p0 OR L1_HTT360er" ),
+    L1SeedsLogicalExpression = cms.string( "L1_TripleJet_95_75_65_DoubleJet_75_65_er2p5 OR L1_TripleJet_100_80_70_DoubleJet_80_70_er2p5 OR L1_SingleJet180 OR L1_SingleJet200 OR L1_DoubleJet_110_35_DoubleJet35_Mass_Min800 OR L1_QuadJet_95_75_65_20_DoubleJet_75_65_er2p5_Jet20_FWD3p0 OR L1_HTT360er OR L1_HTT280er" ),
     L1ObjectMapInputTag = cms.InputTag( "hltGtStage2ObjectMap" ),
     L1GlobalInputTag = cms.InputTag( "hltGtStage2Digis" ),
     L1MuonInputTag = cms.InputTag( 'hltGtStage2Digis','Muon' ),
