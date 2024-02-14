@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_14_0_0/GRun/V11 (CMSSW_14_0_0_pre3)
+# /dev/CMSSW_14_0_0/GRun/V12 (CMSSW_14_0_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLTGRun" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V11')
+  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V12')
 )
 
 process.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -89259,7 +89259,7 @@ process.hltOutputALCAPPSExpress = cms.OutputModule( "PoolOutputModule",
     ),
     SelectEvents = cms.untracked.PSet(  SelectEvents = cms.vstring( 'Dataset_AlCaPPSExpress' ) ),
     outputCommands = cms.untracked.vstring( 'drop *',
-      'keep *_hltGtStage2ObjectMap_*_*',
+      'keep *_hltFEDSelectorL1_*_*',
       'keep *_hltPPSCalibrationRaw_*_*',
       'keep edmTriggerResults_*_*_*',
       'keep triggerTriggerEvent_*_*_*' )
@@ -89275,7 +89275,7 @@ process.hltOutputALCAPPSPrompt = cms.OutputModule( "PoolOutputModule",
     ),
     SelectEvents = cms.untracked.PSet(  SelectEvents = cms.vstring( 'Dataset_AlCaPPSPrompt' ) ),
     outputCommands = cms.untracked.vstring( 'drop *',
-      'keep *_hltGtStage2ObjectMap_*_*',
+      'keep *_hltFEDSelectorL1_*_*',
       'keep *_hltPPSCalibrationRaw_*_*',
       'keep edmTriggerResults_*_*_*',
       'keep triggerTriggerEvent_*_*_*' )
@@ -91308,8 +91308,8 @@ process.HLT_PFJet200_TimeLtNeg2p5ns_v4 = cms.Path( process.HLTBeginSequence + pr
 process.HLT_PFJet200_TimeGt2p5ns_v4 = cms.Path( process.HLTBeginSequence + process.hltL1sSingleJet170IorSingleJet180IorSingleJet200 + process.hltPrePFJet200TimeGt2p5ns + process.HLTAK4CaloJetsSequence + process.hltSingleCaloJet170 + process.HLTAK4PFJetsSequence + process.hltPFJetsCorrectedMatchedToCaloJets170 + process.hltSinglePFJet200 + process.hltEmFraction0p01To0p99CaloJetSelector + process.hltSingleCentralCaloJetpt40 + process.hltCentralCaloJetptLowPtCollectionProducerSingle + process.hltCaloJetTimingProducerSingle + process.hltCaloJetTimingFilterSingle2p5ns + process.HLTEndSequence )
 process.HLT_Photon50_TimeLtNeg2p5ns_v3 = cms.Path( process.HLTBeginSequence + process.hltL1sSingleEG34to45 + process.hltPrePhoton50TimeLtNeg2p5ns + process.HLTPhoton50Sequence + process.hltEgammaClusterShape + process.hltEG50CaloIdLClusterShapeFilter + process.hltEG50CaloIdLTimeNeg2p5nsFilter + process.HLTEndSequence )
 process.HLT_Photon50_TimeGt2p5ns_v3 = cms.Path( process.HLTBeginSequence + process.hltL1sSingleEG34to45 + process.hltPrePhoton50TimeGt2p5ns + process.HLTPhoton50Sequence + process.hltEgammaClusterShape + process.hltEG50CaloIdLClusterShapeFilter + process.hltEG50CaloIdLTime2p5nsFilter + process.HLTEndSequence )
-process.HLT_PPSMaxTracksPerArm1_v5 = cms.Path( process.HLTBeginSequence + process.hltL1sZeroBias + process.hltPrePPSMaxTracksPerArm1 + process.HLTPPSPixelRecoSequence + process.hltPPSExpCalFilter + process.hltPPSCalibrationRaw + process.HLTEndSequence )
-process.HLT_PPSMaxTracksPerRP4_v5 = cms.Path( process.HLTBeginSequence + process.hltL1sZeroBias + process.hltPrePPSMaxTracksPerRP4 + process.HLTPPSPixelRecoSequence + process.hltPPSPrCalFilter + process.hltPPSCalibrationRaw + process.HLTEndSequence )
+process.HLT_PPSMaxTracksPerArm1_v5 = cms.Path( process.HLTBeginSequence + process.hltL1sZeroBias + process.hltPrePPSMaxTracksPerArm1 + process.HLTPPSPixelRecoSequence + process.hltPPSExpCalFilter + process.hltPPSCalibrationRaw + process.hltFEDSelectorL1 + process.HLTEndSequence )
+process.HLT_PPSMaxTracksPerRP4_v5 = cms.Path( process.HLTBeginSequence + process.hltL1sZeroBias + process.hltPrePPSMaxTracksPerRP4 + process.HLTPPSPixelRecoSequence + process.hltPPSPrCalFilter + process.hltPPSCalibrationRaw + process.hltFEDSelectorL1 + process.HLTEndSequence )
 process.HLT_PPSRandom_v1 = cms.Path( process.HLTBeginSequenceRandom + process.hltPrePPSRandom + process.hltPPSCalibrationRaw + process.HLTEndSequence )
 process.MC_ReducedIterativeTracking_v18 = cms.Path( process.HLTBeginSequence + process.hltPreMCReducedIterativeTracking + process.HLTDoLocalPixelSequence + process.HLTRecopixelvertexingSequence + process.HLTDoLocalStripSequence + process.HLTIterativeTrackingIter02 + process.HLTEndSequence )
 process.MC_CaloBTagDeepCSV_v14 = cms.Path( process.HLTBeginSequence + process.hltPreMCCaloBTagDeepCSV + process.HLTAK4CaloJetsSequence + process.HLTBtagDeepCSVSequenceL3 + process.hltBTagCaloDeepCSV10p0Single + process.HLTEndSequence )
