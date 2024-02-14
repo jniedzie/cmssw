@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_14_0_0/GRun/V9 (CMSSW_14_0_0_pre3)
+# /dev/CMSSW_14_0_0/GRun/V10 (CMSSW_14_0_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ process = cms.Process( "HLTGRun" )
 process.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V9')
+  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V10')
 )
 
 process.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -18199,7 +18199,7 @@ process.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
     metCollection = cms.InputTag( "hltPixelOnlyPFMETProducer" ),
     rho = cms.InputTag( "hltFixedGridRhoFastjetPixelOnlyAll" ),
     pfJetPtCut = cms.double( 20.0 ),
-    pfJetEtaCut = cms.double( 3.0 ),
+    pfJetEtaCut = cms.double( 5.0 ),
     pfCandidatePtCut = cms.double( 0.6 ),
     pfCandidateEtaCut = cms.double( 3.0 ),
     mantissaPrecision = cms.int32( 10 ),

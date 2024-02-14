@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/HLT --cff --data --type FULL
 
-# /dev/CMSSW_14_0_0/HLT/V13 (CMSSW_14_0_0_pre3)
+# /dev/CMSSW_14_0_0/HLT/V14 (CMSSW_14_0_0_pre3)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/HLT/V13')
+  tableName = cms.string('/dev/CMSSW_14_0_0/HLT/V14')
 )
 
 fragment.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -24295,7 +24295,7 @@ fragment.hltScoutingPFPacker = cms.EDProducer( "HLTScoutingPFProducer",
     metCollection = cms.InputTag( "hltPixelOnlyPFMETProducer" ),
     rho = cms.InputTag( "hltFixedGridRhoFastjetPixelOnlyAll" ),
     pfJetPtCut = cms.double( 20.0 ),
-    pfJetEtaCut = cms.double( 3.0 ),
+    pfJetEtaCut = cms.double( 5.0 ),
     pfCandidatePtCut = cms.double( 0.6 ),
     pfCandidateEtaCut = cms.double( 3.0 ),
     mantissaPrecision = cms.int32( 10 ),
