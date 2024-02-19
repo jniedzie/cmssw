@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/GRun --cff --data --type GRun
 
-# /dev/CMSSW_14_0_0/GRun/V14 (CMSSW_14_0_0_pre3)
+# /dev/CMSSW_14_0_0/GRun/V15 (CMSSW_14_0_0)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V14')
+  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V15')
 )
 
 fragment.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -17679,6 +17679,7 @@ fragment.hltScoutingEgammaPacker = cms.EDProducer( "HLTScoutingEgammaProducer",
     DphiMap = cms.InputTag( 'hltEgammaGsfTrackVarsUnseeded','Dphi' ),
     MissingHitsMap = cms.InputTag( 'hltEgammaGsfTrackVarsUnseeded','MissingHits' ),
     OneOEMinusOneOPMap = cms.InputTag( 'hltEgammaGsfTrackVarsUnseeded','OneOESuperMinusOneOP' ),
+    fBremMap = cms.InputTag( 'hltEgammaGsfTrackVarsUnseeded','fbrem' ),
     EcalPFClusterIsoMap = cms.InputTag( "hltEgammaEcalPFClusterIsoUnseeded" ),
     EleGsfTrackIsoMap = cms.InputTag( "hltEgammaEleGsfUnseededTrackIsoPixelOnly" ),
     HcalPFClusterIsoMap = cms.InputTag( "hltEgammaHcalPFClusterIsoUnseeded" ),
@@ -55968,7 +55969,9 @@ fragment.hltParticleNetJetTagInfos = cms.EDProducer( "DeepBoostedJetTagInfoProdu
     quality_value_map = cms.InputTag( "" ),
     trkPt_value_map = cms.InputTag( "" ),
     trkEta_value_map = cms.InputTag( "" ),
-    trkPhi_value_map = cms.InputTag( "" )
+    trkPhi_value_map = cms.InputTag( "" ),
+    covarianceVersion = cms.int32( 0 ),
+    covariancePackingSchemas = cms.vint32( 8, 264, 520, 776, 0 )
 )
 fragment.hltParticleNetONNXJetTags = cms.EDProducer( "BoostedJetONNXJetTagsProducer",
     src = cms.InputTag( "hltParticleNetJetTagInfos" ),
@@ -64083,7 +64086,9 @@ fragment.hltParticleNetJetTagsInfosAK8 = cms.EDProducer( "DeepBoostedJetTagInfoP
     quality_value_map = cms.InputTag( "" ),
     trkPt_value_map = cms.InputTag( "" ),
     trkEta_value_map = cms.InputTag( "" ),
-    trkPhi_value_map = cms.InputTag( "" )
+    trkPhi_value_map = cms.InputTag( "" ),
+    covarianceVersion = cms.int32( 0 ),
+    covariancePackingSchemas = cms.vint32( 8, 264, 520, 776, 0 )
 )
 fragment.hltParticleNetONNXJetTagsAK8 = cms.EDProducer( "BoostedJetONNXJetTagsProducer",
     src = cms.InputTag( "hltParticleNetJetTagsInfosAK8" ),
