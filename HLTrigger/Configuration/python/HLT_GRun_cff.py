@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/GRun --cff --data --type GRun
 
-# /dev/CMSSW_14_0_0/GRun/V15 (CMSSW_14_0_0)
+# /dev/CMSSW_14_0_0/GRun/V17 (CMSSW_14_0_0)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -12,7 +12,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V15')
+  tableName = cms.string('/dev/CMSSW_14_0_0/GRun/V17')
 )
 
 fragment.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -84498,7 +84498,7 @@ fragment.hltDatasetExpressPhysics = cms.EDFilter( "TriggerResultsFilter",
       'HLT_ZeroBias_Alignment_v4 / 6',
       'HLT_ZeroBias_FirstCollisionAfterAbortGap_v8',
       'HLT_ZeroBias_IsolatedBunches_v8',
-      'HLT_ZeroBias_v9' )
+      'HLT_ZeroBias_v9 / 2' )
 )
 fragment.hltPreDatasetExpressPhysics = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
