@@ -5,14 +5,13 @@
 import FWCore.ParameterSet.Config as cms
 
 from HeterogeneousCore.CUDACore.SwitchProducerCUDA import SwitchProducerCUDA
-from HeterogeneousCore.CUDACore.ProcessAcceleratorCUDA import ProcessAcceleratorCUDA
 
 fragment = cms.ProcessFragment( "HLT" )
 
-fragment.ProcessAcceleratorCUDA = ProcessAcceleratorCUDA()
+fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string('/frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT/V7')
+  tableName = cms.string("/frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT/V7")
 )
 
 fragment.transferSystem = cms.PSet( 
