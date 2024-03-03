@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT --cff --data --type 2023v12
 
-# /frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT/V7 (CMSSW_14_0_0)
+# /frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT/V8 (CMSSW_14_0_1_HLT1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -11,7 +11,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT/V7")
+  tableName = cms.string("/frozen/2023/2e34/v1.2/CMSSW_14_0_X/HLT/V8")
 )
 
 fragment.transferSystem = cms.PSet( 
@@ -16504,7 +16504,6 @@ fragment.hltEgammaClusterShapeUnseeded = cms.EDProducer( "EgammaHLTClusterShapeP
     recoEcalCandidateProducer = cms.InputTag( "hltEgammaCandidatesUnseeded" ),
     ecalRechitEB = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEB' ),
     ecalRechitEE = cms.InputTag( 'hltEcalRecHit','EcalRecHitsEE' ),
-    isIeta = cms.bool( True ),
     multThresEB = cms.double( 1.0 ),
     multThresEE = cms.double( 1.25 )
 )
@@ -18014,7 +18013,6 @@ fragment.hltEgammaClusterShape = cms.EDProducer( "EgammaHLTClusterShapeProducer"
     recoEcalCandidateProducer = cms.InputTag( "hltEgammaCandidates" ),
     ecalRechitEB = cms.InputTag( 'hltRechitInRegionsECAL','EcalRecHitsEB' ),
     ecalRechitEE = cms.InputTag( 'hltRechitInRegionsECAL','EcalRecHitsEE' ),
-    isIeta = cms.bool( True ),
     multThresEB = cms.double( 1.0 ),
     multThresEE = cms.double( 1.25 )
 )
