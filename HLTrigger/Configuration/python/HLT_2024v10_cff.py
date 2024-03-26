@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2024/2e34/v1.0/HLT --cff --data --type 2024v10
 
-# /frozen/2024/2e34/v1.0/HLT/V2 (CMSSW_14_0_1_HLT3)
+# /frozen/2024/2e34/v1.0/HLT/V5 (CMSSW_14_0_5)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -11,7 +11,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2024/2e34/v1.0/HLT/V2")
+  tableName = cms.string("/frozen/2024/2e34/v1.0/HLT/V5")
 )
 
 fragment.HLTIter0PSetTrajectoryBuilderIT = cms.PSet( 
@@ -6086,7 +6086,6 @@ fragment.hltGtStage2ObjectMap = cms.EDProducer( "L1TGlobalProducer",
     AlgorithmTriggersUnprescaled = cms.bool( True ),
     RequireMenuToMatchAlgoBlkInput = cms.bool( True ),
     AlgorithmTriggersUnmasked = cms.bool( True ),
-    AXOL1TLModelVersion = cms.string( "GTADModel_v3" ),
     useMuonShowers = cms.bool( True ),
     resetPSCountersEachLumiSec = cms.bool( True ),
     semiRandomInitialPSCounters = cms.bool( False ),
@@ -37823,6 +37822,7 @@ fragment.hltParticleNetJetTagInfos = cms.EDProducer( "DeepBoostedJetTagInfoProdu
     secondary_vertices = cms.InputTag( "hltDeepInclusiveMergedVerticesPF" ),
     pf_candidates = cms.InputTag( "hltParticleFlow" ),
     jets = cms.InputTag( "hltPFJetForBtag" ),
+    unsubjet_map = cms.InputTag( "" ),
     puppi_value_map = cms.InputTag( "" ),
     vertex_associator = cms.InputTag( 'hltPrimaryVertexAssociation','original' ),
     use_scouting_features = cms.bool( False ),
@@ -64388,6 +64388,7 @@ fragment.hltPFDeepFlavourTagInfos = cms.EDProducer( "DeepFlavourTagInfoProducer"
     puppi_value_map = cms.InputTag( "" ),
     secondary_vertices = cms.InputTag( "hltDeepInclusiveSecondaryVerticesPF" ),
     jets = cms.InputTag( "hltPFJetForBtag" ),
+    unsubjet_map = cms.InputTag( "" ),
     candidates = cms.InputTag( "hltParticleFlow" ),
     vertex_associator = cms.InputTag( 'hltPrimaryVertexAssociation','original' ),
     fallback_puppi_weight = cms.bool( True ),
@@ -65291,6 +65292,7 @@ fragment.hltParticleNetJetTagsInfosAK8 = cms.EDProducer( "DeepBoostedJetTagInfoP
     secondary_vertices = cms.InputTag( "hltDeepInclusiveMergedVerticesPF" ),
     pf_candidates = cms.InputTag( "hltParticleFlow" ),
     jets = cms.InputTag( "hltPFJetForPNetAK8" ),
+    unsubjet_map = cms.InputTag( "" ),
     puppi_value_map = cms.InputTag( "" ),
     vertex_associator = cms.InputTag( 'hltPrimaryVertexAssociation','original' ),
     use_scouting_features = cms.bool( False ),
@@ -67074,6 +67076,7 @@ fragment.hltParticleNetJetTagInfosMinPt20 = cms.EDProducer( "DeepBoostedJetTagIn
     secondary_vertices = cms.InputTag( "hltDeepInclusiveMergedVerticesPF" ),
     pf_candidates = cms.InputTag( "hltParticleFlow" ),
     jets = cms.InputTag( "hltPFJetForBtagMinPt20" ),
+    unsubjet_map = cms.InputTag( "" ),
     puppi_value_map = cms.InputTag( "" ),
     vertex_associator = cms.InputTag( 'hltPrimaryVertexAssociationMinPt20','original' ),
     use_scouting_features = cms.bool( False ),
@@ -76072,6 +76075,7 @@ fragment.hltParticleNetJetTagInfosMinPt10 = cms.EDProducer( "DeepBoostedJetTagIn
     secondary_vertices = cms.InputTag( "hltDeepInclusiveMergedVerticesPF" ),
     pf_candidates = cms.InputTag( "hltParticleFlow" ),
     jets = cms.InputTag( "hltPFJetForBtagMinPt10" ),
+    unsubjet_map = cms.InputTag( "" ),
     puppi_value_map = cms.InputTag( "" ),
     vertex_associator = cms.InputTag( 'hltPrimaryVertexAssociationMinPt10','original' ),
     use_scouting_features = cms.bool( False ),
