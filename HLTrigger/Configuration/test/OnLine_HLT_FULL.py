@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_14_0_0/HLT --full --data --type FULL --unprescale --process HLTFULL --globaltag auto:run3_hlt_FULL --input file:RelVal_Raw_FULL_DATA.root
 
-# /dev/CMSSW_14_0_0/HLT/V116 (CMSSW_14_0_5)
+# /dev/CMSSW_14_0_0/HLT/V118 (CMSSW_14_0_5)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -11,7 +11,7 @@ process = cms.Process( "HLTFULL" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/dev/CMSSW_14_0_0/HLT/V116")
+  tableName = cms.string("/dev/CMSSW_14_0_0/HLT/V118")
 )
 
 process.HLTIter4PSetTrajectoryBuilderIT = cms.PSet( 
@@ -112489,7 +112489,7 @@ process.hltDatasetJetMET = cms.EDFilter( "TriggerResultsFilter",
       'HLT_DiPFJetAve100_HFJEC_v25',
       'HLT_DiPFJetAve140_v21',
       'HLT_DiPFJetAve160_HFJEC_v24',
-      'HLT_DiPFJetAve180_PPSMatch_Xi0p3_QuadJet_Max2ProtPerRP_v2 / 0',
+      'HLT_DiPFJetAve180_PPSMatch_Xi0p3_QuadJet_Max2ProtPerRP_v2',
       'HLT_DiPFJetAve200_v21',
       'HLT_DiPFJetAve220_HFJEC_v24',
       'HLT_DiPFJetAve260_HFJEC_v7',
