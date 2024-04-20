@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2024/2e34/v1.1/HLT --full --data --type 2024v11 --unprescale --process HLT2024v11 --globaltag auto:run3_hlt_2024v11 --input file:RelVal_Raw_2024v11_DATA.root
 
-# /frozen/2024/2e34/v1.1/HLT/V2 (CMSSW_14_0_5)
+# /frozen/2024/2e34/v1.1/HLT/V3 (CMSSW_14_0_6)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -11,7 +11,7 @@ process = cms.Process( "HLT2024v11" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2024/2e34/v1.1/HLT/V2")
+  tableName = cms.string("/frozen/2024/2e34/v1.1/HLT/V3")
 )
 
 process.HLTIter4PSetTrajectoryBuilderIT = cms.PSet( 

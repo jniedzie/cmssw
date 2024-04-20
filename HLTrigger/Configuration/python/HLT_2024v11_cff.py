@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2024/2e34/v1.1/HLT --cff --data --type 2024v11
 
-# /frozen/2024/2e34/v1.1/HLT/V2 (CMSSW_14_0_5)
+# /frozen/2024/2e34/v1.1/HLT/V3 (CMSSW_14_0_6)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -11,7 +11,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2024/2e34/v1.1/HLT/V2")
+  tableName = cms.string("/frozen/2024/2e34/v1.1/HLT/V3")
 )
 
 fragment.HLTIter4PSetTrajectoryBuilderIT = cms.PSet( 
