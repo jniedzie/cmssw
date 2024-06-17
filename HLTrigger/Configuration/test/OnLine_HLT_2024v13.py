@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2024/2e34/v1.3/HLT --full --data --type 2024v13 --unprescale --process HLT2024v13 --globaltag auto:run3_hlt_2024v13 --input file:RelVal_Raw_2024v13_DATA.root
 
-# /frozen/2024/2e34/v1.3/HLT/V2 (CMSSW_14_0_6)
+# /frozen/2024/2e34/v1.3/HLT/V3 (CMSSW_14_0_11)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -11,7 +11,7 @@ process = cms.Process( "HLT2024v13" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2024/2e34/v1.3/HLT/V2")
+  tableName = cms.string("/frozen/2024/2e34/v1.3/HLT/V3")
 )
 
 process.HLTIter4PSetTrajectoryBuilderIT = cms.PSet( 
@@ -6423,6 +6423,7 @@ process.hltGtStage2ObjectMap = cms.EDProducer( "L1TGlobalProducer",
     JetInputTag = cms.InputTag( 'hltGtStage2Digis','Jet' ),
     EtSumInputTag = cms.InputTag( 'hltGtStage2Digis','EtSum' ),
     EtSumZdcInputTag = cms.InputTag( 'hltGtStage2Digis','EtSumZDC' ),
+    CICADAInputTag = cms.InputTag( "" ),
     ExtInputTag = cms.InputTag( "hltGtStage2Digis" ),
     AlgoBlkInputTag = cms.InputTag( "hltGtStage2Digis" ),
     GetPrescaleColumnFromData = cms.bool( False ),
@@ -7522,6 +7523,7 @@ process.hltPreAlCaLumiPixelsCountsRandom = cms.EDFilter( "HLTPrescaler",
 process.hltPixelTrackerHVOn = cms.EDFilter( "DetectorStateFilter",
     DebugOn = cms.untracked.bool( False ),
     DetectorType = cms.untracked.string( "pixel" ),
+    acceptedCombinations = cms.untracked.vstring(  ),
     DcsStatusLabel = cms.untracked.InputTag( "" ),
     DCSRecordLabel = cms.untracked.InputTag( "hltOnlineMetaDataDigis" )
 )
@@ -24294,6 +24296,7 @@ process.hltDoubleEle8Mass8Filter = cms.EDFilter( "HLTEgammaCombMassFilter",
     saveTags = cms.bool( True ),
     firstLegLastFilter = cms.InputTag( "hltDoubleEle8CaloIdMGsfTrackIdMDphiFilter" ),
     secondLegLastFilter = cms.InputTag( "hltDoubleEle8CaloIdMGsfTrackIdMDphiFilter" ),
+    l1EGCand = cms.InputTag( "hltEgammaCandidates" ),
     minMass = cms.double( 8.0 )
 )
 process.hltDoubleEle8DZFilter = cms.EDFilter( "HLT2PhotonPhotonDZ",
@@ -61467,6 +61470,7 @@ process.hltDoubleL2GlobIsoTau20eta2p2 = cms.EDFilter( "HLT1CaloJet",
 process.hltStripTrackerHVOn = cms.EDFilter( "DetectorStateFilter",
     DebugOn = cms.untracked.bool( False ),
     DetectorType = cms.untracked.string( "sistrip" ),
+    acceptedCombinations = cms.untracked.vstring(  ),
     DcsStatusLabel = cms.untracked.InputTag( "" ),
     DCSRecordLabel = cms.untracked.InputTag( "hltOnlineMetaDataDigis" )
 )
