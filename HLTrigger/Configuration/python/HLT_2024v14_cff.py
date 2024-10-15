@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2024/2e34/v1.4/CMSSW_14_1_X/HLT --cff --data --type 2024v14
 
-# /frozen/2024/2e34/v1.4/CMSSW_14_1_X/HLT/V5 (CMSSW_14_1_0)
+# /frozen/2024/2e34/v1.4/CMSSW_14_1_X/HLT/V6 (CMSSW_14_1_1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2024/2e34/v1.4/CMSSW_14_1_X/HLT/V5")
+  tableName = cms.string("/frozen/2024/2e34/v1.4/CMSSW_14_1_X/HLT/V6")
 )
 
 fragment.HLTIter4PSetTrajectoryBuilderIT = cms.PSet( 
@@ -6942,7 +6942,8 @@ fragment.hltSiPixelRecHits = cms.EDProducer( "SiPixelRecHitFromSoAAlpakaPhase1",
 )
 fragment.hltAlcaPixelClusterCounts = cms.EDProducer( "AlcaPCCEventProducer",
     pixelClusterLabel = cms.InputTag( "hltSiPixelClusters" ),
-    trigstring = cms.untracked.string( "alcaPCCEvent" )
+    trigstring = cms.untracked.string( "alcaPCCEvent" ),
+    savePerROCInfo = cms.bool( True )
 )
 fragment.hltL1sZeroBias = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -7197,7 +7198,8 @@ fragment.hltTowerMakerForAll = cms.EDProducer( "CaloTowersCreator",
     missingHcalRescaleFactorForEcal = cms.double( 0.0 ),
     AllowMissingInputs = cms.bool( False ),
     HcalPhase = cms.int32( 1 ),
-    usePFThresholdsFromDB = cms.bool( True )
+    usePFThresholdsFromDB = cms.bool( True ),
+    EcalRecHitThresh = cms.bool( False )
 )
 fragment.hltAK4CaloJets = cms.EDProducer( "FastjetJetProducer",
     useMassDropTagger = cms.bool( False ),
@@ -10489,7 +10491,6 @@ fragment.hltParticleFlowClusterHBHESoA = cms.EDProducer( "PFClusterSoAProducer@a
     pfClusterParams = cms.ESInputTag( "hltESPPFClusterParams","" ),
     topology = cms.ESInputTag( "hltESPPFRecHitHCALTopology","" ),
     synchronise = cms.bool( False ),
-    pfRecHitFractionAllocation = cms.int32( 250 ),
     alpaka = cms.untracked.PSet(  backend = cms.untracked.string( "" ) )
 )
 fragment.hltParticleFlowClusterHBHE = cms.EDProducer( "LegacyPFClusterProducer",
@@ -11196,7 +11197,8 @@ fragment.hltTowerMakerForAllSerialSync = cms.EDProducer( "CaloTowersCreator",
     missingHcalRescaleFactorForEcal = cms.double( 0.0 ),
     AllowMissingInputs = cms.bool( False ),
     HcalPhase = cms.int32( 1 ),
-    usePFThresholdsFromDB = cms.bool( True )
+    usePFThresholdsFromDB = cms.bool( True ),
+    EcalRecHitThresh = cms.bool( False )
 )
 fragment.hltAK4CaloJetsSerialSync = cms.EDProducer( "FastjetJetProducer",
     useMassDropTagger = cms.bool( False ),
@@ -13743,8 +13745,7 @@ fragment.hltParticleFlowClusterHBHESoASerialSync = cms.EDProducer( "alpaka_seria
     pfRecHits = cms.InputTag( "hltParticleFlowRecHitHBHESoASerialSync" ),
     pfClusterParams = cms.ESInputTag( "hltESPPFClusterParams","" ),
     topology = cms.ESInputTag( "hltESPPFRecHitHCALTopology","" ),
-    synchronise = cms.bool( False ),
-    pfRecHitFractionAllocation = cms.int32( 250 )
+    synchronise = cms.bool( False )
 )
 fragment.hltParticleFlowClusterHBHESerialSync = cms.EDProducer( "LegacyPFClusterProducer",
     src = cms.InputTag( "hltParticleFlowClusterHBHESoASerialSync" ),
@@ -31577,7 +31578,8 @@ fragment.hltStoppedHSCPTowerMakerForAll = cms.EDProducer( "CaloTowersCreator",
     missingHcalRescaleFactorForEcal = cms.double( 0.0 ),
     AllowMissingInputs = cms.bool( True ),
     HcalPhase = cms.int32( 1 ),
-    usePFThresholdsFromDB = cms.bool( True )
+    usePFThresholdsFromDB = cms.bool( True ),
+    EcalRecHitThresh = cms.bool( False )
 )
 fragment.hltStoppedHSCPIterativeCone4CaloJets = cms.EDProducer( "FastjetJetProducer",
     useMassDropTagger = cms.bool( False ),
@@ -38378,7 +38380,8 @@ fragment.hltTowerMakerForAllBeamHaloCleaned = cms.EDProducer( "CaloTowersCreator
     missingHcalRescaleFactorForEcal = cms.double( 0.0 ),
     AllowMissingInputs = cms.bool( False ),
     HcalPhase = cms.int32( 1 ),
-    usePFThresholdsFromDB = cms.bool( True )
+    usePFThresholdsFromDB = cms.bool( True ),
+    EcalRecHitThresh = cms.bool( False )
 )
 fragment.hltMetCleanBH = cms.EDProducer( "CaloMETProducer",
     src = cms.InputTag( "hltTowerMakerForAllBeamHaloCleaned" ),
@@ -59084,7 +59087,8 @@ fragment.hltTowerMakerEcal = cms.EDProducer( "CaloTowersCreator",
     missingHcalRescaleFactorForEcal = cms.double( 0.0 ),
     AllowMissingInputs = cms.bool( True ),
     HcalPhase = cms.int32( 1 ),
-    usePFThresholdsFromDB = cms.bool( True )
+    usePFThresholdsFromDB = cms.bool( True ),
+    EcalRecHitThresh = cms.bool( False )
 )
 fragment.hltHtMhtEcal = cms.EDProducer( "HLTCaloTowerHtMhtProducer",
     usePt = cms.bool( False ),
