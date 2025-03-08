@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_15_0_0/GRun --cff --data --type GRun
 
-# /dev/CMSSW_15_0_0/GRun/V8 (CMSSW_15_0_0)
+# /dev/CMSSW_15_0_0/GRun/V10 (CMSSW_15_0_1)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/dev/CMSSW_15_0_0/GRun/V8")
+  tableName = cms.string("/dev/CMSSW_15_0_0/GRun/V10")
 )
 
 fragment.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -16319,7 +16319,10 @@ fragment.hltMuonHcalRegPFClusterIsoForMuons = cms.EDProducer( "MuonHLTHcalPFClus
     energyEndcap = cms.double( 0.0 ),
     useEt = cms.bool( True ),
     effectiveAreas = cms.vdouble( 0.227, 0.372 ),
-    absEtaLowEdges = cms.vdouble( 0.0, 1.479 )
+    absEtaLowEdges = cms.vdouble( 0.0, 1.479 ),
+    doEffAreaCorrection = cms.bool( False ),
+    effectiveAreasCorr = cms.vdouble( 0.0, 0.0 ),
+    effectiveAreasThres = cms.vdouble( 0.0, 0.0 )
 )
 fragment.hltPixelTracksTrackingRegionsForSeedsL3Muon = cms.EDProducer( "CandidateSeededTrackingRegionsEDProducer",
     RegionPSet = cms.PSet( 
@@ -16628,7 +16631,10 @@ fragment.hltEgammaHcalPFClusterIsoUnseeded = cms.EDProducer( "EgammaHLTHcalPFClu
     energyEndcap = cms.double( 0.0 ),
     useEt = cms.bool( True ),
     effectiveAreas = cms.vdouble( 0.2, 0.25 ),
-    absEtaLowEdges = cms.vdouble( 0.0, 1.479 )
+    absEtaLowEdges = cms.vdouble( 0.0, 1.479 ),
+    doEffAreaCorrection = cms.bool( False ),
+    effectiveAreasCorr = cms.vdouble( 0.0, 0.0 ),
+    effectiveAreasThres = cms.vdouble( 0.0, 0.0 )
 )
 fragment.hltPixelLayerPairs = cms.EDProducer( "SeedingLayersEDProducer",
     layerList = cms.vstring( 'BPix1+BPix2',
@@ -17424,7 +17430,10 @@ fragment.hltMuonHcalPFClusterIsoForMuonsNoVtx = cms.EDProducer( "MuonHLTHcalPFCl
     energyEndcap = cms.double( 0.0 ),
     useEt = cms.bool( True ),
     effectiveAreas = cms.vdouble( 0.11, 0.163 ),
-    absEtaLowEdges = cms.vdouble( 0.0, 1.479 )
+    absEtaLowEdges = cms.vdouble( 0.0, 1.479 ),
+    doEffAreaCorrection = cms.bool( False ),
+    effectiveAreasCorr = cms.vdouble( 0.0, 0.0 ),
+    effectiveAreasThres = cms.vdouble( 0.0, 0.0 )
 )
 fragment.hltPixelTracksTrackingRegionsForSeedsL3MuonNoVtx = cms.EDProducer( "CandidateSeededTrackingRegionsEDProducer",
     RegionPSet = cms.PSet( 
@@ -18795,7 +18804,10 @@ fragment.hltEgammaHcalPFClusterIso = cms.EDProducer( "EgammaHLTHcalPFClusterIsol
     energyEndcap = cms.double( 0.0 ),
     useEt = cms.bool( True ),
     effectiveAreas = cms.vdouble( 0.2, 0.25 ),
-    absEtaLowEdges = cms.vdouble( 0.0, 1.479 )
+    absEtaLowEdges = cms.vdouble( 0.0, 1.479 ),
+    doEffAreaCorrection = cms.bool( False ),
+    effectiveAreasCorr = cms.vdouble( 0.0, 0.0 ),
+    effectiveAreasThres = cms.vdouble( 0.0, 0.0 )
 )
 fragment.hltEG30EBTightIDTightIsoHcalIsoFilter = cms.EDFilter( "HLTEgammaGenericQuadraticFilter",
     saveTags = cms.bool( True ),
@@ -53456,7 +53468,10 @@ fragment.hltEgammaHcalPFClusterIsoR02 = cms.EDProducer( "EgammaHLTHcalPFClusterI
     energyEndcap = cms.double( 0.0 ),
     useEt = cms.bool( True ),
     effectiveAreas = cms.vdouble( 0.0888, 0.111 ),
-    absEtaLowEdges = cms.vdouble( 0.0, 1.479 )
+    absEtaLowEdges = cms.vdouble( 0.0, 1.479 ),
+    doEffAreaCorrection = cms.bool( False ),
+    effectiveAreasCorr = cms.vdouble( 0.0, 0.0 ),
+    effectiveAreasThres = cms.vdouble( 0.0, 0.0 )
 )
 fragment.hltEle15VVVLHcalIsoFilter = cms.EDFilter( "HLTEgammaGenericFilter",
     saveTags = cms.bool( True ),
