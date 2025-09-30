@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_15_0_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_15_0_0/GRun/V112 (CMSSW_15_0_11)
+# /dev/CMSSW_15_0_0/GRun/V114 (CMSSW_15_0_11)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ process = cms.Process( "HLTGRun" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/dev/CMSSW_15_0_0/GRun/V112")
+  tableName = cms.string("/dev/CMSSW_15_0_0/GRun/V114")
 )
 
 process.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -17785,7 +17785,7 @@ process.hltElePixelHitDoubletsUnseeded = cms.EDProducer( "HitPairEDProducer",
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
     clusterCheck = cms.InputTag( "" ),
     produceSeedingHitSets = cms.bool( True ),
-    produceIntermediateHitDoublets = cms.bool( True ),
+    produceIntermediateHitDoublets = cms.bool( False ),
     maxElement = cms.uint32( 0 ),
     maxElementTotal = cms.uint32( 50000000 ),
     putEmptyIfMaxElementReached = cms.bool( False ),
@@ -17796,7 +17796,7 @@ process.hltElePixelHitDoubletsForTripletsUnseeded = cms.EDProducer( "HitPairEDPr
     trackingRegions = cms.InputTag( "hltEleSeedsTrackingRegionsUnseeded" ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
     clusterCheck = cms.InputTag( "" ),
-    produceSeedingHitSets = cms.bool( True ),
+    produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     maxElement = cms.uint32( 0 ),
     maxElementTotal = cms.uint32( 50000000 ),
@@ -21876,7 +21876,7 @@ process.hltElePixelHitDoublets = cms.EDProducer( "HitPairEDProducer",
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
     clusterCheck = cms.InputTag( "" ),
     produceSeedingHitSets = cms.bool( True ),
-    produceIntermediateHitDoublets = cms.bool( True ),
+    produceIntermediateHitDoublets = cms.bool( False ),
     maxElement = cms.uint32( 0 ),
     maxElementTotal = cms.uint32( 50000000 ),
     putEmptyIfMaxElementReached = cms.bool( False ),
@@ -21887,7 +21887,7 @@ process.hltElePixelHitDoubletsForTriplets = cms.EDProducer( "HitPairEDProducer",
     trackingRegions = cms.InputTag( "hltEleSeedsTrackingRegions" ),
     trackingRegionsSeedingLayers = cms.InputTag( "" ),
     clusterCheck = cms.InputTag( "" ),
-    produceSeedingHitSets = cms.bool( True ),
+    produceSeedingHitSets = cms.bool( False ),
     produceIntermediateHitDoublets = cms.bool( True ),
     maxElement = cms.uint32( 0 ),
     maxElementTotal = cms.uint32( 50000000 ),
