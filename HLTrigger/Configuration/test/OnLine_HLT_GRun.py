@@ -1,6 +1,6 @@
-# hltGetConfiguration /dev/CMSSW_15_1_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
+# hltGetConfiguration /dev/CMSSW_16_0_0/GRun --full --data --type GRun --unprescale --process HLTGRun --globaltag auto:run3_hlt_GRun --input file:RelVal_Raw_GRun_DATA.root
 
-# /dev/CMSSW_15_1_0/GRun/V31 (CMSSW_15_1_0)
+# /dev/CMSSW_16_0_0/GRun/V4 (CMSSW_16_0_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ process = cms.Process( "HLTGRun" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/dev/CMSSW_15_1_0/GRun/V31")
+  tableName = cms.string("/dev/CMSSW_16_0_0/GRun/V4")
 )
 
 process.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -4736,7 +4736,8 @@ process.AnyDirectionAnalyticalPropagator = cms.ESProducer( "AnalyticalPropagator
   appendToDataLabel = cms.string( "" )
 )
 process.CSCChannelMapperESProducer = cms.ESProducer( "CSCChannelMapperESProducer",
-  AlgoName = cms.string( "CSCChannelMapperPostls1" )
+  AlgoName = cms.string( "CSCChannelMapperPostls1" ),
+  appendToDataLabel = cms.string( "" )
 )
 process.CSCGeometryESModule = cms.ESProducer( "CSCGeometryESModule",
   fromDDD = cms.bool( False ),
@@ -4751,7 +4752,8 @@ process.CSCGeometryESModule = cms.ESProducer( "CSCGeometryESModule",
   debugV = cms.untracked.bool( False )
 )
 process.CSCIndexerESProducer = cms.ESProducer( "CSCIndexerESProducer",
-  AlgoName = cms.string( "CSCIndexerPostls1" )
+  AlgoName = cms.string( "CSCIndexerPostls1" ),
+  appendToDataLabel = cms.string( "" )
 )
 process.CSCObjectMapESProducer = cms.ESProducer( "CSCObjectMapESProducer",
   appendToDataLabel = cms.string( "" )
@@ -5174,7 +5176,8 @@ process.ecalSeverityLevel = cms.ESProducer( "EcalSeverityLevelESProducer",
     kWeird = cms.vstring(  ),
     kTime = cms.vstring(  )
   ),
-  timeThresh = cms.double( 2.0 )
+  timeThresh = cms.double( 2.0 ),
+  appendToDataLabel = cms.string( "" )
 )
 process.hcalChannelPropertiesESProd = cms.ESProducer( "HcalChannelPropertiesEP",
   appendToDataLabel = cms.string( "" )
@@ -7765,13 +7768,27 @@ process.hltSiPixelRecHits = cms.EDProducer( "SiPixelRecHitFromSoAAlpaka",
 process.hltPixelTracksSoA = cms.EDProducer( "CAHitNtupletAlpakaPhase1@alpaka",
     pixelRecHitSrc = cms.InputTag( "hltSiPixelRecHitsSoA" ),
     cellZ0Cut = cms.double( 12.0 ),
-    cellPtCut = cms.double( 0.5 ),
     dzdrFact = cms.double( 15.2 ),
     minYsizeB1 = cms.int32( 1 ),
     minYsizeB2 = cms.int32( 1 ),
     maxDYsize12 = cms.int32( 28 ),
     maxDYsize = cms.int32( 20 ),
     maxDYPred = cms.int32( 20 ),
+    geometry = cms.PSet( 
+      caThetaCuts = cms.vdouble( 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774 ),
+      pairGraph = cms.vuint32( 0, 1, 0, 4, 0, 7, 1, 2, 1, 4, 1, 7, 4, 5, 7, 8, 2, 3, 2, 4, 2, 7, 5, 6, 8, 9, 0, 2, 1, 3, 0, 5, 0, 8, 4, 6, 7, 9 ),
+      startingPairs = cms.vuint32( 0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15, 16, 17, 18 ),
+      maxOuter = cms.vdouble( 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0 ),
+      maxInner = cms.vdouble( 20.0, 30.0, 0.0, 22.0, 30.0, -10.0, 70.0, 70.0, 22.0, 30.0, -15.0, 70.0, 70.0, 20.0, 22.0, 30.0, 0.0, 70.0, 70.0 ),
+      caDCACuts = cms.vdouble( 0.0918113099491, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835 ),
+      ptCuts = cms.vdouble( 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ),
+      maxDZ = cms.vdouble( 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0 ),
+      minDZ = cms.vdouble( -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0 ),
+      minOuter = cms.vdouble( -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0 ),
+      phiCuts = cms.vint32( 965, 1241, 395, 698, 1058, 1211, 348, 782, 1016, 810, 463, 755, 694, 531, 770, 471, 592, 750, 348 ),
+      maxDR = cms.vdouble( 20.0, 9.0, 9.0, 20.0, 7.0, 7.0, 5.0, 5.0, 20.0, 6.0, 6.0, 5.0, 5.0, 20.0, 20.0, 9.0, 9.0, 9.0, 9.0 ),
+      minInner = cms.vdouble( -20.0, 0.0, -30.0, -22.0, 10.0, -30.0, -70.0, -70.0, -22.0, 15.0, -30.0, -70.0, -70.0, -20.0, -22.0, 0.0, -30.0, -70.0, -70.0 )
+    ),
     maxNumberOfDoublets = cms.string( "524288" ),
     maxNumberOfTuples = cms.string( "32768" ),
     avgHitsPerTrack = cms.double( 4.5 ),
@@ -7801,24 +7818,18 @@ process.hltPixelTracksSoA = cms.EDProducer( "CAHitNtupletAlpakaPhase1@alpaka",
       tripletMinPt = cms.double( 0.5 ),
       chi2Coeff = cms.vdouble( 0.9, 1.8 )
     ),
-    geometry = cms.PSet( 
-      caThetaCuts = cms.vdouble( 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774 ),
-      pairGraph = cms.vuint32( 0, 1, 0, 4, 0, 7, 1, 2, 1, 4, 1, 7, 4, 5, 7, 8, 2, 3, 2, 4, 2, 7, 5, 6, 8, 9, 0, 2, 1, 3, 0, 5, 0, 8, 4, 6, 7, 9 ),
-      startingPairs = cms.vuint32( 0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15, 16, 17, 18 ),
-      maxZ = cms.vdouble( 20.0, 30.0, 0.0, 22.0, 30.0, -10.0, 70.0, 70.0, 22.0, 30.0, -15.0, 70.0, 70.0, 20.0, 22.0, 30.0, 0.0, 70.0, 70.0 ),
-      caDCACuts = cms.vdouble( 0.0918113099491, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835 ),
-      minZ = cms.vdouble( -20.0, 0.0, -30.0, -22.0, 10.0, -30.0, -70.0, -70.0, -22.0, 15.0, -30.0, -70.0, -70.0, -20.0, -22.0, 0.0, -30.0, -70.0, -70.0 ),
-      phiCuts = cms.vint32( 965, 1241, 395, 698, 1058, 1211, 348, 782, 1016, 810, 463, 755, 694, 531, 770, 471, 592, 750, 348 ),
-      maxR = cms.vdouble( 20.0, 9.0, 9.0, 20.0, 7.0, 7.0, 5.0, 5.0, 20.0, 6.0, 6.0, 5.0, 5.0, 20.0, 20.0, 9.0, 9.0, 9.0, 9.0 )
-    ),
     alpaka = cms.untracked.PSet(  backend = cms.untracked.string( "" ) )
 )
 process.hltPixelTracks = cms.EDProducer( "PixelTrackProducerFromSoAAlpaka",
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     trackSrc = cms.InputTag( "hltPixelTracksSoA" ),
     pixelRecHitLegacySrc = cms.InputTag( "hltSiPixelRecHits" ),
+    outerTrackerRecHitSrc = cms.InputTag( "hltSiPhase2RecHits" ),
+    outerTrackerRecHitSoAConverterSrc = cms.InputTag( "phase2OTRecHitsSoAConverter" ),
     minNumberOfHits = cms.int32( 0 ),
-    minQuality = cms.string( "loose" )
+    minQuality = cms.string( "loose" ),
+    useOTExtension = cms.bool( False ),
+    requireQuadsFromConsecutiveLayers = cms.bool( False )
 )
 process.hltPixelVerticesSoA = cms.EDProducer( "PixelVertexProducerAlpakaPhase1@alpaka",
     oneKernel = cms.bool( True ),
@@ -7905,6 +7916,7 @@ process.hltIter0PFLowPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGeneratorF
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -7978,6 +7990,9 @@ process.hltIter0PFlowCkfTrackCandidates = cms.EDProducer( "MkFitOutputConverter"
     qualitySignPt = cms.bool( True ),
     doErrorRescale = cms.bool( True ),
     tfDnnLabel = cms.string( "trackSelectionTf" ),
+    candCutSel = cms.bool( False ),
+    candMinPtCut = cms.double( 0.0 ),
+    candMinNHitsCut = cms.int32( 0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -8186,6 +8201,9 @@ process.hltDoubletRecoveryPFlowCkfTrackCandidates = cms.EDProducer( "MkFitOutput
     qualitySignPt = cms.bool( True ),
     doErrorRescale = cms.bool( True ),
     tfDnnLabel = cms.string( "trackSelectionTf" ),
+    candCutSel = cms.bool( False ),
+    candMinPtCut = cms.double( 0.0 ),
+    candMinNHitsCut = cms.int32( 0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -9374,6 +9392,7 @@ process.hltIter0IterL3MuonPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGener
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -9666,6 +9685,7 @@ process.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracks = cms.EDProducer( "See
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -12890,13 +12910,27 @@ process.hltL2SelectorForL3IOSerialSync = cms.EDProducer( "HLTMuonL2SelectorForL3
 process.hltPixelTracksSoASerialSync = cms.EDProducer( "alpaka_serial_sync::CAHitNtupletAlpakaPhase1",
     pixelRecHitSrc = cms.InputTag( "hltSiPixelRecHitsSoASerialSync" ),
     cellZ0Cut = cms.double( 12.0 ),
-    cellPtCut = cms.double( 0.5 ),
     dzdrFact = cms.double( 15.2 ),
     minYsizeB1 = cms.int32( 1 ),
     minYsizeB2 = cms.int32( 1 ),
     maxDYsize12 = cms.int32( 28 ),
     maxDYsize = cms.int32( 20 ),
     maxDYPred = cms.int32( 20 ),
+    geometry = cms.PSet( 
+      caThetaCuts = cms.vdouble( 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774 ),
+      pairGraph = cms.vuint32( 0, 1, 0, 4, 0, 7, 1, 2, 1, 4, 1, 7, 4, 5, 7, 8, 2, 3, 2, 4, 2, 7, 5, 6, 8, 9, 0, 2, 1, 3, 0, 5, 0, 8, 4, 6, 7, 9 ),
+      startingPairs = cms.vuint32( 0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15, 16, 17, 18 ),
+      maxOuter = cms.vdouble( 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0 ),
+      maxInner = cms.vdouble( 20.0, 30.0, 0.0, 22.0, 30.0, -10.0, 70.0, 70.0, 22.0, 30.0, -15.0, 70.0, 70.0, 20.0, 22.0, 30.0, 0.0, 70.0, 70.0 ),
+      caDCACuts = cms.vdouble( 0.0918113099491, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835 ),
+      ptCuts = cms.vdouble( 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ),
+      maxDZ = cms.vdouble( 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0 ),
+      minDZ = cms.vdouble( -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0 ),
+      minOuter = cms.vdouble( -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0, -10000.0 ),
+      phiCuts = cms.vint32( 965, 1241, 395, 698, 1058, 1211, 348, 782, 1016, 810, 463, 755, 694, 531, 770, 471, 592, 750, 348 ),
+      maxDR = cms.vdouble( 20.0, 9.0, 9.0, 20.0, 7.0, 7.0, 5.0, 5.0, 20.0, 6.0, 6.0, 5.0, 5.0, 20.0, 20.0, 9.0, 9.0, 9.0, 9.0 ),
+      minInner = cms.vdouble( -20.0, 0.0, -30.0, -22.0, 10.0, -30.0, -70.0, -70.0, -22.0, 15.0, -30.0, -70.0, -70.0, -20.0, -22.0, 0.0, -30.0, -70.0, -70.0 )
+    ),
     maxNumberOfDoublets = cms.string( "524288" ),
     maxNumberOfTuples = cms.string( "32768" ),
     avgHitsPerTrack = cms.double( 4.5 ),
@@ -12925,24 +12959,18 @@ process.hltPixelTracksSoASerialSync = cms.EDProducer( "alpaka_serial_sync::CAHit
       tripletMaxZip = cms.double( 12.0 ),
       tripletMinPt = cms.double( 0.5 ),
       chi2Coeff = cms.vdouble( 0.9, 1.8 )
-    ),
-    geometry = cms.PSet( 
-      caThetaCuts = cms.vdouble( 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00123302705499, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774, 0.00355691321774 ),
-      pairGraph = cms.vuint32( 0, 1, 0, 4, 0, 7, 1, 2, 1, 4, 1, 7, 4, 5, 7, 8, 2, 3, 2, 4, 2, 7, 5, 6, 8, 9, 0, 2, 1, 3, 0, 5, 0, 8, 4, 6, 7, 9 ),
-      startingPairs = cms.vuint32( 0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15, 16, 17, 18 ),
-      maxZ = cms.vdouble( 20.0, 30.0, 0.0, 22.0, 30.0, -10.0, 70.0, 70.0, 22.0, 30.0, -15.0, 70.0, 70.0, 20.0, 22.0, 30.0, 0.0, 70.0, 70.0 ),
-      caDCACuts = cms.vdouble( 0.0918113099491, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835, 0.420724617835 ),
-      minZ = cms.vdouble( -20.0, 0.0, -30.0, -22.0, 10.0, -30.0, -70.0, -70.0, -22.0, 15.0, -30.0, -70.0, -70.0, -20.0, -22.0, 0.0, -30.0, -70.0, -70.0 ),
-      phiCuts = cms.vint32( 965, 1241, 395, 698, 1058, 1211, 348, 782, 1016, 810, 463, 755, 694, 531, 770, 471, 592, 750, 348 ),
-      maxR = cms.vdouble( 20.0, 9.0, 9.0, 20.0, 7.0, 7.0, 5.0, 5.0, 20.0, 6.0, 6.0, 5.0, 5.0, 20.0, 20.0, 9.0, 9.0, 9.0, 9.0 )
     )
 )
 process.hltPixelTracksSerialSync = cms.EDProducer( "PixelTrackProducerFromSoAAlpaka",
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     trackSrc = cms.InputTag( "hltPixelTracksSoASerialSync" ),
     pixelRecHitLegacySrc = cms.InputTag( "hltSiPixelRecHitsSerialSync" ),
+    outerTrackerRecHitSrc = cms.InputTag( "hltSiPhase2RecHits" ),
+    outerTrackerRecHitSoAConverterSrc = cms.InputTag( "phase2OTRecHitsSoAConverter" ),
     minNumberOfHits = cms.int32( 0 ),
-    minQuality = cms.string( "loose" )
+    minQuality = cms.string( "loose" ),
+    useOTExtension = cms.bool( False ),
+    requireQuadsFromConsecutiveLayers = cms.bool( False )
 )
 process.hltPixelVerticesSoASerialSync = cms.EDProducer( "alpaka_serial_sync::PixelVertexProducerAlpakaPhase1",
     oneKernel = cms.bool( True ),
@@ -13005,6 +13033,7 @@ process.hltIter0IterL3MuonPixelSeedsFromPixelTracksSerialSync = cms.EDProducer( 
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -13255,6 +13284,7 @@ process.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracksSerialSync = cms.EDProd
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -14146,6 +14176,7 @@ process.hltIter0PFLowPixelSeedsFromPixelTracksSerialSync = cms.EDProducer( "Seed
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -14200,6 +14231,9 @@ process.hltIter0PFlowCkfTrackCandidatesSerialSync = cms.EDProducer( "MkFitOutput
     qualitySignPt = cms.bool( True ),
     doErrorRescale = cms.bool( True ),
     tfDnnLabel = cms.string( "trackSelectionTf" ),
+    candCutSel = cms.bool( False ),
+    candMinPtCut = cms.double( 0.0 ),
+    candMinNHitsCut = cms.int32( 0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -14408,6 +14442,9 @@ process.hltDoubletRecoveryPFlowCkfTrackCandidatesSerialSync = cms.EDProducer( "M
     qualitySignPt = cms.bool( True ),
     doErrorRescale = cms.bool( True ),
     tfDnnLabel = cms.string( "trackSelectionTf" ),
+    candCutSel = cms.bool( False ),
+    candMinPtCut = cms.double( 0.0 ),
+    candMinNHitsCut = cms.int32( 0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -16286,6 +16323,7 @@ process.hltIter0IterL3MuonPixelSeedsFromPixelTracksNoVtx = cms.EDProducer( "Seed
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -16560,6 +16598,7 @@ process.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracksNoVtx = cms.EDProducer(
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -17412,6 +17451,7 @@ process.hltIter0L3MuonPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGenerator
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -18523,6 +18563,7 @@ process.hltIter0L3MuonPixelSeedsFromPixelTracksNoVtx = cms.EDProducer( "SeedGene
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -23410,6 +23451,7 @@ process.hltIter0IterL3MuonPixelSeedsFromPixelTracksOpenMu = cms.EDProducer( "See
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -23671,6 +23713,7 @@ process.hltIter0IterL3FromL1MuonPixelSeedsFromPixelTracksOpenMu = cms.EDProducer
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -25911,6 +25954,7 @@ process.hltMuTrackSeeds = cms.EDProducer( "SeedGeneratorFromProtoTracksEDProduce
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBWithTrackAngle" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( False ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -27458,6 +27502,7 @@ process.hltIter0Tau3muPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGenerator
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -28298,6 +28343,7 @@ process.hltIter0DisplacedMuMuPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGe
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -36712,6 +36758,7 @@ process.hltIter0HighPtTkMuPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGener
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -43139,6 +43186,7 @@ process.hltBSoftMuonMu5L3 = cms.EDProducer( "RecoTrackRefSelector",
     min3DLayer = cms.int32( 0 ),
     minHit = cms.int32( 0 ),
     minPixelHit = cms.int32( 0 ),
+    maxPixelHit = cms.int32( 99 ),
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     usePV = cms.bool( False ),
     vertexTag = cms.InputTag( "none" ),
@@ -43880,6 +43928,7 @@ process.hltBSoftMuonDoubleMu5L3 = cms.EDProducer( "RecoTrackRefSelector",
     min3DLayer = cms.int32( 0 ),
     minHit = cms.int32( 0 ),
     minPixelHit = cms.int32( 0 ),
+    maxPixelHit = cms.int32( 99 ),
     beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     usePV = cms.bool( False ),
     vertexTag = cms.InputTag( "none" ),
@@ -51880,6 +51929,7 @@ process.hltIter0Tau3muNoL1MassPixelSeedsFromPixelTracks = cms.EDProducer( "SeedG
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -52278,6 +52328,7 @@ process.hltIter0DisplacedJpsiTkTkPixelSeedsFromPixelTracks = cms.EDProducer( "Se
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -52544,6 +52595,7 @@ process.hltIter0BcJpsiPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGenerator
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -61633,6 +61685,7 @@ process.hltIter0JpsiTkTkPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGenerat
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -68700,6 +68753,7 @@ process.hltIter0IterL3DisplacedMuonPixelSeedsFromPixelTracks = cms.EDProducer( "
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -73440,6 +73494,7 @@ process.hltIter0PFLowPixelSeedsFromPixelTracksForDisplaced = cms.EDProducer( "Se
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( True ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( False ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -73709,6 +73764,7 @@ process.hltIter1PFLowPixelSeedsFromPixelTracksForDisplaced = cms.EDProducer( "Se
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( False ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
@@ -82990,6 +83046,7 @@ process.hltIter0L3MuonOpenPixelSeedsFromPixelTracks = cms.EDProducer( "SeedGener
     useEventsWithNoVertex = cms.bool( True ),
     TTRHBuilder = cms.string( "hltESPTTRHBuilderPixelOnly" ),
     usePV = cms.bool( False ),
+    removeOTRechits = cms.bool( False ),
     includeFourthHit = cms.bool( True ),
     produceComplement = cms.bool( False ),
     SeedCreatorPSet = cms.PSet(  refToPSet_ = cms.string( "HLTSeedFromProtoTracks" ) )
