@@ -1,6 +1,6 @@
 # hltGetConfiguration /dev/CMSSW_16_0_0/HLT --cff --data --type FULL
 
-# /dev/CMSSW_16_0_0/HLT/V12 (CMSSW_16_0_0_pre4)
+# /dev/CMSSW_16_0_0/HLT/V16 (CMSSW_16_0_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/dev/CMSSW_16_0_0/HLT/V12")
+  tableName = cms.string("/dev/CMSSW_16_0_0/HLT/V16")
 )
 
 fragment.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -1253,6 +1253,7 @@ fragment.streams = cms.PSet(
   DQMOnlineBeamspot = cms.vstring( 'DQMOnlineBeamspot' ),
   DQMOnlineScouting = cms.vstring( 'DQMOnlineScouting' ),
   DQMPPSRandom = cms.vstring( 'DQMPPSRandom' ),
+  DQMTestDataScouting = cms.vstring( 'TestDataScouting' ),
   EcalCalibration = cms.vstring( 'EcalLaser' ),
   Express = cms.vstring( 'ExpressPhysics' ),
   ExpressAlignment = cms.vstring( 'ExpressAlignment' ),
@@ -1266,7 +1267,6 @@ fragment.streams = cms.PSet(
   HIExpressRawPrime = cms.vstring( 'HIExpressPhysicsRawPrime' ),
   HLTMonitor = cms.vstring( 'HLTMonitor' ),
   LocalTestDataRaw = cms.vstring( 'TestDataRaw' ),
-  LocalTestDataScouting = cms.vstring( 'TestDataScouting' ),
   NanoDST = cms.vstring( 'L1Accept' ),
   ParkingAnomalyDetection = cms.vstring( 'ParkingAnomalyDetection' ),
   ParkingDoubleMuonLowMass0 = cms.vstring( 'ParkingDoubleMuonLowMass0',
@@ -16534,15 +16534,6 @@ fragment.preshowerDetIdAssociator = cms.ESProducer( "DetIdAssociatorESProducer",
   includeGEM = cms.bool( False ),
   includeME0 = cms.bool( False )
 )
-fragment.siPixelGainCalibrationForHLTGPU = cms.ESProducer( "SiPixelGainCalibrationForHLTGPUESProducer",
-  appendToDataLabel = cms.string( "" )
-)
-fragment.siPixelROCsStatusAndMappingWrapperESProducer = cms.ESProducer( "SiPixelROCsStatusAndMappingWrapperESProducer",
-  ComponentName = cms.string( "" ),
-  CablingMapLabel = cms.string( "" ),
-  UseQualityInfo = cms.bool( False ),
-  appendToDataLabel = cms.string( "" )
-)
 fragment.siPixelTemplateDBObjectESProducer = cms.ESProducer( "SiPixelTemplateDBObjectESProducer",
   appendToDataLabel = cms.string( "" )
 )
@@ -16774,7 +16765,16 @@ fragment.hltEcalRecHit = cms.EDProducer( "EcalRecHitProducer",
     EEuncalibRecHitCollection = cms.InputTag( 'hltEcalUncalibRecHit','EcalUncalibRecHitsEE' ),
     EBuncalibRecHitCollection = cms.InputTag( 'hltEcalUncalibRecHit','EcalUncalibRecHitsEB' ),
     EBrechitCollection = cms.string( "EcalRecHitsEB" ),
-    ChannelStatusToBeExcluded = cms.vstring(  ),
+    ChannelStatusToBeExcluded = cms.vstring( 'kDAC',
+      'kNoisy',
+      'kNNoisy',
+      'kFixedG6',
+      'kFixedG1',
+      'kFixedG0',
+      'kNonRespondingIsolated',
+      'kDeadVFE',
+      'kDeadFE',
+      'kNoDataNoTP' ),
     killDeadChannels = cms.bool( True ),
     algo = cms.string( "EcalRecHitWorkerSimple" ),
     EBLaserMIN = cms.double( 0.5 ),
@@ -21956,7 +21956,16 @@ fragment.hltEcalRecHitSerialSync = cms.EDProducer( "EcalRecHitProducer",
     EEuncalibRecHitCollection = cms.InputTag( 'hltEcalUncalibRecHitSerialSync','EcalUncalibRecHitsEE' ),
     EBuncalibRecHitCollection = cms.InputTag( 'hltEcalUncalibRecHitSerialSync','EcalUncalibRecHitsEB' ),
     EBrechitCollection = cms.string( "EcalRecHitsEB" ),
-    ChannelStatusToBeExcluded = cms.vstring(  ),
+    ChannelStatusToBeExcluded = cms.vstring( 'kDAC',
+      'kNoisy',
+      'kNNoisy',
+      'kFixedG6',
+      'kFixedG1',
+      'kFixedG0',
+      'kNonRespondingIsolated',
+      'kDeadVFE',
+      'kDeadFE',
+      'kNoDataNoTP' ),
     killDeadChannels = cms.bool( True ),
     algo = cms.string( "EcalRecHitWorkerSimple" ),
     EBLaserMIN = cms.double( 0.5 ),
@@ -25670,20 +25679,6 @@ fragment.hltPreDQMPixelReconstruction = cms.EDFilter( "HLTPrescaler",
     offset = cms.uint32( 0 ),
     L1GtReadoutRecordTag = cms.InputTag( "hltGtStage2Digis" )
 )
-fragment.hltSiPixelRecHitsSoAMonitorCPU = cms.EDProducer( "SiPixelPhase1MonitorRecHitsSoAAlpaka",
-    pixelHitsSrc = cms.InputTag( "hltSiPixelRecHitsSoASerialSync" ),
-    TopFolderName = cms.string( "SiPixelHeterogeneous/PixelRecHitsCPU" )
-)
-fragment.hltSiPixelRecHitsSoAMonitorGPU = cms.EDProducer( "SiPixelPhase1MonitorRecHitsSoAAlpaka",
-    pixelHitsSrc = cms.InputTag( "hltSiPixelRecHitsSoA" ),
-    TopFolderName = cms.string( "SiPixelHeterogeneous/PixelRecHitsGPU" )
-)
-fragment.hltSiPixelRecHitsSoACompareGPUvsCPU = cms.EDProducer( "SiPixelPhase1CompareRecHits",
-    pixelHitsReferenceSoA = cms.InputTag( "hltSiPixelRecHitsSoASerialSync" ),
-    pixelHitsTargetSoA = cms.InputTag( "hltSiPixelRecHitsSoA" ),
-    topFolderName = cms.string( "SiPixelHeterogeneous/PixelRecHitsCompareGPUvsCPU" ),
-    minD2cut = cms.double( 1.0E-4 )
-)
 fragment.hltL1sDQMEcalReconstruction = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
     L1SeedsLogicalExpression = cms.string( "L1GlobalDecision" ),
@@ -26020,20 +26015,6 @@ fragment.hltTrimmedPixelVerticesPPOnAASerialSync = cms.EDProducer( "PixelVertexC
     fractionSumPt2 = cms.double( 0.3 ),
     minSumPt2 = cms.double( 0.0 ),
     PVcomparer = cms.PSet(  refToPSet_ = cms.string( "HLTPSetPvClusterComparerForIT" ) )
-)
-fragment.hltSiPixelRecHitsSoAMonitorCPUPPOnAA = cms.EDProducer( "SiPixelHIonPhase1MonitorRecHitsSoAAlpaka",
-    pixelHitsSrc = cms.InputTag( "hltSiPixelRecHitsPPOnAASoASerialSync" ),
-    TopFolderName = cms.string( "SiPixelHeterogeneous/PixelRecHitsCPU" )
-)
-fragment.hltSiPixelRecHitsSoAMonitorGPUPPOnAA = cms.EDProducer( "SiPixelHIonPhase1MonitorRecHitsSoAAlpaka",
-    pixelHitsSrc = cms.InputTag( "hltSiPixelRecHitsPPOnAASoA" ),
-    TopFolderName = cms.string( "SiPixelHeterogeneous/PixelRecHitsGPU" )
-)
-fragment.hltSiPixelRecHitsSoACompareGPUvsCPUPPOnAA = cms.EDProducer( "SiPixelHIonPhase1CompareRecHits",
-    pixelHitsReferenceSoA = cms.InputTag( "hltSiPixelRecHitsPPOnAASoASerialSync" ),
-    pixelHitsTargetSoA = cms.InputTag( "hltSiPixelRecHitsPPOnAASoA" ),
-    topFolderName = cms.string( "SiPixelHeterogeneous/PixelRecHitsCompareGPUvsCPU" ),
-    minD2cut = cms.double( 1.0E-4 )
 )
 fragment.hltL1sDQMHIEcalReconstruction = cms.EDFilter( "HLTL1TSeed",
     saveTags = cms.bool( True ),
@@ -120213,14 +120194,12 @@ fragment.HLTAK8PFJetsReconstructionSequence = cms.Sequence( fragment.HLTL2muonre
 fragment.HLTAK8PFCorrectorProducersSequence = cms.Sequence( fragment.hltAK8PFFastJetCorrector + fragment.hltAK8PFRelativeCorrector + fragment.hltAK8PFAbsoluteCorrector + fragment.hltAK8PFResidualCorrector + fragment.hltAK8PFCorrector )
 fragment.HLTAK8PFJetsCorrectionSequence = cms.Sequence( fragment.hltFixedGridRhoFastjetAll + fragment.HLTAK8PFCorrectorProducersSequence + fragment.hltAK8PFJetsCorrected )
 fragment.HLTAK8PFJetsSequence = cms.Sequence( fragment.HLTPreAK8PFJetsRecoSequence + fragment.HLTAK8PFJetsReconstructionSequence + fragment.HLTAK8PFJetsCorrectionSequence )
-fragment.HLTDQMPixelReconstruction = cms.Sequence( fragment.hltSiPixelRecHitsSoAMonitorCPU + fragment.hltSiPixelRecHitsSoAMonitorGPU + fragment.hltSiPixelRecHitsSoACompareGPUvsCPU )
 fragment.HLTDoLocalPixelPPOnAASequence = cms.Sequence( fragment.hltOnlineBeamSpotDevice + fragment.hltSiPixelClustersPPOnAASoA + fragment.hltSiPixelClustersPPOnAA + fragment.hltSiPixelClustersCachePPOnAA + fragment.hltSiPixelDigiErrorsPPOnAA + fragment.hltSiPixelRecHitsPPOnAASoA + fragment.hltSiPixelRecHitsPPOnAA )
 fragment.HLTDoLocalPixelPPOnAASequenceSerialSync = cms.Sequence( fragment.hltOnlineBeamSpotDeviceSerialSync + fragment.hltSiPixelClustersPPOnAASoASerialSync + fragment.hltSiPixelClustersPPOnAASerialSync + fragment.hltSiPixelClustersCachePPOnAASerialSync + fragment.hltSiPixelDigiErrorsPPOnAASerialSync + fragment.hltSiPixelRecHitsPPOnAASoASerialSync + fragment.hltSiPixelRecHitsPPOnAASerialSync )
 fragment.HLTRecoPixelTracksPPOnAASequence = cms.Sequence( fragment.hltPixelTracksPPOnAASoA + fragment.hltPixelTracksPPOnAA )
 fragment.HLTRecopixelvertexingPPOnAASequence = cms.Sequence( fragment.HLTRecoPixelTracksPPOnAASequence + fragment.hltPixelVerticesPPOnAASoA + fragment.hltPixelVerticesPPOnAA + fragment.hltTrimmedPixelVerticesPPOnAA )
 fragment.HLTRecoPixelTracksPPOnAASequenceSerialSync = cms.Sequence( fragment.hltPixelTracksPPOnAASoASerialSync + fragment.hltPixelTracksPPOnAASerialSync )
 fragment.HLTRecopixelvertexingPPOnAASequenceSerialSync = cms.Sequence( fragment.HLTRecoPixelTracksPPOnAASequenceSerialSync + fragment.hltPixelVerticesPPOnAASoASerialSync + fragment.hltPixelVerticesPPOnAASerialSync + fragment.hltTrimmedPixelVerticesPPOnAASerialSync )
-fragment.HLTDQMPixelReconstructionPPOnAA = cms.Sequence( fragment.hltSiPixelRecHitsSoAMonitorCPUPPOnAA + fragment.hltSiPixelRecHitsSoAMonitorGPUPPOnAA + fragment.hltSiPixelRecHitsSoACompareGPUvsCPUPPOnAA )
 fragment.HLTL2muonrecoSequenceNoVtx = cms.Sequence( fragment.HLTL2muonrecoNocandSequence + fragment.hltL2MuonCandidatesNoVtx )
 fragment.HLTIterL3OImuonTkCandidateSequenceNoVtx = cms.Sequence( fragment.hltIterL3OISeedsFromL2MuonsNoVtx + fragment.hltIterL3OITrackCandidatesNoVtx + fragment.hltIterL3OIMuCtfWithMaterialTracksNoVtx + fragment.hltIterL3OIMuonTrackCutClassifierNoVtx + fragment.hltIterL3OIMuonTrackSelectionHighPurityNoVtx + fragment.hltL3MuonsIterL3OINoVtx )
 fragment.HLTIterL3MuonRecoPixelTracksSequenceNoVtx = cms.Sequence( fragment.HLTRecopixelvertexingSequence + fragment.hltIterL3MuonPixelTracksTrackingRegionsNoVtx + fragment.hltPixelTracksInRegionL2NoVtx )
@@ -120732,10 +120711,10 @@ fragment.AlCa_LumiPixelsCounts_ZeroBias_v16 = cms.Path( fragment.HLTBeginSequenc
 fragment.AlCa_PFJet40_v37 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreAlCaPFJet40 + fragment.HLTAK4CaloJetsSequence + fragment.hltSingleCaloJet10 + fragment.HLTAK4PFJetsSequence + fragment.hltPFJetsCorrectedMatchedToCaloJets10 + fragment.hltSinglePFJet40 + fragment.HLTEndSequence )
 fragment.AlCa_PFJet40_CPUOnly_v16 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreAlCaPFJet40CPUOnly + fragment.HLTAK4CaloJetsSequenceSerialSync + fragment.hltSingleCaloJet10SerialSync + fragment.HLTAK4PFJetsSequenceSerialSync + fragment.hltPFJetsCorrectedMatchedToCaloJets10SerialSync + fragment.hltSinglePFJet40SerialSync + fragment.HLTEndSequence )
 fragment.AlCa_AK8PFJet40_v32 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sZeroBias + fragment.hltPreAlCaAK8PFJet40 + fragment.HLTAK8CaloJetsSequence + fragment.hltSingleCaloJet10AK8 + fragment.HLTAK8PFJetsSequence + fragment.hltPFJetsCorrectedMatchedToCaloJets10AK8 + fragment.hltSinglePFJet40AK8 + fragment.HLTEndSequence )
-fragment.DQM_PixelReconstruction_v15 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMPixelReconstruction + fragment.hltPreDQMPixelReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoLocalPixelSequence + fragment.HLTDoLocalPixelSequenceSerialSync + fragment.HLTRecopixelvertexingSequence + fragment.HLTRecopixelvertexingSequenceSerialSync + fragment.HLTDQMPixelReconstruction + fragment.HLTEndSequence )
+fragment.DQM_PixelReconstruction_v15 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMPixelReconstruction + fragment.hltPreDQMPixelReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoLocalPixelSequence + fragment.HLTDoLocalPixelSequenceSerialSync + fragment.HLTRecopixelvertexingSequence + fragment.HLTRecopixelvertexingSequenceSerialSync + fragment.HLTEndSequence )
 fragment.DQM_EcalReconstruction_v13 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMEcalReconstruction + fragment.hltPreDQMEcalReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoFullUnpackingEgammaEcalWithoutPreshowerSequence + fragment.HLTDoFullUnpackingEgammaEcalWithoutPreshowerSequenceSerialSync + fragment.HLTEndSequence )
 fragment.DQM_HcalReconstruction_v11 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMHcalReconstruction + fragment.hltPreDQMHcalReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTDoLocalHcalSequenceSerialSync + fragment.HLTPFHcalClustering + fragment.HLTPFHcalClusteringSerialSync + fragment.HLTEndSequence )
-fragment.DQM_HIPixelReconstruction_v15 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMHIPixelReconstruction + fragment.hltPreDQMHIPixelReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoLocalPixelPPOnAASequence + fragment.HLTDoLocalPixelPPOnAASequenceSerialSync + fragment.HLTRecopixelvertexingPPOnAASequence + fragment.HLTRecopixelvertexingPPOnAASequenceSerialSync + fragment.HLTDQMPixelReconstructionPPOnAA + fragment.HLTEndSequence )
+fragment.DQM_HIPixelReconstruction_v15 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMHIPixelReconstruction + fragment.hltPreDQMHIPixelReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoLocalPixelPPOnAASequence + fragment.HLTDoLocalPixelPPOnAASequenceSerialSync + fragment.HLTRecopixelvertexingPPOnAASequence + fragment.HLTRecopixelvertexingPPOnAASequenceSerialSync + fragment.HLTEndSequence )
 fragment.DQM_HIEcalReconstruction_v11 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMHIEcalReconstruction + fragment.hltPreDQMHIEcalReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoFullUnpackingEgammaEcalWithoutPreshowerSequence + fragment.HLTDoFullUnpackingEgammaEcalWithoutPreshowerSequenceSerialSync + fragment.HLTEndSequence )
 fragment.DQM_HIHcalReconstruction_v9 = cms.Path( fragment.HLTBeginSequence + fragment.hltL1sDQMHIHcalReconstruction + fragment.hltPreDQMHIHcalReconstruction + fragment.hltBackend + fragment.hltStatusOnGPUFilter + fragment.HLTDoLocalHcalSequence + fragment.HLTDoLocalHcalSequenceSerialSync + fragment.HLTPFHcalClustering + fragment.HLTPFHcalClusteringSerialSync + fragment.HLTEndSequence )
 fragment.DQM_Random_v1 = cms.Path( fragment.HLTBeginSequenceRandom + fragment.hltPreDQMRandom + fragment.HLTEndSequence )
