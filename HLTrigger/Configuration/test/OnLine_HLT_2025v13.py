@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT --full --data --type 2025v13 --unprescale --process HLT2025v13 --globaltag auto:run3_hlt_2025v13 --input file:RelVal_Raw_2025v13_DATA.root
 
-# /frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V4 (CMSSW_16_0_0_pre4)
+# /frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V5 (CMSSW_16_0_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ process = cms.Process( "HLT2025v13" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V4")
+  tableName = cms.string("/frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V5")
 )
 
 process.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -6795,9 +6795,6 @@ process.preshowerDetIdAssociator = cms.ESProducer( "DetIdAssociatorESProducer",
   includeGEM = cms.bool( False ),
   includeME0 = cms.bool( False )
 )
-process.siPixelGainCalibrationForHLTGPU = cms.ESProducer( "SiPixelGainCalibrationForHLTGPUESProducer",
-  appendToDataLabel = cms.string( "" )
-)
 process.siPixelQualityESProducer = cms.ESProducer( "SiPixelQualityESProducer",
   siPixelQualityFromDbLabel = cms.string( "" ),
   ListOfRecordToMerge = cms.VPSet( 
@@ -6808,12 +6805,6 @@ process.siPixelQualityESProducer = cms.ESProducer( "SiPixelQualityESProducer",
       tag = cms.string( "" )
     )
   ),
-  appendToDataLabel = cms.string( "" )
-)
-process.siPixelROCsStatusAndMappingWrapperESProducer = cms.ESProducer( "SiPixelROCsStatusAndMappingWrapperESProducer",
-  ComponentName = cms.string( "" ),
-  CablingMapLabel = cms.string( "" ),
-  UseQualityInfo = cms.bool( False ),
   appendToDataLabel = cms.string( "" )
 )
 process.siPixelTemplateDBObjectESProducer = cms.ESProducer( "SiPixelTemplateDBObjectESProducer",

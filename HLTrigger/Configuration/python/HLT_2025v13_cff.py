@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT --cff --data --type 2025v13
 
-# /frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V4 (CMSSW_16_0_0_pre4)
+# /frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V5 (CMSSW_16_0_0_pre4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V4")
+  tableName = cms.string("/frozen/2025/2e34/v1.3/CMSSW_16_0_X/HLT/V5")
 )
 
 fragment.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -6599,15 +6599,6 @@ fragment.preshowerDetIdAssociator = cms.ESProducer( "DetIdAssociatorESProducer",
   includeBadChambers = cms.bool( False ),
   includeGEM = cms.bool( False ),
   includeME0 = cms.bool( False )
-)
-fragment.siPixelGainCalibrationForHLTGPU = cms.ESProducer( "SiPixelGainCalibrationForHLTGPUESProducer",
-  appendToDataLabel = cms.string( "" )
-)
-fragment.siPixelROCsStatusAndMappingWrapperESProducer = cms.ESProducer( "SiPixelROCsStatusAndMappingWrapperESProducer",
-  ComponentName = cms.string( "" ),
-  CablingMapLabel = cms.string( "" ),
-  UseQualityInfo = cms.bool( False ),
-  appendToDataLabel = cms.string( "" )
 )
 fragment.siPixelTemplateDBObjectESProducer = cms.ESProducer( "SiPixelTemplateDBObjectESProducer",
   appendToDataLabel = cms.string( "" )
