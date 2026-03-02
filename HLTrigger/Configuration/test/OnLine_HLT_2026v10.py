@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2026/2e34/v1.0/HLT --full --data --type 2026v10 --unprescale --process HLT2026v10 --globaltag auto:run3_hlt_2026v10 --input file:RelVal_Raw_2026v10_DATA.root
 
-# /frozen/2026/2e34/v1.0/HLT/V1 (CMSSW_16_0_0_patch1)
+# /frozen/2026/2e34/v1.0/HLT/V4 (CMSSW_16_0_4)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ process = cms.Process( "HLT2026v10" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2026/2e34/v1.0/HLT/V1")
+  tableName = cms.string("/frozen/2026/2e34/v1.0/HLT/V4")
 )
 
 process.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -7772,6 +7772,8 @@ process.MessageLogger = cms.Service( "MessageLogger",
 )
 process.ThroughputService = cms.Service( "ThroughputService",
     eventRange = cms.untracked.uint32( 10000 ),
+    eventSkip = cms.untracked.uint32( 0 ),
+    eventClip = cms.untracked.uint32( 0 ),
     eventResolution = cms.untracked.uint32( 1 ),
     printEventSummary = cms.untracked.bool( False ),
     enableDQM = cms.untracked.bool( True ),
