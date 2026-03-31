@@ -529,11 +529,14 @@ namespace {
               auto deallocEntries = deallocTraceStrings | std::views::reverse;
 
               auto [it_alloc, it_dealloc] = std::ranges::mismatch(allocEntries, deallocEntries);
-              assert(it_alloc != allocEntries.end() and it_dealloc != deallocEntries.end());
-
-              // Because the comparisons were done with strings, the
-              // it_alloc and it_dealloc should point to different
-              // functions. Go one level up (toward outer frames) to find the common function
+              // If it_alloc and it_dealloc point to different
+              // functions, go one level up (toward outer frames) to
+              // find the common function.
+              //
+              // If it_alloc and it_dealloc point to the same function
+              // (can happen at least with realloc()), it_alloc would
+              // point to allocEntries.end(), and to get the lowest
+              // entry need to decrease the iterator as well.
               assert(it_alloc != allocEntries.begin());
               --it_alloc;
 
