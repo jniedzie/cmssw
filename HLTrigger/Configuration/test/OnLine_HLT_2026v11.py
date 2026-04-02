@@ -1,6 +1,6 @@
 # hltGetConfiguration /frozen/2026/2e34/v1.1/HLT --full --data --type 2026v11 --unprescale --process HLT2026v11 --globaltag auto:run3_hlt_2026v11 --input file:RelVal_Raw_2026v11_DATA.root
 
-# /frozen/2026/2e34/v1.1/HLT/V1 (CMSSW_16_0_4)
+# /frozen/2026/2e34/v1.1/HLT/V2 (CMSSW_16_0_6)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ process = cms.Process( "HLT2026v11" )
 process.load("Configuration.StandardSequences.Accelerators_cff")
 
 process.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/frozen/2026/2e34/v1.1/HLT/V1")
+  tableName = cms.string("/frozen/2026/2e34/v1.1/HLT/V2")
 )
 
 process.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -9794,7 +9794,7 @@ process.hltGemRecHits = cms.EDProducer( "GEMRecHitProducer",
     recAlgo = cms.string( "GEMRecHitStandardAlgo" ),
     gemDigiLabel = cms.InputTag( "hltMuonGEMDigis" ),
     applyMasking = cms.bool( True ),
-    ge21Off = cms.bool( False )
+    ge21Container = cms.bool( True )
 )
 process.hltGemSegments = cms.EDProducer( "GEMSegmentProducer",
     gemRecHitLabel = cms.InputTag( "hltGemRecHits" ),
