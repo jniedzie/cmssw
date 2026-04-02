@@ -47,6 +47,7 @@
   <class name="edm::OwnVector<GEMSegment,edm::ClonePolicy<GEMSegment> >" splitLevel="0"  rntupleStreamerMode="true"/>
   <class name="edm::RangeMap<GEMDetId,edm::OwnVector<GEMSegment,edm::ClonePolicy<GEMSegment> >,edm::ClonePolicy<GEMSegment> >" splitLevel="0"/>
   <class name="edm::Wrapper<edm::RangeMap<GEMDetId,edm::OwnVector<GEMSegment,edm::ClonePolicy<GEMSegment> >,edm::ClonePolicy<GEMSegment> > >" splitLevel="0"/>
+  <class name="edm::refhelper::FindUsingAdvance<edm::RangeMap<GEMDetId,edm::OwnVector<GEMSegment,edm::ClonePolicy<GEMSegment> >,edm::ClonePolicy<GEMSegment> >,GEMSegment>"/>
   <class name="GEMSegmentRef" splitLevel="0"/>
 
   <class name="ME0Segment" ClassVersion="13">
@@ -59,6 +60,7 @@
   <class name="edm::OwnVector<ME0Segment,edm::ClonePolicy<ME0Segment> >" splitLevel="0"  rntupleStreamerMode="true" />
   <class name="edm::RangeMap<ME0DetId,edm::OwnVector<ME0Segment,edm::ClonePolicy<ME0Segment> >,edm::ClonePolicy<ME0Segment> >" splitLevel="0"/>
   <class name="edm::Wrapper<edm::RangeMap<ME0DetId,edm::OwnVector<ME0Segment,edm::ClonePolicy<ME0Segment> >,edm::ClonePolicy<ME0Segment> > >" splitLevel="0"/>
+  <class name="edm::refhelper::FindUsingAdvance<edm::RangeMap<ME0DetId,edm::OwnVector<ME0Segment,edm::ClonePolicy<ME0Segment> >,edm::ClonePolicy<ME0Segment> >,ME0Segment>"/>
   <class name="ME0SegmentRef" splitLevel="0"/>
 
 </selection>
