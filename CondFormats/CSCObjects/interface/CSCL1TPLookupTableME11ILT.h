@@ -3,6 +3,9 @@
 
 #include "CondFormats/Serialization/interface/Serializable.h"
 #include <vector>
+#include <string_view>
+#include <initializer_list>
+#include <utility>
 
 #define DECLARE_CSCL1TP_LUT(NAME)    \
 private:                             \

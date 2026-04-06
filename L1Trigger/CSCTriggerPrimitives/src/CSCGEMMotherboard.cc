@@ -48,7 +48,7 @@ void CSCGEMMotherboard::clear() { clusterProc_->clear(); }
 //function to convert GEM-CSC amended signed slope into Run2 legacy pattern number
 uint16_t CSCGEMMotherboard::Run2PatternConverter(const int slope) const {
   unsigned sign = std::signbit(slope);
-  unsigned slope_ = abs(slope);
+  unsigned slope_ = std::abs(slope);
   uint16_t Run2Pattern = 0;
 
   if (slope_ < 3)
@@ -536,7 +536,7 @@ void CSCGEMMotherboard::fillCCLUTInfo(CSCCorrelatedLCTDigi& thisLCT,
       const int slope = cscGEMMatcher_->calculateGEMCSCBending(*clct, *gem, lookupTableME11ILT, lookupTableME21ILT);
       const int gemLayer = gem->isMatchingLayer1() ? 1 : (gem->isMatchingLayer2() ? 2 : 0);
       thisLCT.setGemLayerUsedForSlopeComputation(gemLayer);
-      thisLCT.setSlope(abs(slope));
+      thisLCT.setSlope(std::abs(slope));
       thisLCT.setBend(std::signbit(slope));
       thisLCT.setPattern(Run2PatternConverter(slope));
     } else {
