@@ -81,6 +81,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
 
     std::vector<unsigned int> ph2_detId;
     ph2_detId.reserve(phase2OTHits.dataSize());
+    std::vector<uint16_t> ph2_clustSize;
+    ph2_clustSize.reserve(phase2OTHits.dataSize());
     std::vector<float> ph2_x;
     ph2_x.reserve(phase2OTHits.dataSize());
     std::vector<float> ph2_y;
@@ -94,6 +96,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
       const DetId hitId = it.detId();
       for (auto const& hit : it) {
         ph2_detId.push_back(hitId.rawId());
+        ph2_clustSize.push_back(hit.cluster()->size());
         ph2_x.push_back(hit.globalPosition().x());
         ph2_y.push_back(hit.globalPosition().y());
         ph2_z.push_back(hit.globalPosition().z());
@@ -121,6 +124,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
     std::vector<float> see_stateTrajGlbPz;
     std::vector<int> see_q;
     std::vector<std::vector<int>> see_hitIdx;
+    std::vector<std::vector<int>> see_hitType;
     TrajectorySeedCollection see_seeds;
 
     for (auto const& seedToken : seedTokens_) {
@@ -157,15 +161,22 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
         auto const& stateGlobal = tsos.globalParameters();
 
         std::vector<int> hitIdx;
+        std::vector<int> hitType;
         for (auto const& hit : seed.recHits()) {
-          int subid = hit.geographicalId().subdetId();
-          if (subid == (int)PixelSubdetector::PixelBarrel || subid == (int)PixelSubdetector::PixelEndcap) {
+          auto det = hit.geographicalId().det();
+          if (det == DetId::Tracker) {
             const BaseTrackerRecHit* bhit = dynamic_cast<const BaseTrackerRecHit*>(&hit);
             const auto& clusterRef = bhit->firstClusterRef();
-            const auto clusterKey = clusterRef.cluster_pixel().key();
-            hitIdx.push_back(clusterKey);
+            hitIdx.push_back(clusterRef.index());
+            if (clusterRef.isPixel()) {
+              hitType.push_back(static_cast<int>(lst::HitType::Pixel));
+            } else if (clusterRef.isPhase2()) {
+              hitType.push_back(static_cast<int>(lst::HitType::Phase2OT));
+            } else {
+              throw cms::Exception("LSTInputProducer") << "Unknown tracker hit type found!";
+            }
           } else {
-            throw cms::Exception("LSTInputProducer") << "Not pixel hits found!";
+            throw cms::Exception("LSTInputProducer") << "Not tracker hit found!";
           }
         }
 
@@ -185,6 +196,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
         see_stateTrajGlbPz.push_back(stateGlobal.momentum().z());
         see_q.push_back(seedTrack.charge());
         see_hitIdx.emplace_back(std::move(hitIdx));
+        see_hitType.emplace_back(std::move(hitType));
         see_seeds.push_back(seed);
       }
     }
@@ -204,8 +216,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
                                         see_stateTrajGlbPz,
                                         see_q,
                                         see_hitIdx,
+                                        see_hitType,
                                         {},
                                         ph2_detId,
+                                        ph2_clustSize,
                                         ph2_x,
                                         ph2_y,
                                         ph2_z,

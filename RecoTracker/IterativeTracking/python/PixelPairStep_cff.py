@@ -177,6 +177,7 @@ highBetaStar.toModify(pixelPairStepTrackingRegionsSeedLayersB,RegionPSet = dict(
      ptMin        = 0.05,
      originRadius = 0.2,
 ))
+(highBetaStar & run3_upc).toModify(pixelPairStepTrackingRegionsSeedLayersB,RegionPSet = dict(ptMin = 0.08, originRadius  = 0.015))
 #include commented lines from above in pp_on_XY eras; global seeds (A) are not used in this era b/c timing
 from Configuration.Eras.Modifier_pp_on_XeXe_2017_cff import pp_on_XeXe_2017
 from Configuration.ProcessModifiers.pp_on_AA_cff import pp_on_AA
@@ -457,6 +458,8 @@ trackingPhase2PU140.toModify(pixelPairStepSelector,
     vertices = 'firstStepPrimaryVertices'
 ) #end of clone
 
+fastSim.toModify(pixelPairStepSelector, vertices = "firstStepPrimaryVerticesBeforeMixing")
+
 from Configuration.ProcessModifiers.vectorHits_cff import vectorHits
 vectorHits.toModify(pixelPairStepSelector.trackSelectors[2], minNumberLayers = 3, minNumber3DLayers = 3)
 
@@ -494,12 +497,14 @@ _PixelPairStepTask_pp_on_AA.replace(pixelPairStepHitDoublets, cms.Task(pixelPair
 #fastSim
 import FastSimulation.Tracking.FastTrackerRecHitMaskProducer_cfi
 pixelPairStepMasks = FastSimulation.Tracking.FastTrackerRecHitMaskProducer_cfi.maskProducerFromClusterRemover(pixelPairStepClusters)
-fastSim.toReplaceWith(PixelPairStepTask,
-                      cms.Task(pixelPairStepMasks
-                                   ,pixelPairStepTrackingRegions
-                                   ,pixelPairStepSeeds
-                                   ,pixelPairStepTrackCandidates
-                                   ,pixelPairStepTracks
-                                   ,pixelPairStep 
-                                   )
+_PixelPairStepTask_fastSim = cms.Task(pixelPairStepMasks
+                                     ,pixelPairStepTrackingRegions
+                                     ,pixelPairStepSeeds
+                                     ,pixelPairStepTrackCandidates
+                                     ,pixelPairStepTracks
+                                     ,pixelPairStep
 )
+_PixelPairStepTask_fastSim_phase2 = _PixelPairStepTask_fastSim.copy()
+_PixelPairStepTask_fastSim_phase2.replace(pixelPairStep, pixelPairStepSelector)
+fastSim.toReplaceWith(PixelPairStepTask, _PixelPairStepTask_fastSim)
+(fastSim & trackingPhase2PU140).toReplaceWith(PixelPairStepTask, _PixelPairStepTask_fastSim_phase2)

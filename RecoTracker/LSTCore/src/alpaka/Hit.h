@@ -11,7 +11,7 @@
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
 
-  template <typename TAcc>
+  template <alpaka::concepts::Acc TAcc>
   ALPAKA_FN_HOST_ACC ALPAKA_FN_INLINE float deltaPhiChange(TAcc const& acc, float x1, float y1, float x2, float y2) {
     return cms::alpakatools::deltaPhi(acc, x1, y1, x2 - x1, y2 - y1);
   }
@@ -50,6 +50,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
       auto geoMapDetId = endcapGeometry.geoMapDetId();  // DetId's from endcap map
       auto geoMapPhi = endcapGeometry.geoMapPhi();      // Phi values from endcap map
       int nHits = hitsExtended.metadata().size();
+      auto const nHitsOT = hitsBase.nHitsOT();
       ALPAKA_ASSERT_ACC(nHits == hitsBase.metadata().size());
       for (unsigned int ihit : cms::alpakatools::uniform_elements(acc, nHits)) {
         float ihit_x = hitsBase.xs()[ihit];
@@ -64,17 +65,18 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
             alpaka::math::acosh(acc,
                                 alpaka::math::sqrt(acc, ihit_x * ihit_x + ihit_y * ihit_y + ihit_z * ihit_z) /
                                     hitsExtended.rts()[ihit]);
-        auto found_pointer = alpaka_std::lower_bound(modules.mapdetId(), modules.mapdetId() + nModules, iDetId);
-        ALPAKA_ASSERT_ACC(found_pointer != modules.mapdetId() + nModules);
-        int found_index = std::distance(modules.mapdetId(), found_pointer);
+        auto found_pointer =
+            alpaka_std::lower_bound(modules.mapdetId().data(), modules.mapdetId().data() + nModules, iDetId);
+        ALPAKA_ASSERT_ACC(found_pointer != modules.mapdetId().data() + nModules);
+        int found_index = std::distance(modules.mapdetId().data(), found_pointer);
         uint16_t lastModuleIndex = modules.mapIdx()[found_index];
 
         hitsExtended.moduleIndices()[ihit] = lastModuleIndex;
 
         if (modules.subdets()[lastModuleIndex] == Endcap && modules.moduleType()[lastModuleIndex] == TwoS) {
-          found_pointer = alpaka_std::lower_bound(geoMapDetId, geoMapDetId + nEndCapMap, iDetId);
-          ALPAKA_ASSERT_ACC(found_pointer != geoMapDetId + nEndCapMap);
-          found_index = std::distance(geoMapDetId, found_pointer);
+          found_pointer = alpaka_std::lower_bound(geoMapDetId.data(), geoMapDetId.data() + nEndCapMap, iDetId);
+          ALPAKA_ASSERT_ACC(found_pointer != geoMapDetId.data() + nEndCapMap);
+          found_index = std::distance(geoMapDetId.data(), found_pointer);
           float phi = geoMapPhi[found_index];
           float cos_phi = alpaka::math::cos(acc, phi);
           hitsExtended.highEdgeXs()[ihit] = ihit_x + 2.5f * cos_phi;
@@ -83,19 +85,22 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
           hitsExtended.highEdgeYs()[ihit] = ihit_y + 2.5f * sin_phi;
           hitsExtended.lowEdgeYs()[ihit] = ihit_y - 2.5f * sin_phi;
         }
-        // Need to set initial value if index hasn't been seen before.
-        int old = alpaka::atomicCas(acc,
-                                    &(hitsRanges.hitRanges()[lastModuleIndex][0]),
-                                    -1,
-                                    static_cast<int>(ihit),
-                                    alpaka::hierarchy::Threads{});
-        // For subsequent visits, stores the min value.
-        if (old != -1)
-          alpaka::atomicMin(
-              acc, &hitsRanges.hitRanges()[lastModuleIndex][0], static_cast<int>(ihit), alpaka::hierarchy::Threads{});
+        // hits above nHitsOT are from seed tracks: don't reindex the full OT hits (all below nHitsOT)
+        if (ihit < nHitsOT || iDetId == kPixelModuleId) {
+          // Need to set initial value if index hasn't been seen before.
+          int old = alpaka::atomicCas(acc,
+                                      &(hitsRanges.hitRanges()[lastModuleIndex][0]),
+                                      -1,
+                                      static_cast<int>(ihit),
+                                      alpaka::hierarchy::Threads{});
+          // For subsequent visits, stores the min value.
+          if (old != -1)
+            alpaka::atomicMin(
+                acc, &hitsRanges.hitRanges()[lastModuleIndex][0], static_cast<int>(ihit), alpaka::hierarchy::Threads{});
 
-        alpaka::atomicMax(
-            acc, &hitsRanges.hitRanges()[lastModuleIndex][1], static_cast<int>(ihit), alpaka::hierarchy::Threads{});
+          alpaka::atomicMax(
+              acc, &hitsRanges.hitRanges()[lastModuleIndex][1], static_cast<int>(ihit), alpaka::hierarchy::Threads{});
+        }
       }
     }
   };

@@ -3,7 +3,7 @@
 #include "DataFormats/Provenance/interface/ProductDescription.h"
 #include "DataFormats/Provenance/interface/BranchID.h"
 #include "DataFormats/Provenance/interface/BranchIDListHelper.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
+
 #include "DataFormats/Provenance/interface/SelectedProducts.h"
 #include "FWCore/AbstractServices/interface/ResourceInformation.h"
 #include "FWCore/Framework/interface/ExceptionActions.h"
@@ -29,7 +29,6 @@ namespace edm {
       : actReg_(std::make_shared<ActivityRegistry>()),
         preg_(std::make_shared<SignallingProductRegistryFiller>()),
         branchIDListHelper_(std::make_shared<BranchIDListHelper>()),
-        thinnedAssociationsHelper_(std::make_shared<ThinnedAssociationsHelper>()),
         act_table_(),
         processConfiguration_() {}
 
@@ -87,6 +86,7 @@ namespace edm {
     }
     // propagate_const<T> has no reset() function
     processConfiguration_ = std::make_shared<ProcessConfiguration>(processName, releaseVersion, hwResources);
+    preg_->setCurrentProcess(processName);
     auto common = std::make_shared<CommonParams>(
         parameterSet.getUntrackedParameterSet("maxEvents").getUntrackedParameter<int>("input"),
         parameterSet.getUntrackedParameterSet("maxLuminosityBlocks").getUntrackedParameter<int>("input"),
@@ -114,7 +114,6 @@ namespace edm {
                      *preg_,
                      *branchIDListHelper_,
                      processBlockHelper,
-                     *thinnedAssociationsHelper_,
                      actReg_,
                      processConfiguration(),
                      config,
@@ -150,7 +149,6 @@ namespace edm {
                        *preg_,
                        *branchIDListHelper_,
                        processBlockHelper,
-                       *thinnedAssociationsHelper_,
                        actReg_,
                        processConfiguration(),
                        config,

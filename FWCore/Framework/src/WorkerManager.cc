@@ -1,21 +1,14 @@
 #include "FWCore/Framework/interface/WorkerManager.h"
 #include "UnscheduledConfigurator.h"
 
-#include "DataFormats/Provenance/interface/ProductRegistry.h"
-#include "DataFormats/Provenance/interface/ProductResolverIndexHelper.h"
 #include "FWCore/Framework/interface/maker/Worker.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/Algorithms.h"
 #include "FWCore/Utilities/interface/ConvertException.h"
 #include "FWCore/Utilities/interface/Exception.h"
-#include "FWCore/Utilities/interface/ExceptionCollector.h"
 #include "FWCore/Utilities/interface/thread_safety_macros.h"
 
 #include <exception>
 #include <functional>
-
-static const std::string kFilterType("EDFilter");
-static const std::string kProducerType("EDProducer");
 
 namespace edm {
   // -----------------------------
@@ -38,20 +31,6 @@ namespace edm {
     }
   }
 
-  Worker* WorkerManager::getWorker(ParameterSet& pset,
-                                   SignallingProductRegistryFiller& preg,
-                                   PreallocationConfiguration const* prealloc,
-                                   std::shared_ptr<ProcessConfiguration const> processConfiguration,
-                                   std::string const& label,
-                                   bool addToAll) {
-    WorkerParams params(&pset, preg, prealloc, processConfiguration, *actionTable_);
-    auto worker = workerReg_.getWorker(params, label);
-    if (nullptr != worker and addToAll) {
-      addToAllWorkers(worker);
-    }
-    return worker;
-  }
-
   Worker* WorkerManager::getWorkerForExistingModule(std::string const& label) {
     auto worker = workerReg_.getWorkerFromExistingModule(label, actionTable_);
     if (nullptr != worker) {
@@ -60,79 +39,13 @@ namespace edm {
     return worker;
   }
 
-  void WorkerManager::addToUnscheduledWorkers(ParameterSet& pset,
-                                              SignallingProductRegistryFiller& preg,
-                                              PreallocationConfiguration const* prealloc,
-                                              std::shared_ptr<ProcessConfiguration const> processConfiguration,
-                                              std::string label,
-                                              std::set<std::string>& unscheduledLabels,
-                                              std::vector<std::string>& shouldBeUsedLabels) {
-    //Need to
-    // 1) create worker
-    // 2) if it is a WorkerT<EDProducer>, add it to our list
-    auto modType = pset.getParameter<std::string>("@module_edm_type");
-    if (modType == kProducerType || modType == kFilterType) {
-      Worker* newWorker = getWorker(pset, preg, prealloc, processConfiguration, label);
-      assert(newWorker->moduleType() == Worker::kProducer || newWorker->moduleType() == Worker::kFilter);
-      unscheduledLabels.insert(label);
-      unscheduled_.addWorker(newWorker);
-      //add to list so it gets reset each new event
-      addToAllWorkers(newWorker);
-    } else {
-      shouldBeUsedLabels.push_back(label);
-    }
-  }
-
-  void WorkerManager::beginJob(GlobalContext const& globalContext) {
-    std::exception_ptr exceptionPtr;
-
-    for (auto& worker : allWorkers_) {
-      CMS_SA_ALLOW try { worker->beginJob(globalContext); } catch (...) {
-        if (!exceptionPtr) {
-          exceptionPtr = std::current_exception();
-        }
-      }
-    }
-    if (exceptionPtr) {
-      std::rethrow_exception(exceptionPtr);
-    }
-  }
-
-  void WorkerManager::endJob(ExceptionCollector& collector, GlobalContext const& globalContext) {
-    for (auto& worker : allWorkers_) {
-      try {
-        convertException::wrap([&worker, &globalContext]() { worker->endJob(globalContext); });
-      } catch (cms::Exception const& ex) {
-        collector.addException(ex);
-      }
-    }
-  }
-
-  void WorkerManager::beginStream(StreamID streamID, StreamContext const& streamContext) {
-    std::exception_ptr exceptionPtr;
-    for (auto& worker : allWorkers_) {
-      CMS_SA_ALLOW try { worker->beginStream(streamID, streamContext); } catch (...) {
-        if (!exceptionPtr) {
-          exceptionPtr = std::current_exception();
-        }
-      }
-    }
-    if (exceptionPtr) {
-      std::rethrow_exception(exceptionPtr);
-    }
-  }
-
-  void WorkerManager::endStream(StreamID streamID,
-                                StreamContext const& streamContext,
-                                ExceptionCollector& collector,
-                                std::mutex& collectorMutex) noexcept {
-    for (auto& worker : allWorkers_) {
-      CMS_SA_ALLOW try { worker->endStream(streamID, streamContext); } catch (...) {
-        std::exception_ptr exceptionPtr = std::current_exception();
-        std::lock_guard<std::mutex> collectorLock(collectorMutex);
-        collector.call([&exceptionPtr]() { std::rethrow_exception(exceptionPtr); });
-      }
-    }
+  void WorkerManager::addToUnscheduledWorkers(ModuleDescription const& iDescription) {
+    auto newWorker = workerReg_.getWorkerFromExistingModule(iDescription.moduleLabel(), actionTable_);
+    assert(nullptr != newWorker);
+    assert(newWorker->moduleType() == Worker::kProducer || newWorker->moduleType() == Worker::kFilter);
+    unscheduled_.addWorker(newWorker);
+    //add to list so it gets reset each new event
+    addToAllWorkers(newWorker);
   }
 
   void WorkerManager::resetAll() { for_all(allWorkers_, std::bind(&Worker::reset, std::placeholders::_1)); }

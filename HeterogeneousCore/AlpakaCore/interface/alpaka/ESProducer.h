@@ -75,8 +75,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
               auto const& devices = cms::alpakatools::devices<Platform>();
               assert(devices.size() == 1);
               device::Record<TRecord> const deviceRecord(record, devices.front());
-              static_assert(std::is_same_v<std::remove_cvref_t<decltype(deviceRecord.queue())>,
-                                           alpaka::Queue<Device, alpaka::Blocking>>,
+              static_assert(std::is_same_v<Queue, alpaka::Queue<Device, alpaka::Blocking>>,
                             "Non-blocking queue when trying to use ES data product directly. This might indicate a "
                             "need to extend the Alpaka ESProducer base class.");
               return std::invoke(iMethod, iThis, deviceRecord);
@@ -118,7 +117,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
               if (synchronize) {
                 alpaka::wait(deviceRecord.queue());
               } else {
-                enqueueCallback(deviceRecord.queue(), std::move(holder));
+                asyncWait(deviceRecord.queue(), std::move(holder));
               }
               // The Queue is returned to the QueueCache. The same
               // Queue may be used for other work before the work
@@ -155,7 +154,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
           label);
     }
 
-    static void enqueueCallback(Queue& queue, edm::WaitingTaskWithArenaHolder holder);
+    static void asyncWait(Queue& queue, edm::WaitingTaskWithArenaHolder holder);
     static void throwSomeNullException();
 
     std::string const moduleLabel_;

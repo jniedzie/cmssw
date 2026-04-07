@@ -20,6 +20,7 @@
 
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Sources/interface/SciTagCategoryForEmbeddedSources.h"
 #include "Mixing/Base/interface/PileUp.h"
 #include "FWCore/Framework/interface/ESWatcher.h"
 #include "CondFormats/DataRecord/interface/MixingRcd.h"
@@ -38,10 +39,14 @@ namespace edm {
     };
   }  // namespace MixingCache
 
-  class BMixingModule : public stream::EDProducer<GlobalCache<MixingCache::Config>> {
+  class BMixingModule : public stream::EDProducer<GlobalCache<MixingCache::Config>,
+                                                  edm::stream::WatchRuns,
+                                                  edm::stream::WatchLuminosityBlocks> {
   public:
     /** standard constructor*/
-    explicit BMixingModule(const edm::ParameterSet& ps, MixingCache::Config const* globalConf);
+    explicit BMixingModule(const edm::ParameterSet& ps,
+                           MixingCache::Config const* globalConf,
+                           SciTagCategoryForEmbeddedSources cat = SciTagCategoryForEmbeddedSources::Embedded);
 
     /**Default destructor*/
     ~BMixingModule() override;

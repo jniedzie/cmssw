@@ -28,7 +28,7 @@ countTrgMuons = cms.EDFilter("PATCandViewCountFilter",
 TrgMatchMuonTable = simplePATMuonFlatTableProducer.clone(
     src  = cms.InputTag("muonBPH:SelectedMuons"), # Could this be removed and simply select userInt('isTriggering')==1
     cut  = cms.string(""), # We should not filter on cross linked collections
-    name = cms.string("TrgMatchMuon"),
+    name = cms.string("BPHMuon"),
     doc  = cms.string("slimmedMuons after basic selection and trigger match"),
     singleton = cms.bool(False), # the number of entries is variable
     extension = cms.bool(False), # this is the main table for the muons
@@ -52,7 +52,7 @@ TrgMatchMuonTable = simplePATMuonFlatTableProducer.clone(
         isPFcand    = Var("isPFMuon", bool, doc="muon is PF candidate"),
         isGlobal    = Var("isGlobalMuon", bool, doc="muon is global muon"),
         isTracker   = Var("isTrackerMuon", bool, doc="muon is tracker muon"),
-        looseId     = Var("passed('CutBasedIdLoose')", bool, doc="cut-based ID, medium WP"),
+        looseId     = Var("passed('CutBasedIdLoose')", bool, doc="cut-based ID, loose WP"),
         mediumId    = Var("passed('CutBasedIdMedium')", bool, doc="cut-based ID, medium WP"),
         # tightId     = Var("passed('CutBasedIdTight')", bool, doc="cut-based ID, tight WP"),
         triggerIdLoose  = Var("passed('TriggerIdLoose')", bool, doc="TriggerIdLoose ID"),

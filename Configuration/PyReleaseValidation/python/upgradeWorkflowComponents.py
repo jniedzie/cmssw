@@ -1,8 +1,9 @@
-from copy import copy, deepcopy
+from copy import deepcopy
 from collections import OrderedDict
 from .MatrixUtil import merge, Kby, Mby, check_dups
 import re
 
+run3_years = ['2022','2023','2024','2025','2026']
 undefInput = "UNDEF"
 
 U2000by1={'--relval': '2000,1'}
@@ -44,6 +45,7 @@ upgradeKeys[2017] = [
     '2024SimOnGen',
     '2024FS',
     '2024FSPU',
+    ### 2025
     '2025',
     '2025PU',
     '2025HLTOnDigi',
@@ -52,37 +54,20 @@ upgradeKeys[2017] = [
     '2025GenOnly',
     '2025FS',
     '2025FSPU',
+    ### 2026
+    '2026',
+    '2026PU',
+    '2026HLTOnDigi',
+    '2026HLTOnDigiPU',
+    '2026SimOnGen',
+    '2026GenOnly',
+    '2026FS',
+    '2026FSPU',
 ]
 
 upgradeKeys['Run4'] = [
-    'Run4D95',
-    'Run4D95PU',
-    'Run4D96',
-    'Run4D96PU',
-    'Run4D98',
-    'Run4D98PU',
-    'Run4D99',
-    'Run4D99PU',
-    'Run4D100',
-    'Run4D100PU',
-    'Run4D101',
-    'Run4D101PU',
-    'Run4D102',
-    'Run4D102PU',
-    'Run4D103',
-    'Run4D103PU',
     'Run4D104',
     'Run4D104PU',
-    'Run4D105',
-    'Run4D105PU',
-    'Run4D106',
-    'Run4D106PU',
-    'Run4D107',
-    'Run4D107PU',
-    'Run4D108',
-    'Run4D108PU',
-    'Run4D109',
-    'Run4D109PU',
     'Run4D110',
     'Run4D110PU',
     'Run4D111',
@@ -97,14 +82,6 @@ upgradeKeys['Run4'] = [
     'Run4D110SimOnGen',
     'Run4D115',
     'Run4D115PU',
-    'Run4D116',
-    'Run4D116PU',
-    'Run4D117',
-    'Run4D117PU',
-    'Run4D118',
-    'Run4D118PU',
-    'Run4D119',
-    'Run4D119PU',
     'Run4D120',
     'Run4D120PU',
     'Run4D121',
@@ -113,6 +90,14 @@ upgradeKeys['Run4'] = [
     'Run4D122PU',
     'Run4D123',
     'Run4D123PU',
+    'Run4D124',
+    'Run4D124PU',
+    'Run4D125',
+    'Run4D125PU',
+    'Run4D110FS',
+    'Run4D110FSPU',
+    'Run4D121FS',
+    'Run4D121FSPU',
 ]
 
 # pre-generation of WF numbers
@@ -123,7 +108,9 @@ numWFStart={
 numWFSkip=200
 # temporary measure to keep other WF numbers the same
 numWFConflict = [[14400,14800], #2022ReReco, 2022ReRecoPU (in 12_4)
-                 [24400,24800], #D97
+                 [23600,27200], #D95-D103
+                 [27600,29600], #D105-D109
+                 [32400,34000], #D116-D119
                  [50000,51000]]
 numWFAll={
     2017: [],
@@ -224,9 +211,10 @@ upgradeWFs['baseline'] = UpgradeWorkflow_baseline(
         'GenHLBeamSpot14',
         'Sim',
         'GenSim',
+        'GenSimCloseBy',
         'GenSimHLBeamSpot',
         'GenSimHLBeamSpot14',
-        'GenSimHLBeamSpotHGCALCloseBy',
+        'GenSimHLBeamSpotCloseBy',
         'Digi',
         'DigiNoHLT',
         'DigiTrigger',
@@ -254,6 +242,8 @@ upgradeWFs['baseline'] = UpgradeWorkflow_baseline(
         'HLT75e33',
         'FastSimRun3',
         'HARVESTFastRun3',
+        'FastSimRun4',
+        'HARVESTFastRun4',
     ],
     PU =  [
         'DigiTrigger',
@@ -278,6 +268,8 @@ upgradeWFs['baseline'] = UpgradeWorkflow_baseline(
         'HLT75e33',
         'FastSimRun3',
         'HARVESTFastRun3',
+        'FastSimRun4',
+        'HARVESTFastRun4',
     ],
     suffix = '',
     offset = 0.0,
@@ -474,7 +466,7 @@ class UpgradeWorkflow_trackingMkFit(UpgradeWorkflowTracking):
         if ('Digi' in step and 'NoHLT' not in step) or ('HLTOnly' in step): stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
         if 'Reco' in step: stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
     def condition_(self, fragment, stepList, key, hasHarvest):     
-        return any(y in key for y in ['2017','2022','2023','2024','2025']) and ('FS' not in key)
+        return any(y in key for y in ['2017'] + run3_years) and ('FS' not in key)
 upgradeWFs['trackingMkFit'] = UpgradeWorkflow_trackingMkFit(
     steps = [
         'Digi',
@@ -542,7 +534,7 @@ upgradeWFs['lstOnCPUIters01TrackingOnly'] = UpgradeWorkflow_lstOnCPUIters01Track
         'HARVESTGlobal',
     ],
     suffix = '_lstOnCPUIters01TrackingOnly',
-    offset = 0.703,
+    offset = 0.711,
 )
 upgradeWFs['lstOnCPUIters01TrackingOnly'].step3 = upgradeWFs['trackingOnly'].step3 | {
     '--procModifiers': 'trackingIters01,trackingLST',
@@ -553,7 +545,7 @@ upgradeWFs['lstOnCPUIters01TrackingOnly'].step3 = upgradeWFs['trackingOnly'].ste
 class UpgradeWorkflow_lstOnGPUIters01TrackingOnly(UpgradeWorkflowTracking):
     def setup__(self, step, stepName, stepDict, k, properties):
         if 'Reco' in step: stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
-        elif 'HARVEST' in step: stepDict[stepName][k] = merge([{'-s': 'HARVESTING:@trackingOnlyValidation+@trackingOnlyDQM'}, stepDict[step][k]])
+        elif 'HARVEST' in step: stepDict[stepName][k] = merge([{'-s': 'HARVESTING:@trackingOnlyValidation+@trackingOnlyDQM', '--procModifiers': 'trackingIters01,trackingLST'}, stepDict[step][k]])
         elif 'ALCA' in step: stepDict[stepName][k] = None
     def condition(self, fragment, stepList, key, hasHarvest):
         result = (fragment=="TTbar_14TeV") and hasHarvest and ('Run4' in key)
@@ -571,10 +563,20 @@ upgradeWFs['lstOnGPUIters01TrackingOnly'] = UpgradeWorkflow_lstOnGPUIters01Track
         'HARVESTGlobal',
     ],
     suffix = '_lstOnGPUIters01TrackingOnly',
-    offset = 0.704,
+    offset = 0.712,
 )
 upgradeWFs['lstOnGPUIters01TrackingOnly'].step3 = upgradeWFs['trackingOnly'].step3 | {
     '--procModifiers': 'trackingIters01,trackingLST',
+}
+
+# LST on GPU (if available), initialStep+highPtTripletStep-only tracking-only, CPU vs. GPU comparison
+class UpgradeWorkflow_lstOnGPUIters01TrackingOnlyAlpakaValidationLST(UpgradeWorkflow_lstOnGPUIters01TrackingOnly):
+    pass
+upgradeWFs['lstOnGPUIters01TrackingOnlyAlpakaValidationLST'] = deepcopy(upgradeWFs['lstOnGPUIters01TrackingOnly'])
+upgradeWFs['lstOnGPUIters01TrackingOnlyAlpakaValidationLST'].suffix = '_lstOnGPUIters01TrackingOnlyAlpakaValidationLST'
+upgradeWFs['lstOnGPUIters01TrackingOnlyAlpakaValidationLST'].offset = 0.713
+upgradeWFs['lstOnGPUIters01TrackingOnlyAlpakaValidationLST'].step3 = upgradeWFs['trackingOnly'].step3 | {
+    '--procModifiers': 'alpakaValidationLST,trackingIters01,trackingLST',
 }
 
 #DeepCore seeding for JetCore iteration workflow
@@ -625,7 +627,7 @@ class UpgradeWorkflow_siPixelDigiMorphing(UpgradeWorkflow):
         if 'Reco' in step:
             stepDict[stepName][k] = merge([{'--procModifiers': 'siPixelDigiMorphing'}, stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        result = (fragment=="QCD_Pt_1800_2400_14" or fragment=="TTbar_14TeV" ) and any(y in key for y in ['2022','2023','2024','2025'])
+        result = (fragment=="QCD_Pt_1800_2400_14" or fragment=="TTbar_14TeV" ) and any(y in key for y in run3_years)
         return result
 upgradeWFs['siPixelDigiMorphing'] = UpgradeWorkflow_siPixelDigiMorphing(
     steps = [
@@ -654,7 +656,7 @@ class UpgradeWorkflow_siPixelGoodEdgeAlgo(UpgradeWorkflow):
         if 'Reco' in step:
             stepDict[stepName][k] = merge([{'--procModifiers': 'siPixelGoodEdgeAlgo'}, stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        result = (fragment=="QCD_Pt_1800_2400_14" or fragment=="TTbar_14TeV" ) and any(y in key for y in ['2025'])
+        result = (fragment=="QCD_Pt_1800_2400_14" or fragment=="TTbar_14TeV" ) and any(y in key for y in ['2025','2026'])
         return result
 upgradeWFs['siPixelGoodEdgeAlgo'] = UpgradeWorkflow_siPixelGoodEdgeAlgo(
     steps = [
@@ -682,7 +684,7 @@ class UpgradeWorkflow_displacedRegional(UpgradeWorkflowTracking):
     def setup__(self, step, stepName, stepDict, k, properties):
         if 'Reco' in step: stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
     def condition_(self, fragment, stepList, key, hasHarvest):
-        return any(y in key for y in ['2022','2023','2024','2025'])
+        return any(y in key for y in run3_years)
 upgradeWFs['displacedRegional'] = UpgradeWorkflow_displacedRegional(
     steps = [
         'Reco',
@@ -768,7 +770,7 @@ class UpgradeWorkflow_weightedVertex(UpgradeWorkflow):
     def condition(self, fragment, stepList, key, hasHarvest):
         # select only a subset of the workflows
         selected = (fragment == "TTbar_14TeV") and ('FS' not in key) and hasHarvest
-        result =  selected and any(y in key for y in ['2022','2024','2025','Run4'])
+        result =  selected and any(y in key for y in run3_years + ['Run4'])
 
         return result
 
@@ -856,7 +858,8 @@ class UpgradeWorkflow_ticl_v5(UpgradeWorkflow):
         if 'HARVESTGlobal' in step:
             stepDict[stepName][k] = merge([self.step4, stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        return (fragment=="TTbar_14TeV" or 'CloseByP' in fragment or 'Eta1p7_2p7' in fragment) and 'Run4' in key
+        selected_fragments = ["TTbar_14TeV", "CloseByP", "Eta1p7_2p7", "ZEE_14"]
+        return any(sf in fragment for sf in selected_fragments) and 'Run4' in key
 
 upgradeWFs['ticl_v5'] = UpgradeWorkflow_ticl_v5(
     steps = [
@@ -996,6 +999,100 @@ upgradeWFs['CPfromPU'] = UpgradeWorkflow_CPfromPU(
 upgradeWFs['CPfromPU'].step2 = {'--procModifiers': 'enableCPfromPU'}
 upgradeWFs['CPfromPU'].step3 = {'--procModifiers': 'enableCPfromPU'}
 upgradeWFs['CPfromPU'].step4 = {'--procModifiers': 'enableCPfromPU'}
+
+class UpgradeWorkflow_ticl_barrel(UpgradeWorkflow):
+    def setup_(self, step, stepName, stepDict, k, properties):
+        if ('Digi' in step and 'NoHLT' not in step) or ('HLTOnly' in step):      
+            stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
+        if 'RecoGlobal' in step:
+            stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
+        if 'HARVESTGlobal' in step:
+            stepDict[stepName][k] = merge([self.step4, stepDict[step][k]])
+    def condition(self, fragment, stepList, key, hasHarvest):
+        return ('CloseByPGun_Barrel') in fragment and ('Run4' in key)
+
+upgradeWFs['ticl_barrel'] = UpgradeWorkflow_ticl_barrel(
+    steps = [
+        'HLTOnly',
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal'
+    ],
+    PU = [
+        'HLTOnly',
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal'
+    ], 
+    suffix = '_ticl_barrel',
+    offset = 0.209,
+)
+upgradeWFs['ticl_barrel'].step2 = {'--procModifiers': 'ticl_barrel'}
+upgradeWFs['ticl_barrel'].step3 = {'--procModifiers': 'ticl_barrel'}
+upgradeWFs['ticl_barrel'].step4 = {'--procModifiers': 'ticl_barrel'}
+
+class UpgradeWorkflow_ticl_barrel_CPfromPU(UpgradeWorkflow):
+    def setup_(self, step, stepName, stepDict, k, properties):
+        if ('Digi' in step and 'NoHLT' not in step) or ('HLTOnly' in step):
+            stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
+        if 'RecoGlobal' in step:
+            stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
+        if 'HARVESTGlobal' in step:
+            stepDict[stepName][k] = merge([self.step4, stepDict[step][k]])
+    def condition(self, fragment, stepList, key, hasHarvest):
+        return ('CloseByPGun_Barrel') in fragment and ('Run4' in key) and ('PU' in key)
+
+upgradeWFs['ticl_barrel_CPfromPU'] = UpgradeWorkflow_ticl_barrel_CPfromPU(
+    steps = [
+        'HLTOnly',
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal'
+    ],
+    PU = [
+        'HLTOnly',
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal'
+    ],
+    suffix = '_ticl_barrel_CPfromPU',
+    offset = 0.2091,
+)
+upgradeWFs['ticl_barrel_CPfromPU'].step2 = {'--procModifiers': 'ticl_barrel,enableCPfromPU'}
+upgradeWFs['ticl_barrel_CPfromPU'].step3 = {'--procModifiers': 'ticl_barrel,enableCPfromPU'}
+upgradeWFs['ticl_barrel_CPfromPU'].step4 = {'--procModifiers': 'ticl_barrel,enableCPfromPU'}
+
+class UpgradeWorkflow_ticlv5_TrackLinkingGNN(UpgradeWorkflow):
+    def setup_(self, step, stepName, stepDict, k, properties):
+        if ('Digi' in step and 'NoHLT' not in step) or ('HLTOnly' in step):
+            stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
+        if 'RecoGlobal' in step:
+            stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
+        if 'HARVESTGlobal' in step:
+            stepDict[stepName][k] = merge([self.step4, stepDict[step][k]])
+    def condition(self, fragment, stepList, key, hasHarvest):
+        selected_fragments = ["TTbar_14TeV", "CloseByP", "Eta1p7_2p7", "ZEE_14"]
+        return any(sf in fragment for sf in selected_fragments) and 'Run4' in key
+    
+upgradeWFs['ticlv5_TrackLinkingGNN'] = UpgradeWorkflow_ticlv5_TrackLinkingGNN(
+    steps = [
+        'HLTOnly',
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal'
+    ],
+    PU = [
+        'HLTOnly',
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal'
+    ],
+    suffix = '_ticlv5_TrackLinkGNN',
+    offset = 0.211,
+)
+upgradeWFs['ticlv5_TrackLinkingGNN'].step2 = {'--procModifiers': 'ticlv5_TrackLinkingGNN'}
+upgradeWFs['ticlv5_TrackLinkingGNN'].step3 = {'--procModifiers': 'ticlv5_TrackLinkingGNN'}
+upgradeWFs['ticlv5_TrackLinkingGNN'].step4 = {'--procModifiers': 'ticlv5_TrackLinkingGNN'}
 
 # L3 Tracker Muon Outside-In reconstruction first
 class UpgradeWorkflow_phase2L3MuonsOIFirst(UpgradeWorkflow):
@@ -1147,7 +1244,7 @@ upgradeWFs['photonDRN'].step3 = {
 
 # Patatrack workflows (NoPU and PU):
 #   - TTbar_14, ZMM_14", ZEE_14, ZTT_14, NuGun, SingleMu, QCD_Pt15To7000_Flat for
-#       > 2022, 2023, 2024, 2025 and Run4 conditions, TTbar
+#       > 2022, 2023, 2024, 2025, 2026 and Run4 conditions, TTbar
 #   - Hydjet for HI conditions
 class PatatrackWorkflow(UpgradeWorkflow):
     def __init__(self, digi = {}, reco = {}, mini = {}, harvest = {}, **kwargs):
@@ -1208,7 +1305,7 @@ class PatatrackWorkflow(UpgradeWorkflow):
 
     def condition(self, fragment, stepList, key, hasHarvest):
         # select only a subset of the workflows
-        years = ['2022','2023','2024','2025','Run4']
+        years = run3_years + ['Run4']
         fragments = ["TTbar_14","ZMM_14","ZEE_14","ZTT_14","NuGun","SingleMu","QCD_Pt15To7000_Flat"]
         selected = [
             (any(y in key for y in years) and ('FS' not in key) and any( f in fragment for f in fragments)),
@@ -1306,12 +1403,12 @@ upgradeWFs['PatatrackECALOnlyAlpaka'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_ecalOnly,RECO:reconstruction_ecalOnly,VALIDATION:@ecalOnlyValidation,DQM:@ecalOnly',
+        '-s': 'RAW2DIGI:RawToDigi_ecalOnly,RECO:reconstruction_ecalOnly,VALIDATION:@ecalOnlyValidation,DQM:@ecalOnly+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     harvest = {
-        '-s': 'HARVESTING:@ecalOnlyValidation+@ecal'
+        '-s': 'HARVESTING:@ecalOnlyValidation+@ecal+@hltGPUvsCPU'
     },
     suffix = 'Patatrack_ECALOnlyAlpaka',
     offset = 0.412,
@@ -1328,12 +1425,12 @@ upgradeWFs['PatatrackECALOnlyAlpakaValidation'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_ecalOnly,RECO:reconstruction_ecalOnly,VALIDATION:@ecalOnlyValidation,DQM:@ecalOnly',
+        '-s': 'RAW2DIGI:RawToDigi_ecalOnly,RECO:reconstruction_ecalOnly,VALIDATION:@ecalOnlyValidation,DQM:@ecalOnly+@hltGPUvsCPU',
         '--procModifiers': 'alpakaValidation',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     harvest = {
-        '-s': 'HARVESTING:@ecalOnlyValidation+@ecal'
+        '-s': 'HARVESTING:@ecalOnlyValidation+@ecal+@hltGPUvsCPU'
     },
     suffix = 'Patatrack_ECALOnlyAlpakaValidation',
     offset = 0.413,
@@ -1347,12 +1444,12 @@ upgradeWFs['PatatrackHCALOnlyAlpakaValidation'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_hcalOnly,RECO:reconstruction_hcalOnly,VALIDATION:@hcalOnlyValidation,DQM:@hcalOnly+@hcal2Only',
+        '-s': 'RAW2DIGI:RawToDigi_hcalOnly,RECO:reconstruction_hcalOnly,VALIDATION:@hcalOnlyValidation,DQM:@hcalOnly+@hcal2Only+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     harvest = {
-        '-s': 'HARVESTING:@hcalOnlyValidation'
+        '-s': 'HARVESTING:@hcalOnlyValidation+@hltGPUvsCPU'
     },
     suffix = 'Patatrack_HCALOnlyAlpaka_Validation',
     offset = 0.422,
@@ -1366,12 +1463,12 @@ upgradeWFs['PatatrackHCALOnlyGPUandAlpakaValidation'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_hcalOnly,RECO:reconstruction_hcalOnlyLegacy+reconstruction_hcalOnly,VALIDATION:@hcalOnlyValidation+pfClusterHBHEOnlyAlpakaComparisonSequence,DQM:@hcalOnly+@hcal2Only+hcalOnlyOfflineSourceSequenceAlpaka',
+        '-s': 'RAW2DIGI:RawToDigi_hcalOnly,RECO:reconstruction_hcalOnlyLegacy+reconstruction_hcalOnly,VALIDATION:@hcalOnlyValidation+pfClusterHBHEOnlyAlpakaComparisonSequence,DQM:@hcalOnly+@hcal2Only+hcalOnlyOfflineSourceSequenceAlpaka+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     harvest = {
-        '-s': 'HARVESTING:@hcalOnlyValidation'
+        '-s': 'HARVESTING:@hcalOnlyValidation+@hltGPUvsCPU'
     },
     suffix = 'Patatrack_HCALOnlyGPUandAlpaka_Validation',
     offset = 0.423,
@@ -1402,7 +1499,7 @@ upgradeWFs['PatatrackFullRecoAlpaka'] = PatatrackWorkflow(
     },
     reco = {
         # skip the @pixelTrackingOnlyValidation which cannot run together with the full reconstruction
-        '-s': 'RAW2DIGI:RawToDigi+RawToDigi_pixelOnly,L1Reco,RECO:reconstruction+reconstruction_pixelTrackingOnly,RECOSIM,PAT,VALIDATION:@standardValidation+@miniAODValidation,DQM:@standardDQM+@ExtraHLT+@miniAODDQM+@pixelTrackingOnlyDQM',
+        '-s': 'RAW2DIGI:RawToDigi+RawToDigi_pixelOnly,L1Reco,RECO:reconstruction+reconstruction_pixelTrackingOnly,RECOSIM,PAT,VALIDATION:@standardValidation+@miniAODValidation,DQM:@standardDQM+@ExtraHLT+@miniAODDQM+@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
@@ -1424,7 +1521,7 @@ upgradeWFs['PatatrackFullRecoAlpaka'] = PatatrackWorkflow(
     },
     reco = {
         # skip the @pixelTrackingOnlyValidation which cannot run together with the full reconstruction
-        '-s': 'RAW2DIGI:RawToDigi+RawToDigi_pixelOnly,L1Reco,RECO:reconstruction+reconstruction_pixelTrackingOnly,RECOSIM,PAT,VALIDATION:@standardValidation+@miniAODValidation,DQM:@standardDQM+@ExtraHLT+@miniAODDQM+@pixelTrackingOnlyDQM',
+        '-s': 'RAW2DIGI:RawToDigi+RawToDigi_pixelOnly,L1Reco,RECO:reconstruction+reconstruction_pixelTrackingOnly,RECOSIM,PAT,VALIDATION:@standardValidation+@miniAODValidation,DQM:@standardDQM+@ExtraHLT+@miniAODDQM+@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
         '--customise' : 'RecoTracker/Configuration/customizePixelTracksForTriplets.customizePixelTracksForTriplets,HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
@@ -1445,15 +1542,37 @@ upgradeWFs['PatatrackPixelOnlyAlpaka'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM',
+        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
+        '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
+    },
+    harvest = {
+        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM+@hltGPUvsCPU'
+    },
+    suffix = 'Patatrack_PixelOnlyAlpaka',
+    offset = 0.402,
+)
+
+
+# Pixel-only quadruplets with CA Extension workflow running on GPU (optional)
+#  - Pixel-only with CA Extension reconstruction with Alpaka, with DQM and validation
+#  - harvesting
+
+upgradeWFs['PatatrackPixelOnlyAlpakaCAExtension'] = PatatrackWorkflow(
+    digi = {
+        '--procModifiers': 'alpaka,phase2CAExtension',
+        '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
+    },
+    reco = {
+        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM',
+        '--procModifiers': 'alpaka,phase2CAExtension',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     harvest = {
         '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM'
     },
-    suffix = 'Patatrack_PixelOnlyAlpaka',
-    offset = 0.402,
+    suffix = 'Patatrack_PixelOnlyAlpakaCAExtension',
+    offset = 0.4021,
 )
 
 # Pixel-only quadruplets workflow running on GPU (optional)
@@ -1466,12 +1585,12 @@ upgradeWFs['PatatrackPixelOnlyAlpakaValidation'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM',
+        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpakaValidation',
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     harvest = {
-        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM',
+        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpakaValidation',
     },
     suffix = 'Patatrack_PixelOnlyAlpaka_Validation',
@@ -1505,12 +1624,12 @@ upgradeWFs['PatatrackPixelOnlyTripletsAlpaka'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM',
+        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpaka',
         '--customise' : 'RecoTracker/Configuration/customizePixelTracksForTriplets.customizePixelTracksForTriplets,HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling'
     },
     harvest = {
-        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM'
+        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM+@hltGPUvsCPU'
     },
     suffix = 'Patatrack_PixelOnlyTripletsAlpaka',
     offset = 0.406,
@@ -1526,12 +1645,12 @@ upgradeWFs['PatatrackPixelOnlyTripletsAlpakaValidation'] = PatatrackWorkflow(
         '--customise' : 'HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling',
     },
     reco = {
-        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM',
+        '-s': 'RAW2DIGI:RawToDigi_pixelOnly,RECO:reconstruction_pixelTrackingOnly,VALIDATION:@pixelTrackingOnlyValidation,DQM:@pixelTrackingOnlyDQM+@hltGPUvsCPU',
         '--procModifiers': 'alpakaValidation',
         '--customise' : 'RecoTracker/Configuration/customizePixelTracksForTriplets.customizePixelTracksForTriplets,HeterogeneousCore/AlpakaServices/customiseAlpakaServiceMemoryFilling.customiseAlpakaServiceMemoryFilling'
     },
     harvest = {
-        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM'
+        '-s': 'HARVESTING:@trackingOnlyValidation+@pixelTrackingOnlyDQM+@hltGPUvsCPU'
     },
     suffix = 'Patatrack_PixelOnlyTripletsAlpaka_Validation',
     offset = 0.407,
@@ -1579,7 +1698,7 @@ class UpgradeWorkflow_ProdLike(UpgradeWorkflow):
             stepDict[stepName][k].pop('--pileup', None)
             stepDict[stepName][k].pop('--pileup_input', None)
     def condition(self, fragment, stepList, key, hasHarvest):
-        years = ['2022','2023','2024','2025','Run4']
+        years = run3_years + ['Run4']
         return fragment=="TTbar_14TeV" and any(y in key for y in years)
 upgradeWFs['ProdLike'] = UpgradeWorkflow_ProdLike(
     steps = [
@@ -1768,13 +1887,20 @@ class UpgradeWorkflow_HLT75e33Timing(UpgradeWorkflow):
         if ('ALCA' in step) or ('Reco' in step) or ('HLT' in step):
             stepDict[stepName][k] = None
         elif 'DigiTrigger' in step:
-            stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
+            # Add the aging customization
+            mergedStep = merge([self.step2, stepDict[step][k]])
+            if '--customise' in mergedStep:
+                mergedStep['--customise'] += ',SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            else:
+                mergedStep['--customise'] = 'SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            stepDict[stepName][k] = mergedStep
         elif 'HARVEST' in step:
             stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
         else:
             stepDict[stepName][k] = merge([stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        return fragment=="TTbar_14TeV" and 'Run4' in key
+        fragments = ["TTbar_14","ZMM_14","ZEE_14","NuGun","SingleMu"]
+        return any(f in fragment for f in fragments) and 'Run4' in key
     
 upgradeWFs['HLTTiming75e33'] = UpgradeWorkflow_HLT75e33Timing(
     steps = [
@@ -1814,6 +1940,84 @@ upgradeWFs['HLTTiming75e33'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
+upgradeWFs['HLTTrackingOnly75e33'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTrackingOnly75e33'].suffix = '_HLT75e33TrackingOnly'
+upgradeWFs['HLTTrackingOnly75e33'].offset = 0.7501
+upgradeWFs['HLTTrackingOnly75e33'].step2 = {
+    '-s':'DIGI:pdigi_valid,DIGI2RAW,L1TrackTrigger,L1,L1P2GT,HLT:75e33_trackingOnly,VALIDATION::hltMultiTrackValidation+hltMultiPVValidation',
+    '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
+    '--eventcontent':'FEVTDEBUGHLT,DQMIO'
+}
+
+class UpgradeWorkflow_HLT75e33TrackingNtuple(UpgradeWorkflow):
+    def setup_(self, step, stepName, stepDict, k, properties):
+        # skip RECO, ALCA and HLT
+        if ('ALCA' in step) or ('Reco' in step) or ('HLT' in step):
+            stepDict[stepName][k] = None
+        elif 'DigiTrigger' in step:
+            # Add the aging customization
+            mergedStep = merge([self.step2, stepDict[step][k]])
+            if '--customise' in mergedStep:
+                mergedStep['--customise'] += ',SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            else:
+                mergedStep['--customise'] = 'SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            stepDict[stepName][k] = mergedStep
+        elif 'HARVEST' in step:
+                stepDict[stepName][k] = None
+        else:
+            stepDict[stepName][k] = merge([stepDict[step][k]])
+    def condition(self, fragment, stepList, key, hasHarvest):
+        fragments = ["TTbar_14","ZMM_14","ZEE_14","NuGun","SingleMu"]
+        return any(f in fragment for f in fragments) and 'Run4' in key
+
+upgradeWFs['HLTTrackingNtuple75e33'] = UpgradeWorkflow_HLT75e33TrackingNtuple(
+    steps = [
+        'Reco',
+        'RecoGlobal',
+        'RecoNano',
+        'DigiTrigger',
+        'ALCA',
+        'ALCAPhase2',
+        'RecoGlobalFakeHLT',
+        'HLT75e33',
+        'HARVESTGlobal',
+        'HARVESTGlobalFakeHLT',
+    ],
+    PU = [
+        'Reco',
+        'RecoGlobal',
+        'RecoNano',
+        'DigiTrigger',
+        'ALCA',
+        'ALCAPhase2',
+        'HARVESTGlobal',
+        'RecoGlobalFakeHLT',
+        'HLT75e33',
+        'HARVESTGlobal',
+        'HARVESTGlobalFakeHLT',
+    ],
+    suffix = '_HLT75e33TrackingNtuple',
+    offset = 0.7502,
+)
+upgradeWFs['HLTTrackingNtuple75e33'].step2 = {
+    '-s':'DIGI:pdigi_valid,DIGI2RAW,L1TrackTrigger,L1,L1P2GT,HLT:75e33,VALIDATION:@hltValidation',
+    '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
+    '--eventcontent':'FEVTDEBUGHLT,DQMIO',
+    '--customise' : 'Validation/RecoTrack/customiseTrackingNtuple.customiseTrackingNtupleHLT,Validation/RecoTrack/customiseTrackingNtuple.extendedContent'
+}
+
+upgradeWFs['HLTHeterogeneousValid'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTHeterogeneousValid'].suffix = '_HLTHeterogeneousValid'
+upgradeWFs['HLTHeterogeneousValid'].offset = 0.7503
+upgradeWFs['HLTHeterogeneousValid'].step2['-s'] = upgradeWFs['HLTHeterogeneousValid'].step2['-s'].replace(
+    'HLT:75e33_timing', 'HLT:75e33'
+)
+upgradeWFs['HLTHeterogeneousValid'].step2['--procModifiers'] = 'alpakaValidationHLT'
+upgradeWFs['HLTHeterogeneousValid'].step3['-s'] = upgradeWFs['HLTHeterogeneousValid'].step3['-s'].replace(
+    'HARVESTING:@hltValidation', 'HARVESTING:@hltValidation+HLTHeterogeneousMonitoringHarvesting'
+)
+upgradeWFs['HLTHeterogeneousValid'].step3['--procModifiers'] = 'alpakaValidationHLT'
+
 upgradeWFs['HLTTiming75e33Alpaka'] = deepcopy(upgradeWFs['HLTTiming75e33'])
 upgradeWFs['HLTTiming75e33Alpaka'].suffix = '_HLT75e33TimingAlpaka'
 upgradeWFs['HLTTiming75e33Alpaka'].offset = 0.751
@@ -1840,42 +2044,56 @@ upgradeWFs['HLTTiming75e33TiclV5'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
-upgradeWFs['HLTTiming75e33AlpakaSingleIter'] = deepcopy(upgradeWFs['HLTTiming75e33'])
-upgradeWFs['HLTTiming75e33AlpakaSingleIter'].suffix = '_HLT75e33TimingAlpakaSingleIter'
-upgradeWFs['HLTTiming75e33AlpakaSingleIter'].offset = 0.753
-upgradeWFs['HLTTiming75e33AlpakaSingleIter'].step2 = {
+upgradeWFs['HLTTiming75e33TiclV5TrackLinkingGNN'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTiming75e33TiclV5TrackLinkingGNN'].suffix = '_HLT75e33TimingTiclV5TrackLinkGNN'
+upgradeWFs['HLTTiming75e33TiclV5TrackLinkingGNN'].offset = 0.7521
+upgradeWFs['HLTTiming75e33TiclV5TrackLinkingGNN'].step2 = {
     '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
-    '--procModifiers': 'alpaka,singleIterPatatrack',
+    '--procModifiers': 'ticlv5_TrackLinkingGNN',
     '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
     '--eventcontent':'FEVTDEBUGHLT,DQMIO'
 }
-upgradeWFs['HLTTiming75e33AlpakaSingleIter'].step3 = {
+upgradeWFs['HLTTiming75e33TiclV5TrackLinkingGNN'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLST'] = deepcopy(upgradeWFs['HLTTiming75e33'])
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLST'].suffix = '_HLT75e33TimingAlpakaSingleIterLST'
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLST'].offset = 0.754
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLST'].step2 = {
+
+upgradeWFs['HLTTiming75e33LegacyTracking'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTiming75e33LegacyTracking'].suffix = '_HLT75e33TimingLegacyTracking'
+upgradeWFs['HLTTiming75e33LegacyTracking'].offset = 0.753
+upgradeWFs['HLTTiming75e33LegacyTracking'].step2 = {
     '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
-    '--procModifiers': 'alpaka,singleIterPatatrack,trackingLST',
+    '--procModifiers': 'hltPhase2LegacyTracking',
     '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
     '--eventcontent':'FEVTDEBUGHLT,DQMIO'
 }
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLST'].step3 = {
+upgradeWFs['HLTTiming75e33LegacyTracking'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
-upgradeWFs['HLTTiming75e33AlpakaLST'] = deepcopy(upgradeWFs['HLTTiming75e33'])
-upgradeWFs['HLTTiming75e33AlpakaLST'].suffix = '_HLT75e33TimingAlpakaLST'
-upgradeWFs['HLTTiming75e33AlpakaLST'].offset = 0.755
-upgradeWFs['HLTTiming75e33AlpakaLST'].step2 = {
+upgradeWFs['HLTTiming75e33LegacyTrackingPatatrackQuads'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTiming75e33LegacyTrackingPatatrackQuads'].suffix = '_HLT75e33TimingLegacyTrackingPatatrackQuads'
+upgradeWFs['HLTTiming75e33LegacyTrackingPatatrackQuads'].offset = 0.754
+upgradeWFs['HLTTiming75e33LegacyTrackingPatatrackQuads'].step2 = {
     '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
-    '--procModifiers': 'alpaka,trackingLST',
+    '--procModifiers': 'hltPhase2LegacyTrackingPatatrackQuadsChain',
     '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
     '--eventcontent':'FEVTDEBUGHLT,DQMIO'
 }
-upgradeWFs['HLTTiming75e33AlpakaLST'].step3 = {
+upgradeWFs['HLTTiming75e33LegacyTrackingPatatrackQuads'].step3 = {
+    '-s':'HARVESTING:@hltValidation'
+}
+
+upgradeWFs['HLTTiming75e33LST'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTiming75e33LST'].suffix = '_HLT75e33TimingLST'
+upgradeWFs['HLTTiming75e33LST'].offset = 0.755
+upgradeWFs['HLTTiming75e33LST'].step2 = {
+    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
+    '--procModifiers': 'trackingLST',
+    '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
+    '--eventcontent':'FEVTDEBUGHLT,DQMIO'
+}
+upgradeWFs['HLTTiming75e33LST'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
@@ -1889,36 +2107,29 @@ upgradeWFs['HLTTiming75e33TrimmedTracking'].step2 = {
     '--eventcontent':'FEVTDEBUGHLT,DQMIO'
 }
 
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTracking'] = deepcopy(upgradeWFs['HLTTiming75e33'])
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTracking'].suffix = '_HLT75e33TimingAlpakaTrimmedTracking'
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTracking'].offset = 0.7561
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTracking'].step2 = {
+upgradeWFs['HLTTiming75e33MkFitFit'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTiming75e33MkFitFit'].suffix = '_HLT75e33TimingMkFitFit'
+upgradeWFs['HLTTiming75e33MkFitFit'].offset = 0.757
+upgradeWFs['HLTTiming75e33MkFitFit'].step2 = {
     '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
-    '--procModifiers': 'alpaka,phase2_hlt_vertexTrimming',
+    '--procModifiers': 'trackingMkFitFit',
     '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
     '--eventcontent':'FEVTDEBUGHLT,DQMIO'
+}
+upgradeWFs['HLTTiming75e33MkFitFit'].step3 = {
+    '-s':'HARVESTING:@hltValidation'
 }
 
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTrackingSingleIter'] = deepcopy(upgradeWFs['HLTTiming75e33'])
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTrackingSingleIter'].suffix = '_HLT75e33TimingAlpakaTrimmedTrackingSingleIter'
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTrackingSingleIter'].offset = 0.7562
-upgradeWFs['HLTTiming75e33AlpakaTrimmedTrackingSingleIter'].step2 = {
-    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
-    '--procModifiers': 'alpaka,phase2_hlt_vertexTrimming,singleIterPatatrack',
+upgradeWFs['HLTTiming75e33TiclBarrel'] = deepcopy(upgradeWFs['HLTTiming75e33'])
+upgradeWFs['HLTTiming75e33TiclBarrel'].suffix = '_HLT75e33TimingTiclBarrel'
+upgradeWFs['HLTTiming75e33TiclBarrel'].offset = 0.758
+upgradeWFs['HLTTiming75e33TiclBarrel'].step2 = {
+    '-s' : 'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
+    '--procModifiers': 'ticl_barrel',
     '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
     '--eventcontent':'FEVTDEBUGHLT,DQMIO'
 }
-
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLSTSeeding'] = deepcopy(upgradeWFs['HLTTiming75e33'])
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLSTSeeding'].suffix = '_HLT75e33TimingAlpakaSingleIterLSTSeeding'
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLSTSeeding'].offset = 0.757
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLSTSeeding'].step2 = {
-    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
-    '--procModifiers': 'alpaka,singleIterPatatrack,trackingLST,seedingLST',
-    '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
-    '--eventcontent':'FEVTDEBUGHLT,DQMIO'
-}
-upgradeWFs['HLTTiming75e33AlpakaSingleIterLSTSeeding'].step3 = {
+upgradeWFs['HLTTiming75e33TiclBarrel'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
@@ -1928,13 +2139,19 @@ class UpgradeWorkflow_HLTPhase2_WithNano(UpgradeWorkflow):
         if ('ALCA' in step) or ('Reco' in step) or ('HLT' in step) or ('HARVEST' in step):
             stepDict[stepName][k] = None
         elif 'DigiTrigger' in step:
-            stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
+            # Add the aging customization
+            mergedStep = merge([self.step2, stepDict[step][k]])
+            if '--customise' in mergedStep:
+                mergedStep['--customise'] += ',SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            else:
+                mergedStep['--customise'] = 'SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            stepDict[stepName][k] = mergedStep
         else:
             stepDict[stepName][k] = merge([stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
         return fragment=="TTbar_14TeV" and 'Run4' in key
     
-upgradeWFs['HLTPhaseWithNano'] = UpgradeWorkflow_HLTPhase2_WithNano(
+upgradeWFs['HLTPhase2WithNano'] = UpgradeWorkflow_HLTPhase2_WithNano(
     steps = [
         'Reco',
         'RecoGlobal',
@@ -1959,21 +2176,32 @@ upgradeWFs['HLTPhaseWithNano'] = UpgradeWorkflow_HLTPhase2_WithNano(
         'HARVESTGlobal',
         'HARVESTGlobalFakeHLT',
     ],
-    suffix = '_HLTPhaseWithNano',
+    suffix = '_HLTPhase2WithNano',
     offset = 0.759,
 )
-upgradeWFs['HLTPhaseWithNano'].step2 = {
+upgradeWFs['HLTPhase2WithNano'].step2 = {
     '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33,NANO:@Phase2HLT',
     '--datatier':'GEN-SIM-DIGI-RAW,NANOAODSIM',
     '--eventcontent':'FEVTDEBUGHLT,NANOAODSIM'
 }
 
-upgradeWFs['NGTScoutingWithNano'] = deepcopy(upgradeWFs['HLTPhaseWithNano'])
+upgradeWFs['NGTScoutingWithNano'] = deepcopy(upgradeWFs['HLTPhase2WithNano'])
 upgradeWFs['NGTScoutingWithNano'].suffix = '_NGTScoutingWithNano'
-upgradeWFs['NGTScoutingWithNano'].offset = 0.771
+upgradeWFs['NGTScoutingWithNano'].offset = 0.772
 upgradeWFs['NGTScoutingWithNano'].step2 = {
     '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:NGTScouting,NANO:@NGTScouting',
     '--datatier':'GEN-SIM-DIGI-RAW,NANOAODSIM',
+    '--procModifiers': 'ngtScouting',
+    '--eventcontent':'FEVTDEBUGHLT,NANOAODSIM'
+}
+
+upgradeWFs['NGTScoutingWithNanoValid'] = deepcopy(upgradeWFs['HLTPhase2WithNano'])
+upgradeWFs['NGTScoutingWithNanoValid'].suffix = '_NGTScoutingWithNanoVal'
+upgradeWFs['NGTScoutingWithNanoValid'].offset = 0.773
+upgradeWFs['NGTScoutingWithNanoValid'].step2 = {
+    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:NGTScouting,VALIDATION:@hltValidation,NANO:@NGTScoutingVal',
+    '--datatier':'GEN-SIM-DIGI-RAW,NANOAODSIM',
+    '--procModifiers': 'ngtScouting',
     '--eventcontent':'FEVTDEBUGHLT,NANOAODSIM'
 }
 
@@ -2000,13 +2228,19 @@ class UpgradeWorkflow_NGTScouting(UpgradeWorkflow):
         if ('ALCA' in step) or ('Reco' in step) or ('HLT' in step):
             stepDict[stepName][k] = None
         elif 'DigiTrigger' in step:
-            stepDict[stepName][k] = merge([self.step2, stepDict[step][k]])
+            # Add the aging customization
+            mergedStep = merge([self.step2, stepDict[step][k]])
+            if '--customise' in mergedStep:
+                mergedStep['--customise'] += ',SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            else:
+                mergedStep['--customise'] = 'SLHCUpgradeSimulations/Configuration/aging.customise_aging_1000'
+            stepDict[stepName][k] = mergedStep
         elif 'HARVEST' in step:
             stepDict[stepName][k] = merge([self.step3, stepDict[step][k]])
         else:
             stepDict[stepName][k] = merge([stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        return fragment=="TTbar_14TeV" and 'Run4' in key
+        return (fragment=="TTbar_14TeV" or fragment=="SingleMuPt15Eta0p_0p4") and 'Run4' in key
 upgradeWFs['NGTScouting'] = UpgradeWorkflow_NGTScouting(
     steps = [
         'Reco',
@@ -2037,6 +2271,33 @@ upgradeWFs['NGTScouting'].step2 = {
 }
 upgradeWFs['NGTScouting'].step3 = {
     '--procModifiers': 'ngtScouting',
+    '-s':'HARVESTING:@hltValidation'
+}
+
+upgradeWFs['NGTScoutingAll'] = deepcopy(upgradeWFs['NGTScouting'])
+upgradeWFs['NGTScoutingAll'].suffix = '_NGTScoutingAll'
+upgradeWFs['NGTScoutingAll'].offset = 0.771
+upgradeWFs['NGTScoutingAll'].step2 = {
+    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:NGTScouting,VALIDATION:@hltValidation',
+    '--procModifiers': 'ngtScouting,alpaka,ticl_v5,ticl_barrel',
+    '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
+    '--eventcontent':'FEVTDEBUGHLT,DQMIO'
+}
+upgradeWFs['NGTScoutingAll'].step3 = {
+    '--procModifiers': 'ngtScouting,alpaka,ticl_v5,ticl_barrel',
+   '-s':'HARVESTING:@hltValidation'
+}
+
+upgradeWFs['NGTScoutingCAExtensionMergeT5'] = deepcopy(upgradeWFs['NGTScouting'])
+upgradeWFs['NGTScoutingCAExtensionMergeT5'].suffix = '_NGTScoutingCAExtensionMergeT5'
+upgradeWFs['NGTScoutingCAExtensionMergeT5'].offset = 0.775
+upgradeWFs['NGTScoutingCAExtensionMergeT5'].step2 = {
+    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33_timing,VALIDATION:@hltValidation',
+    '--procModifiers': 'ngtScouting,trackingLST',
+    '--datatier':'GEN-SIM-DIGI-RAW,DQMIO',
+    '--eventcontent':'FEVTDEBUGHLT,DQMIO'
+}
+upgradeWFs['NGTScoutingCAExtensionMergeT5'].step3 = {
     '-s':'HARVESTING:@hltValidation'
 }
 
@@ -2167,11 +2428,13 @@ class UpgradeWorkflow_ecalDevel(UpgradeWorkflow):
         mods = {'--era': stepDict[step][k]['--era']+',phase2_ecal_devel'}
         if 'Digi' in step:
             mods['-s'] = 'DIGI:pdigi_valid,DIGI2RAW'
+            mods['--custom_conditions'] = 'EcalSimPulseShapePhaseII,EcalSimPulseShapeRcd,frontier://FrontierProd/CMS_CONDITIONS'
             mods |= self.__digi
         elif 'Reco' in step:
-            mods['-s'] = 'RAW2DIGI,RECO:reconstruction_ecalOnly,VALIDATION:@ecalOnlyValidation,DQM:@ecalOnly'
+            mods['-s'] = 'RAW2DIGI:RawToDigi_ecalOnly,RECO:reconstruction_ecalOnly,VALIDATION:@ecalOnlyValidation,DQM:@ecalOnly'
             mods['--datatier'] = 'GEN-SIM-RECO,DQMIO'
             mods['--eventcontent'] = 'FEVTDEBUGHLT,DQM'
+            mods['--custom_conditions'] = 'EcalSimPulseShapePhaseII,EcalSimPulseShapeRcd,frontier://FrontierProd/CMS_CONDITIONS'
             mods |= self.__reco
         elif 'HARVEST' in step:
             mods['-s'] = 'HARVESTING:@ecalOnlyValidation+@ecal'
@@ -2207,7 +2470,7 @@ class UpgradeWorkflow_ECalComponent(UpgradeWorkflow):
                      'GenSim',
                      'GenSimHLBeamSpot',
                      'GenSimHLBeamSpot14',
-                     'GenSimHLBeamSpotHGCALCloseBy',
+                     'GenSimHLBeamSpotCloseBy',
                      'Digi',
                      'DigiTrigger',
                      'RecoGlobal',
@@ -2218,7 +2481,7 @@ class UpgradeWorkflow_ECalComponent(UpgradeWorkflow):
                      'GenSim',
                      'GenSimHLBeamSpot',
                      'GenSimHLBeamSpot14',
-                     'GenSimHLBeamSpotHGCALCloseBy',
+                     'GenSimHLBeamSpotCloseBy',
                      'Digi',
                      'DigiTrigger',
                      'RecoGlobal',
@@ -2298,7 +2561,7 @@ class UpgradeWorkflow_0T(UpgradeWorkflow):
         # override '-n' setting from PUDataSets in relval_steps.py
         stepDict[stepName][k] = merge([{'-n':'1'}, stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        return (fragment=="TTbar_13" or fragment=="TTbar_14TeV") and ('2017' in key or '2018' in key or '2022' in key or '2024' in key) and ('FS' not in key)
+        return (fragment=="TTbar_13" or fragment=="TTbar_14TeV") and any(y in key for y in ['2017','2018'] + run3_years) and ('FS' not in key)
 upgradeWFs['0T'] = UpgradeWorkflow_0T(
     steps = [
         'GenSim',
@@ -2477,7 +2740,7 @@ class UpgradeWorkflow_SplittingFromHLT(UpgradeWorkflow):
     def setup_(self, step, stepName, stepDict, k, properties):
         stepDict[stepName][k] = merge([{'--procModifiers': 'hltClusterSplitting'}, stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        return '2025' in key and fragment=="TTbar_14TeV"
+        return any(y in key for y in run3_years) and fragment=="TTbar_14TeV"
 
 upgradeWFs['SplittingFromHLT'] = UpgradeWorkflow_SplittingFromHLT(
     steps = [
@@ -2511,7 +2774,7 @@ class UpgradeWorkflow_SplittingProdLike(UpgradeWorkflow_ProdLike):
         stepDict[stepName][k] = merge([{'--procModifiers': 'hltClusterSplitting'}, stepDict[step][k]])
 
     def condition(self, fragment, stepList, key, hasHarvest):
-        return '2025' in key and fragment=="TTbar_14TeV"
+        return any(y in key for y in run3_years) and fragment=="TTbar_14TeV"
 
 upgradeWFs['SplittingFromHLTProdLike'] = UpgradeWorkflow_SplittingProdLike(
     steps = [
@@ -2722,7 +2985,7 @@ class UpgradeWorkflowPremix(UpgradeWorkflow):
     def condition(self, fragment, stepList, key, hasHarvest):
         if not 'PU' in key:
             return False
-        if not any(y in key for y in ['2022', '2023', '2024', '2025', 'Run4']):
+        if not any(y in key for y in run3_years + ['Run4']):
             return False
         if self.suffix.endswith("S1"):
             return "NuGun" in fragment
@@ -3022,7 +3285,7 @@ upgradeWFs['DD4hepDB'].allowReuse = False
 class UpgradeWorkflow_DDDDB(UpgradeWorkflow):
     def setup_(self, step, stepName, stepDict, k, properties):
         the_era = stepDict[step][k]['--era']
-        exclude = ['2025','2024','2023','Fast','Pb']
+        exclude = ['2026','2025','2024','2023','Fast','Pb']
         if 'Run3' in the_era and not any(e in the_era for e in exclude):
             # retain any other eras
             tmp_eras = the_era.split(',')
@@ -3112,6 +3375,8 @@ upgradeWFs['SonicTriton'] = UpgradeWorkflow_SonicTriton(
 class UpgradeWorkflow_Phase2_HeavyIon(UpgradeWorkflow):
     def setup_(self, step, stepName, stepDict, k, properties):
         stepDict[stepName][k] = merge([{'--procModifiers': 'phase2_pp_on_AA'}, stepDict[step][k]])
+        # override '-n' setting from PUDataSets in relval_steps.py
+        stepDict[stepName][k] = merge([{'-n':'1'}, stepDict[step][k]])
         if 'GenSim' in step:
             stepDict[stepName][k] = merge([{'--conditions': stepDict[step][k]["--conditions"].replace('_13TeV',''), '-n': 1}, stepDict[stepName][k]])
         elif 'Digi' in step:
@@ -3303,7 +3568,7 @@ upgradeProperties[2017] = {
         'HLTmenu': '@relval2025',
         'Era' : 'Run3_2025',
         'BeamSpot': 'DBrealistic',
-        'ScenToRun' : ['GenSim','Digi','RecoNano','HARVESTNano','ALCA'],
+        'ScenToRun' : ['GenSim','Digi','RecoNanoFakeHLT','HARVESTNanoFakeHLT','ALCA'],
     },
     '2025HLTOnDigi' : {
         'Geom' : 'DB:Extended',
@@ -3311,7 +3576,7 @@ upgradeProperties[2017] = {
         'HLTmenu': '@relval2025',
         'Era' : 'Run3_2025',
         'BeamSpot': 'DBrealistic',
-        'ScenToRun' : ['GenSim','DigiNoHLT','HLTOnly','RecoNano','HARVESTNano','ALCA'],
+        'ScenToRun' : ['GenSim','DigiNoHLT','HLTOnly','RecoNanoFakeHLT','HARVESTNanoFakeHLT','ALCA'],
     },
     '2025GenOnly' : {
         'Geom' : 'DB:Extended',
@@ -3327,7 +3592,7 @@ upgradeProperties[2017] = {
         'HLTmenu': '@relval2025',
         'Era' : 'Run3_2025',
         'BeamSpot': 'DBrealistic',
-        'ScenToRun' : ['Gen','Sim','Digi','RecoNano','HARVESTNano','ALCA'],
+        'ScenToRun' : ['Gen','Sim','Digi','RecoNanoFakeHLT','HARVESTNanoFakeHLT','ALCA'],
     },
     '2025FS' : {
         'Geom' : 'DB:Extended',
@@ -3337,6 +3602,47 @@ upgradeProperties[2017] = {
         'BeamSpot': 'DBrealistic',
         'ScenToRun' : ['Gen','FastSimRun3','HARVESTFastRun3'],
     },
+    #### 2026
+    '2026' : {
+        'Geom' : 'DB:Extended',
+        'GT' : 'auto:phase1_2026_realistic',
+        'HLTmenu': '@relval2026',
+        'Era' : 'Run3_2026',
+        'BeamSpot': 'DBrealistic',
+        'ScenToRun' : ['GenSim','Digi','RecoNano','HARVESTNano','ALCA'],
+    },
+    '2026HLTOnDigi' : {
+        'Geom' : 'DB:Extended',
+        'GT' : 'auto:phase1_2026_realistic',
+        'HLTmenu': '@relval2026',
+        'Era' : 'Run3_2026',
+        'BeamSpot': 'DBrealistic',
+        'ScenToRun' : ['GenSim','DigiNoHLT','HLTOnly','RecoNano','HARVESTNano','ALCA'],
+    },
+    '2026GenOnly' : {   
+        'Geom' : 'DB:Extended',
+        'GT' : 'auto:phase1_2026_realistic',
+        'HLTmenu': '@relval2026',
+        'Era' : 'Run3_2026',
+        'BeamSpot': 'DBrealistic',
+        'ScenToRun' : ['Gen'],
+    },
+    '2026SimOnGen' : {
+        'Geom' : 'DB:Extended',
+        'GT' : 'auto:phase1_2026_realistic',
+        'HLTmenu': '@relval2026',
+        'Era' : 'Run3_2026',
+        'BeamSpot': 'DBrealistic',
+        'ScenToRun' : ['Gen','Sim','Digi','RecoNano','HARVESTNano','ALCA'],
+    },
+    '2026FS' : {
+        'Geom' : 'DB:Extended',
+        'GT' : 'auto:phase1_2026_realistic',
+        'HLTmenu': '@relval2026',
+        'Era' : 'Run3_2026_FastSim',
+        'BeamSpot': 'DBrealistic',
+        'ScenToRun' : ['Gen','FastSimRun3','HARVESTFastRun3'],
+    }
 }
 
 # standard PU sequences
@@ -3356,157 +3662,17 @@ for key in list(upgradeProperties[2017].keys()):
         upgradeProperties[2017][key+'PU']['ScenToRun'] = ['Gen','FastSimRun3PU','HARVESTFastRun3PU']
 
 upgradeProperties['Run4'] = {
-    'Run4D86' : {
-        'Geom' : 'ExtendedRun4D86',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D88' : {
-        'Geom' : 'ExtendedRun4D88',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D91' : {
-        'Geom' : 'ExtendedRun4D91',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T30',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D92' : {
-        'Geom' : 'ExtendedRun4D92',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D93' : {
-        'Geom' : 'ExtendedRun4D93',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D94' : {
-        'Geom' : 'ExtendedRun4D94',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C20I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D95' : {
-        'Geom' : 'ExtendedRun4D95',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D96' : {
-        'Geom' : 'ExtendedRun4D96',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D97' : {
-        'Geom' : 'ExtendedRun4D97',
-        'HLTmenu': '@fake2',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobalFakeHLT', 'HARVESTGlobalFakeHLT', 'ALCAPhase2'],
-    },
-    'Run4D98' : {
-        'Geom' : 'ExtendedRun4D98',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D99' : {
-        'Geom' : 'ExtendedRun4D99',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D100' : {
-        'Geom' : 'ExtendedRun4D100',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D101' : {
-        'Geom' : 'ExtendedRun4D101',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D102' : {
-        'Geom' : 'ExtendedRun4D102',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D103' : {
-        'Geom' : 'ExtendedRun4D103',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
     'Run4D104' : {
         'Geom' : 'ExtendedRun4D104',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C22I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D105' : {
-        'Geom' : 'ExtendedRun4D105',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D106' : {
-        'Geom' : 'ExtendedRun4D106',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C22I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D107' : {
-        'Geom' : 'ExtendedRun4D107',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T25',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D108' : {
-        'Geom' : 'ExtendedRun4D108',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C17I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D109' : {
-        'Geom' : 'ExtendedRun4D109',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C22I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D110' : {
         'Geom' : 'ExtendedRun4D110',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C17I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
@@ -3534,14 +3700,14 @@ upgradeProperties['Run4'] = {
     'Run4D114' : {
         'Geom' : 'ExtendedRun4D114',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C17I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D110GenOnly' : {
         'Geom' : 'ExtendedRun4D110',
         'BeamSpot' : 'DBrealisticHLLHC',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C17I13M9',
         'ScenToRun' : ['GenHLBeamSpot'],
     },
@@ -3549,72 +3715,72 @@ upgradeProperties['Run4'] = {
         'Geom' : 'ExtendedRun4D110',
         'HLTmenu': '@relvalRun4',
         'BeamSpot' : 'DBrealisticHLLHC',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C17I13M9',
         'ScenToRun' : ['GenHLBeamSpot','Sim','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D115' : {
         'Geom' : 'ExtendedRun4D115',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C20I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D116' : {
-        'Geom' : 'ExtendedRun4D116',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C22I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D117' : {
-        'Geom' : 'ExtendedRun4D117',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C22I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D118' : {
-        'Geom' : 'ExtendedRun4D118',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C22I13M9',
-        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
-    },
-    'Run4D119' : {
-        'Geom' : 'ExtendedRun4D119',
-        'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
-        'Era' : 'Phase2C22I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D120' : {
         'Geom' : 'ExtendedRun4D120',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C26I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D121' : {
         'Geom' : 'ExtendedRun4D121',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C22I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D122' : {
         'Geom' : 'ExtendedRun4D122',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C26I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
     },
     'Run4D123' : {
         'Geom' : 'ExtendedRun4D123',
         'HLTmenu': '@relvalRun4',
-        'GT' : 'auto:phase2_realistic_T33',
+        'GT' : 'auto:phase2_realistic_T35',
         'Era' : 'Phase2C26I13M9',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
+    },
+    'Run4D124' : {
+        'Geom' : 'ExtendedRun4D124',
+        'HLTmenu': '@relvalRun4',
+        'GT' : 'auto:phase2_realistic_T35',
+        'Era' : 'Phase2C22I13M9',
+        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
+    },
+    'Run4D125' : {
+        'Geom' : 'ExtendedRun4D125',
+        'HLTmenu': '@relvalRun4',
+        'GT' : 'auto:phase2_realistic_T35',
+        'Era' : 'Phase2C22I13M9',
+        'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal', 'ALCAPhase2'],
+    },
+    'Run4D110FS' : {
+        'Geom' : 'ExtendedRun4D110',
+        'HLTmenu': '@relvalRun4',
+        'GT' : 'auto:phase2_realistic_T35',
+        'Era' : 'Phase2C17I13M9_FastSim',
+        'ScenToRun' : ['GenHLBeamSpot','FastSimRun4','HARVESTFastRun4'],
+    },
+    'Run4D121FS' : {
+        'Geom' : 'ExtendedRun4D121',
+        'HLTmenu': '@relvalRun4',
+        'GT' : 'auto:phase2_realistic_T35',
+        'Era' : 'Phase2C22I13M9_FastSim',
+        'ScenToRun' : ['GenHLBeamSpot','FastSimRun4','HARVESTFastRun4'],
     },
 }
 
@@ -3623,7 +3789,10 @@ for key in list(upgradeProperties['Run4'].keys()):
     if "GenOnly" in key:
         continue
     upgradeProperties['Run4'][key+'PU'] = deepcopy(upgradeProperties['Run4'][key])
-    upgradeProperties['Run4'][key+'PU']['ScenToRun'] = ['GenSimHLBeamSpot','DigiTriggerPU','RecoGlobalPU', 'HARVESTGlobalPU']
+    if 'FS' not in key:
+        upgradeProperties['Run4'][key+'PU']['ScenToRun'] = ['GenSimHLBeamSpot','DigiTriggerPU','RecoGlobalPU', 'HARVESTGlobalPU']
+    else:
+        upgradeProperties['Run4'][key+'PU']['ScenToRun'] = ['GenHLBeamSpot','FastSimRun4PU','HARVESTFastRun4PU']
 
 # for relvals
 defaultDataSets = {}
@@ -3792,4 +3961,5 @@ upgradeFragments = OrderedDict([
     ('Hydjet_Quenched_MinBias_5362GeV_cfi', UpgradeFragment(U2000by1,'HydjetQMinBias_5362GeV')),
     ('Hydjet_Quenched_MinBias_5519GeV_cfi', UpgradeFragment(U2000by1,'HydjetQMinBias_5519GeV')),
     ('SingleMuPt15Eta0_0p4_cfi', UpgradeFragment(Kby(9,100),'SingleMuPt15Eta0p_0p4')),
+    ('CloseByPGun_Barrel_Front_cfi', UpgradeFragment(Kby(9,100),'CloseByPGun_Barrel_Front')),
 ])

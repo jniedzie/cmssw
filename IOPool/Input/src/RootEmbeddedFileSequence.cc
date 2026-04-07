@@ -8,14 +8,14 @@
 
 #include "DataFormats/Provenance/interface/BranchID.h"
 #include "DataFormats/Provenance/interface/BranchIDListHelper.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
-#include "FWCore/Catalog/interface/InputFileCatalog.h"
-#include "FWCore/Catalog/interface/SiteLocalConfig.h"
+
 #include "FWCore/Framework/interface/InputSource.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWStorage/Catalog/interface/InputFileCatalog.h"
+#include "FWStorage/Catalog/interface/SiteLocalConfig.h"
 
 #include "CLHEP/Random/RandFlat.h"
 
@@ -25,7 +25,7 @@
 
 namespace {
   std::atomic<unsigned int> badFilesSkipped_{0};
-  auto operator"" _uz(unsigned long long i) -> std::size_t { return std::size_t{i}; }  // uz will be in C++23
+  auto operator""_uz(unsigned long long i) -> std::size_t { return std::size_t{i}; }  // uz will be in C++23
 }  // namespace
 
 namespace edm {
@@ -112,7 +112,9 @@ namespace edm {
       }
     }
     if (rootFile()) {
-      input_.productRegistryUpdate().updateFromInput(rootFile()->productRegistry()->productList());
+      std::vector<std::string> processOrder;
+      processingOrderMerge(input_.processHistoryRegistry(), processOrder);
+      input_.productRegistryUpdate().updateFromInput(rootFile()->productRegistry()->productList(), processOrder);
     } else {
       throw Exception(errors::FileOpenError) << "RootEmbeddedFileSequence::RootEmbeddedFileSequence(): "
                                              << " input file retries exhausted.\n";

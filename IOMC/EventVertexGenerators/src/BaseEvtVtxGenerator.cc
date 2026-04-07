@@ -20,7 +20,8 @@
 using namespace edm;
 using namespace CLHEP;
 
-BaseEvtVtxGenerator::BaseEvtVtxGenerator(const ParameterSet& pset) {
+template <typename... T>
+BaseEvtVtxGeneratorT<T...>::BaseEvtVtxGeneratorT(const ParameterSet& pset) {
   Service<RandomNumberGenerator> rng;
   if (!rng.isAvailable()) {
     throw cms::Exception("Configuration") << "The BaseEvtVtxGenerator requires the RandomNumberGeneratorService\n"
@@ -29,15 +30,17 @@ BaseEvtVtxGenerator::BaseEvtVtxGenerator(const ParameterSet& pset) {
                                              "in the configuration file or remove the modules that require it.";
   }
 
-  sourceToken3 = consumes<edm::HepMC3Product>(pset.getParameter<edm::InputTag>("src"));
-  sourceToken = consumes<edm::HepMCProduct>(pset.getParameter<edm::InputTag>("src"));
-  produces<edm::HepMC3Product>();
-  produces<edm::HepMCProduct>();
+  sourceToken3 = this->template consumes<edm::HepMC3Product>(pset.getParameter<edm::InputTag>("src"));
+  sourceToken = this->template consumes<edm::HepMCProduct>(pset.getParameter<edm::InputTag>("src"));
+  this->template produces<edm::HepMC3Product>();
+  this->template produces<edm::HepMCProduct>();
 }
 
-BaseEvtVtxGenerator::~BaseEvtVtxGenerator() {}
+template <typename... T>
+BaseEvtVtxGeneratorT<T...>::~BaseEvtVtxGeneratorT() {}
 
-void BaseEvtVtxGenerator::produce(Event& evt, const EventSetup&) {
+template <typename... T>
+void BaseEvtVtxGeneratorT<T...>::produce(Event& evt, const EventSetup&) {
   edm::Service<edm::RandomNumberGenerator> rng;
   CLHEP::HepRandomEngine* engine = &rng->getEngine(evt.streamID());
 
@@ -69,9 +72,9 @@ void BaseEvtVtxGenerator::produce(Event& evt, const EventSetup&) {
     if (!found)
       throw cms::Exception("ProductAbsent") << "No HepMCProduct, tried to get HepMC3Product, but it is also absent.";
 
-    HepMC3::GenEvent* genevt3 = new HepMC3::GenEvent();
-    genevt3->read_data(*HepUnsmearedMCEvt3->GetEvent());
-    HepMC3Product* productcopy3 = new HepMC3Product(genevt3);
+    HepMC3::GenEvent genevt3;
+    genevt3.read_data(*HepUnsmearedMCEvt3->GetEvent());
+    auto productcopy3 = std::make_unique<HepMC3Product>(genevt3);
     ROOT::Math::XYZTVector VertexShift = vertexShift(engine);
     productcopy3->applyVtxGen(HepMC3::FourVector(VertexShift.x(), VertexShift.y(), VertexShift.z(), VertexShift.t()));
 
@@ -91,9 +94,11 @@ void BaseEvtVtxGenerator::produce(Event& evt, const EventSetup&) {
       }
     }
 
-    std::unique_ptr<edm::HepMC3Product> HepMC3Evt(productcopy3);
-    evt.put(std::move(HepMC3Evt));
+    evt.put(std::move(productcopy3));
   }
 
   return;
 }
+
+template class BaseEvtVtxGeneratorT<>;
+template class BaseEvtVtxGeneratorT<edm::stream::WatchLuminosityBlocks>;

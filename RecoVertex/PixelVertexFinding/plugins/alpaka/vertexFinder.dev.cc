@@ -29,24 +29,23 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
     class LoadTracks {
     public:
       ALPAKA_FN_ACC void operator()(Acc1D const& acc,
-                                    reco::TrackSoAConstView<TrackerTraits> tracks_view,
+                                    ::reco::TrackSoAConstView tracks_view,
                                     VtxSoAView data,
                                     TrkSoAView trkdata,
                                     WsSoAView ws,
                                     float ptMin,
                                     float ptMax) const {
-        auto const* quality = tracks_view.quality();
-        using helper = TracksUtilities<TrackerTraits>;
+        auto const quality = tracks_view.quality();
 
         for (auto idx : cms::alpakatools::uniform_elements(acc, tracks_view.nTracks())) {
-          [[maybe_unused]] auto nHits = helper::nHits(tracks_view, idx);
+          [[maybe_unused]] auto nHits = ::reco::nHits(tracks_view, idx);
           ALPAKA_ASSERT_ACC(nHits >= 3);
 
           // initialize the track data
           trkdata[idx].idv() = -1;
 
           // do not use triplets
-          if (reco::isTriplet(tracks_view, idx))
+          if (::reco::isTriplet(tracks_view, idx))
             continue;
 
           // use only "high purity" track
@@ -64,7 +63,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
           // load the track data into the workspace
           auto it = alpaka::atomicAdd(acc, &ws.ntrks(), 1u, alpaka::hierarchy::Blocks{});
           ws[it].itrk() = idx;
-          ws[it].zt() = reco::zip(tracks_view, idx);
+          ws[it].zt() = ::reco::zip(tracks_view, idx);
           ws[it].ezt2() = tracks_view[idx].covariance()(14);
           ws[it].ptt2() = pt * pt;
         }
@@ -126,20 +125,17 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
 #endif
 
     template <typename TrackerTraits>
-    ZVertexSoACollection Producer<TrackerTraits>::makeAsync(Queue& queue,
-                                                            reco::TrackSoAConstView<TrackerTraits> const& tracks_view,
-                                                            int maxVertices,
-                                                            float ptMin,
-                                                            float ptMax) const {
+    reco::ZVertexSoACollection Producer<TrackerTraits>::makeAsync(
+        Queue& queue, ::reco::TrackSoAConstView const& tracks_view, int maxVertices, float ptMin, float ptMax) const {
 #ifdef PIXVERTEX_DEBUG_PRODUCE
       std::cout << "producing Vertices on GPU" << std::endl;
 #endif  // PIXVERTEX_DEBUG_PRODUCE
       const auto maxTracks = tracks_view.metadata().size();
-      ZVertexSoACollection vertices({{maxVertices, maxTracks}}, queue);
-      auto data = vertices.view();
-      auto trkdata = vertices.view<reco::ZVertexTracksSoA>();
+      reco::ZVertexSoACollection vertices(queue, maxVertices, maxTracks);
+      auto data = vertices.view().zvertex();
+      auto trkdata = vertices.view().zvertexTracks();
 
-      PixelVertexWorkSpaceSoADevice workspace(maxTracks, queue);
+      PixelVertexWorkSpaceSoADevice workspace(queue, maxTracks);
       auto ws = workspace.view();
 
       // Initialize

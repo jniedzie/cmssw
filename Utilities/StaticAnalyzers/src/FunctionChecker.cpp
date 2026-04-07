@@ -73,7 +73,17 @@ namespace clangcms {
     if (support::isSafeClassName(D->getCanonicalDecl()->getQualifiedNameAsString()))
       return;
 
-    const char *sfile = BR.getSourceManager().getPresumedLoc(D->getLocation()).getFilename();
+    const auto &SM = BR.getSourceManager();
+
+    // Normalize to where the code is actually defined
+    clang::SourceLocation loc = SM.getSpellingLoc(D->getLocation());
+
+    // Ignore anything coming from system headers (via -isystem)
+    if (SM.isInSystemHeader(loc)) {
+      return;
+    }
+
+    const char *sfile = SM.getPresumedLoc(loc).getFilename();
     std::string fname(sfile);
     if (!support::isInterestingLocation(fname))
       return;
@@ -107,7 +117,11 @@ namespace clangcms {
       llvm::raw_string_ostream os(buf);
       os << "function '" << dname << "' accesses or modifies non-const static local variable '" << svname << "'.\n";
       BR.EmitBasicReport(D,
+#if LLVM_VERSION_MAJOR >= 21
+                         Checker->getName(),
+#else
                          Checker->getCheckerName(),
+#endif
                          "non-const static local variable accessed or modified",
                          "ThreadSafety",
                          os.str(),
@@ -123,7 +137,11 @@ namespace clangcms {
       os << "function '" << dname << "' accesses or modifies non-const static member data variable '" << svname
          << "'.\n";
       BR.EmitBasicReport(D,
+#if LLVM_VERSION_MAJOR >= 21
+                         Checker->getName(),
+#else
                          Checker->getCheckerName(),
+#endif
                          "non-const static local variable accessed or modified",
                          "ThreadSafety",
                          os.str(),
@@ -138,7 +156,11 @@ namespace clangcms {
       llvm::raw_string_ostream os(buf);
       os << "function '" << dname << "' accesses or modifies non-const global static variable '" << svname << "'.\n";
       BR.EmitBasicReport(D,
+#if LLVM_VERSION_MAJOR >= 21
+                         Checker->getName(),
+#else
                          Checker->getCheckerName(),
+#endif
                          "non-const static local variable accessed or modified",
                          "ThreadSafety",
                          os.str(),
@@ -178,8 +200,16 @@ namespace clangcms {
               "'COMMONBLOCK'.\n";
         clang::ento::PathDiagnosticLocation FDLoc =
             clang::ento::PathDiagnosticLocation::createBegin(FD, BR.getSourceManager());
-        BR.EmitBasicReport(
-            FD, this->getCheckerName(), "COMMONBLOCK variable accessed or modified", "ThreadSafety", os.str(), FDLoc);
+        BR.EmitBasicReport(FD,
+#if LLVM_VERSION_MAJOR >= 21
+                           this->getName(),
+#else
+                           this->getCheckerName(),
+#endif
+                           "COMMONBLOCK variable accessed or modified",
+                           "ThreadSafety",
+                           os.str(),
+                           FDLoc);
         std::string ostring = "function '" + dname + "' static variable 'COMMONBLOCK'.\n";
         std::string tname = "function-checker.txt.unsorted";
         support::writeLog(ostring, tname);

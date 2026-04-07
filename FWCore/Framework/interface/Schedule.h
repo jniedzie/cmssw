@@ -82,6 +82,7 @@
 #include "FWCore/Utilities/interface/get_underlying_safe.h"
 #include "FWCore/Utilities/interface/propagate_const.h"
 #include "FWCore/Utilities/interface/Transition.h"
+#include "FWCore/Utilities/interface/Signal.h"
 
 #include <array>
 #include <map>
@@ -115,7 +116,6 @@ namespace edm {
   struct TriggerTimingReport;
   class ModuleRegistry;
   class ModuleTypeResolverMaker;
-  class ThinnedAssociationsHelper;
   class TriggerResultInserter;
   class PathStatusInserter;
   class EndPathStatusInserter;
@@ -143,7 +143,6 @@ namespace edm {
                      SignallingProductRegistryFiller& preg,
                      BranchIDListHelper& branchIDListHelper,
                      ProcessBlockHelperBase& processBlockHelper,
-                     ThinnedAssociationsHelper& thinnedAssociationsHelper,
                      std::shared_ptr<ActivityRegistry> areg,
                      std::shared_ptr<ProcessConfiguration> processConfiguration,
                      PreallocationConfiguration const& prealloc,
@@ -170,7 +169,7 @@ namespace edm {
     void beginJob(ProductRegistry const&,
                   eventsetup::ESRecordsToProductResolverIndices const&,
                   ProcessBlockHelperBase const&,
-                  ProcessContext const&);
+                  std::string const& processName);
     void endJob(ExceptionCollector& collector);
     void sendFwkSummaryToMessageLogger() const;
 
@@ -289,6 +288,8 @@ namespace edm {
     /// returns the collection of pointers to workers
     AllWorkers const& allWorkers() const;
 
+    ModuleRegistry const& moduleRegistry() const { return *moduleRegistry_; }
+
     /// Convert "@currentProcess" in InputTag process names to the actual current process name.
     void convertCurrentProcessAlias(std::string const& processName);
 
@@ -301,8 +302,10 @@ namespace edm {
       return get_underlying_safe(resultsInserter_);
     }
     std::shared_ptr<TriggerResultInserter>& resultsInserter() { return get_underlying_safe(resultsInserter_); }
-    std::shared_ptr<ModuleRegistry const> moduleRegistry() const { return get_underlying_safe(moduleRegistry_); }
-    std::shared_ptr<ModuleRegistry>& moduleRegistry() { return get_underlying_safe(moduleRegistry_); }
+    std::shared_ptr<ModuleRegistry const> moduleRegistrySharedPtr() const {
+      return get_underlying_safe(moduleRegistry_);
+    }
+    std::shared_ptr<ModuleRegistry>& moduleRegistrySharedPtr() { return get_underlying_safe(moduleRegistry_); }
 
     edm::propagate_const<std::shared_ptr<ModuleRegistry>> moduleRegistry_;
     edm::propagate_const<std::shared_ptr<TriggerResultInserter>> resultsInserter_;
@@ -319,6 +322,8 @@ namespace edm {
 
     std::vector<std::string> const* pathNames_;
     std::vector<std::string> const* endPathNames_;
+    edm::signalslot::Signal<void()> preModulesInitializationFinalizedSignal_;
+    edm::signalslot::Signal<void()> postModulesInitializationFinalizedSignal_;
     bool wantSummary_;
   };
 

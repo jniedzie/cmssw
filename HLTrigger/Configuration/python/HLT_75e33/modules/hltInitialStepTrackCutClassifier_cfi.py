@@ -26,9 +26,24 @@ hltInitialStepTrackCutClassifier = cms.EDProducer("TrackCutClassifier",
         minLayers = cms.vint32(3, 3, 3),
         minNVtxTrk = cms.int32(3),
         minNdof = cms.vdouble(1e-05, 1e-05, 1e-05),
-        minPixelHits = cms.vint32(0, 0, 3)
+        minPixelHits = cms.vint32(0, 0, 3),
+        passThroughForAll = cms.bool(True),
+        passThroughForDisplaced = cms.bool(False),
+        minLayersForDisplaced = cms.int32(4)
     ),
     qualityCuts = cms.vdouble(-0.7, 0.1, 0.7),
     src = cms.InputTag("hltInitialStepTracks"),
     vertices = cms.InputTag("hltPhase2PixelVertices")
+)
+
+
+from Configuration.ProcessModifiers.trackingLST_cff import trackingLST
+trackingLST.toModify(hltInitialStepTrackCutClassifier,
+    mva = dict(passThroughForAll=False, passThroughForDisplaced=True)
+)
+
+
+from Configuration.ProcessModifiers.hltPhase2LegacyTracking_cff import hltPhase2LegacyTracking
+hltPhase2LegacyTracking.toModify(hltInitialStepTrackCutClassifier,
+    mva = dict(passThroughForAll=False, passThroughForDisplaced=False)
 )

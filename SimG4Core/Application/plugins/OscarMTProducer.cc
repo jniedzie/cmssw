@@ -39,7 +39,8 @@
 #include "Randomize.hh"
 
 // for some reason void doesn't compile
-class OscarMTProducer : public edm::stream::EDProducer<edm::GlobalCache<OscarMTMasterThread>, edm::RunCache<int>> {
+class OscarMTProducer
+    : public edm::stream::EDProducer<edm::GlobalCache<OscarMTMasterThread>, edm::RunCache<int>, edm::stream::WatchRuns> {
 public:
   typedef std::vector<std::shared_ptr<SimProducer>> Producers;
 
@@ -268,7 +269,7 @@ void OscarMTProducer::produce(edm::Event& e, const edm::EventSetup& es) {
         edm::LogVerbatim("Track") << " " << i << ". " << (*p1)[i].trackId() << ", " << (*p1)[i] << ", "
                                   << (*p1)[i].crossedBoundary() << "-> " << (*p1)[i].getIDAtBoundary() << ", "
                                   << (*p1)[i].isFromBackScattering() << ", " << (*p1)[i].isPrimary() << "-> "
-                                  << (*p1)[i].getPrimaryID();
+                                  << (*p1)[i].getPrimaryOrLastStoredID();
       }
     }
   }

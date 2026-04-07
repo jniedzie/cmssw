@@ -15,7 +15,7 @@ void TreeUtil::Init(TTree* treeIn) {
 void TreeUtil::GetEntry(unsigned int idx) {
   index = idx;
   for (auto& pair : data) {
-    pair.second.isLoaded = false;
+    pair.second->isLoaded = false;
   }
 }
 
@@ -81,47 +81,63 @@ void TreeUtil::loadAllBranches() {
   }
 }
 
-template <typename T>
-T const& TreeUtil::get(std::string name) {
-  auto search = data.find(name);
-  if (search == data.end()) {
-    tree->SetMakeClass(1);
-    TBranch* branch = tree->GetBranch(name.c_str());
-    if (branch == nullptr)
-      throw std::out_of_range("Branch " + name + " does not exist!");
-    search = data.emplace(name, std::move(BranchData{branch, false, static_cast<T*>(nullptr)})).first;
-    branch->SetAddress(&search->second.ptr);
-    tree->SetMakeClass(0);
+bool TreeUtil::contains(const std::string& name) const {
+  if (data.find(name) != data.end()) {
+    return true;
   }
-  if (!search->second.isLoaded) {
-    search->second.branch->GetEntry(index);
-    search->second.isLoaded = true;
+  if (tree->GetBranch(name.c_str())) {
+    return true;
   }
-  return *std::get<T*>(search->second.ptr);
+  return false;
 }
 
-short const& TreeUtil::getS(std::string name) { return get<short>(name); }
-unsigned short const& TreeUtil::getUS(std::string name) { return get<unsigned short>(name); }
-int const& TreeUtil::getI(std::string name) { return get<int>(name); }
-unsigned int const& TreeUtil::getU(std::string name) { return get<unsigned int>(name); }
-float const& TreeUtil::getF(std::string name) { return get<float>(name); }
-std::vector<short> const& TreeUtil::getVS(std::string name) { return get<std::vector<short>>(name); }
-std::vector<unsigned short> const& TreeUtil::getVUS(std::string name) { return get<std::vector<unsigned short>>(name); }
-std::vector<int> const& TreeUtil::getVI(std::string name) { return get<std::vector<int>>(name); }
-std::vector<unsigned int> const& TreeUtil::getVU(std::string name) { return get<std::vector<unsigned int>>(name); }
-std::vector<float> const& TreeUtil::getVF(std::string name) { return get<std::vector<float>>(name); }
-std::vector<std::vector<short>> const& TreeUtil::getVVS(std::string name) {
+template <typename T>
+const T& TreeUtil::get(const std::string& name) {
+  auto it = data.find(name);
+  if (it == data.end()) {
+    tree->SetMakeClass(1);
+    TBranch* br = tree->GetBranch(name.c_str());
+    if (!br)
+      throw std::out_of_range("Branch " + name + " does not exist!");
+    it = data.emplace(name, std::make_unique<BranchDataHolder<T>>(br)).first;
+    tree->SetMakeClass(0);
+  }
+
+  auto* bd = static_cast<BranchDataHolder<T>*>(it->second.get());
+  if (!bd->isLoaded) {
+    bd->branch->GetEntry(index);
+    bd->adoptIfNeeded();
+    bd->isLoaded = true;
+  }
+  return *static_cast<const T*>(bd->getRaw());
+}
+
+short const& TreeUtil::getS(std::string const& name) { return get<short>(name); }
+unsigned short const& TreeUtil::getUS(std::string const& name) { return get<unsigned short>(name); }
+int const& TreeUtil::getI(std::string const& name) { return get<int>(name); }
+unsigned int const& TreeUtil::getU(std::string const& name) { return get<unsigned int>(name); }
+float const& TreeUtil::getF(std::string const& name) { return get<float>(name); }
+std::vector<short> const& TreeUtil::getVS(std::string const& name) { return get<std::vector<short>>(name); }
+std::vector<unsigned short> const& TreeUtil::getVUS(std::string const& name) {
+  return get<std::vector<unsigned short>>(name);
+}
+std::vector<int> const& TreeUtil::getVI(std::string const& name) { return get<std::vector<int>>(name); }
+std::vector<unsigned int> const& TreeUtil::getVU(std::string const& name) {
+  return get<std::vector<unsigned int>>(name);
+}
+std::vector<float> const& TreeUtil::getVF(std::string const& name) { return get<std::vector<float>>(name); }
+std::vector<std::vector<short>> const& TreeUtil::getVVS(std::string const& name) {
   return get<std::vector<std::vector<short>>>(name);
 }
-std::vector<std::vector<unsigned short>> const& TreeUtil::getVVUS(std::string name) {
+std::vector<std::vector<unsigned short>> const& TreeUtil::getVVUS(std::string const& name) {
   return get<std::vector<std::vector<unsigned short>>>(name);
 }
-std::vector<std::vector<int>> const& TreeUtil::getVVI(std::string name) {
+std::vector<std::vector<int>> const& TreeUtil::getVVI(std::string const& name) {
   return get<std::vector<std::vector<int>>>(name);
 }
-std::vector<std::vector<unsigned int>> const& TreeUtil::getVVU(std::string name) {
+std::vector<std::vector<unsigned int>> const& TreeUtil::getVVU(std::string const& name) {
   return get<std::vector<std::vector<unsigned int>>>(name);
 }
-std::vector<std::vector<float>> const& TreeUtil::getVVF(std::string name) {
+std::vector<std::vector<float>> const& TreeUtil::getVVF(std::string const& name) {
   return get<std::vector<std::vector<float>>>(name);
 }

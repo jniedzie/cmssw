@@ -136,6 +136,7 @@ private:
   const edm::EDGetTokenT<pat::TriggerObjectStandAloneCollection> triggerObjects_;
 
   const edm::EDGetTokenT<std::vector<Run3ScoutingElectron>> scoutingElectronCollection_;
+  const bool useOfflineObject_;
 };
 
 ScoutingElectronTagProbeAnalyzer::ScoutingElectronTagProbeAnalyzer(const edm::ParameterSet& iConfig)
@@ -145,9 +146,10 @@ ScoutingElectronTagProbeAnalyzer::ScoutingElectronTagProbeAnalyzer(const edm::Pa
       filterToMatch_{iConfig.getParameter<vector<string>>("finalfilterSelection")},
       triggerResultsToken_(consumes<edm::TriggerResults>(iConfig.getParameter<edm::InputTag>("TriggerResultTag"))),
       triggerObjects_(
-          consumes<pat::TriggerObjectStandAloneCollection>(iConfig.getParameter<edm::InputTag>("TriggerObjects"))),
+          mayConsume<pat::TriggerObjectStandAloneCollection>(iConfig.getParameter<edm::InputTag>("TriggerObjects"))),
       scoutingElectronCollection_(consumes<std::vector<Run3ScoutingElectron>>(
-          iConfig.getParameter<edm::InputTag>("ScoutingElectronCollection"))) {}
+          iConfig.getParameter<edm::InputTag>("ScoutingElectronCollection"))),
+      useOfflineObject_(iConfig.getParameter<bool>("useOfflineObject")) {}
 
 void ScoutingElectronTagProbeAnalyzer::dqmAnalyze(edm::Event const& iEvent,
                                                   edm::EventSetup const& iSetup,
@@ -155,19 +157,17 @@ void ScoutingElectronTagProbeAnalyzer::dqmAnalyze(edm::Event const& iEvent,
   edm::Handle<std::vector<Run3ScoutingElectron>> sctEls;
   iEvent.getByToken(scoutingElectronCollection_, sctEls);
   if (sctEls.failedToGet()) {
-    edm::LogWarning("ScoutingMonitoring") << "Run3ScoutingElectron collection not found.";
+    edm::LogWarning("ScoutingElectronTagProbeAnalyzer") << "Run3ScoutingElectron collection not found.";
     return;
   }
 
   // Trigger
   edm::Handle<edm::TriggerResults> triggerResults;
-  edm::Handle<pat::TriggerObjectStandAloneCollection> triggerObjects;
   iEvent.getByToken(triggerResultsToken_, triggerResults);
-  iEvent.getByToken(triggerObjects_, triggerObjects);
 
   // Trigger result
   if (triggerResults.failedToGet()) {
-    edm::LogWarning("ScoutingEGammaCollectionMonitoring") << "Trgger Results not found.";
+    edm::LogWarning("ScoutingElectronTagProbeAnalyzer") << "Trgger Results not found.";
     return;
   }
   int nTriggers = triggerResults->size();
@@ -191,24 +191,32 @@ void ScoutingElectronTagProbeAnalyzer::dqmAnalyze(edm::Event const& iEvent,
     }
   }
 
-  // Trigger Object Matching
+  // Trigger Object Matching (HLTSCOUT don't have)
   size_t numberOfFilters = filterToMatch_.size();
   trigger::TriggerObjectCollection* legObjects = new trigger::TriggerObjectCollection[numberOfFilters];
-  for (size_t iteFilter = 0; iteFilter < filterToMatch_.size(); iteFilter++) {
-    std::string filterTag = filterToMatch_.at(iteFilter);
-    for (pat::TriggerObjectStandAlone obj : *triggerObjects) {
-      obj.unpackNamesAndLabels(iEvent, *triggerResults);
-      if (obj.hasFilterLabel(filterTag)) {
-        legObjects[iteFilter].push_back(obj);
+  if (useOfflineObject_) {
+    edm::Handle<pat::TriggerObjectStandAloneCollection> triggerObjects;
+    iEvent.getByToken(triggerObjects_, triggerObjects);
+    if (triggerObjects.failedToGet()) {
+      return;  // add protection against missing input
+    }
+    for (size_t iteFilter = 0; iteFilter < filterToMatch_.size(); iteFilter++) {
+      std::string filterTag = filterToMatch_.at(iteFilter);
+      for (pat::TriggerObjectStandAlone obj : *triggerObjects) {
+        obj.unpackNamesAndLabels(iEvent, *triggerResults);
+        if (obj.hasFilterLabel(filterTag)) {
+          legObjects[iteFilter].push_back(obj);
+        }
       }
     }
   }
 
-  edm::LogInfo("ScoutingMonitoring") << "Process Run3ScoutingElectrons: " << sctEls->size();
+  edm::LogInfo("ScoutingElectronTagProbeAnalyzer") << "Process Run3ScoutingElectrons: " << sctEls->size();
 
   // Pt ordered sct electron collection
 
   std::vector<std::pair<size_t, Run3ScoutingElectron>> indexed_sctElectrons;
+  indexed_sctElectrons.reserve(sctEls->size());
   for (size_t i = 0; i < sctEls->size(); i++) {
     indexed_sctElectrons.emplace_back(i, (*sctEls)[i]);
   }
@@ -235,7 +243,7 @@ void ScoutingElectronTagProbeAnalyzer::dqmAnalyze(edm::Event const& iEvent,
       math::PtEtaPhiMLorentzVector probe_sct_el(
           sct_el_second.pt(), sct_el_second.eta(), sct_el_second.phi(), sct_el_second.m());
       float invMass = (tag_sct_el + probe_sct_el).mass();
-      edm::LogInfo("ScoutingMonitoring") << "Inv Mass: " << invMass;
+      edm::LogInfo("ScoutingElectronTagProbeAnalyzer") << "Inv Mass: " << invMass;
       if ((80 < invMass) && (invMass < 100)) {
         fillHistograms_resonance(
             histos.resonanceZ, sct_el_second, invMass, legObjects, passBaseDST, second_sct_pt_order);
@@ -600,8 +608,8 @@ void ScoutingElectronTagProbeAnalyzer::fillDescriptions(edm::ConfigurationDescri
   desc.add<vector<string>>("finalfilterSelection", {});
   desc.add<edm::InputTag>("TriggerResultTag", edm::InputTag("TriggerResults", "", "HLT"));
   desc.add<edm::InputTag>("TriggerObjects", edm::InputTag("slimmedPatTrigger"));
-  desc.add<edm::InputTag>("ElectronCollection", edm::InputTag("slimmedElectrons"));
   desc.add<edm::InputTag>("ScoutingElectronCollection", edm::InputTag("Run3ScoutingElectrons"));
+  desc.add<bool>("useOfflineObject", true);
   descriptions.addWithDefaultLabel(desc);
 }
 

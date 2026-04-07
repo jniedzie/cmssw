@@ -7,7 +7,6 @@
 #include "DataFormats/Math/interface/FastMath.h"
 #include "DataFormats/ForwardDetId/interface/HGCSiliconDetId.h"
 #include "SimG4CMS/Calo/interface/HGCalSD.h"
-#include "SimG4Core/Notification/interface/TrackInformation.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "Geometry/HGCalCommonData/interface/HGCalDDDConstants.h"
 #include "Geometry/HGCalCommonData/interface/HGCalGeometryMode.h"
@@ -168,7 +167,8 @@ uint32_t HGCalSD::setDetUnitId(const G4Step* aStep) {
   int module = touch->GetReplicaNumber(moduleLev);
   if (verbose_ && (cell == -1))
     edm::LogVerbatim("HGCSim") << "Top " << touch->GetVolume(0)->GetName() << " Module " << moduleLev << ":"
-                               << touch->GetVolume(moduleLev)->GetName() << " " << module;
+                               << touch->GetVolume(moduleLev)->GetName() << " " << module << " Layer " << layer << ":"
+                               << cell;
 #ifdef EDM_ML_DEBUG
   edm::LogVerbatim("HGCSim") << "DepthsTop: " << touch->GetHistoryDepth() << ":" << levelT1_ << ":" << levelT2_ << ":"
                              << useSimWt_ << " name " << touch->GetVolume(0)->GetName() << " layer:module:cell "

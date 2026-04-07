@@ -1,5 +1,5 @@
 import FWCore.ParameterSet.Config as cms
-from HLTriggerOffline.Scouting. ScoutingEGammaCollectionMonitoring_cfi import *
+from HLTriggerOffline.Scouting.ScoutingEGammaCollectionMonitoring_cfi import *
 from HLTriggerOffline.Scouting.ScoutingElectronTagProbeAnalyzer_cfi import *
 from HLTriggerOffline.Scouting.PatElectronTagProbeAnalyzer_cfi import *
 
@@ -7,7 +7,7 @@ from RecoEgamma.ElectronIdentification.egmGsfElectronIDs_cff import egmGsfElectr
 
 egmGsfElectronIDsForScoutingDQM = egmGsfElectronIDs.clone()
 egmGsfElectronIDsForScoutingDQM.physicsObjectsIDs = cms.VPSet()
-egmGsfElectronIDsForScoutingDQM.physicsObjectSrc = cms.InputTag('slimmedElectrons')
+egmGsfElectronIDsForScoutingDQM.physicsObjectSrc = cms.InputTag('gedGsfElectrons')
 #note: be careful here to when selecting new ids that the vid tools dont do extra setup for them
 #for example the HEEP cuts need an extra producer which vid tools automatically handles
 from PhysicsTools.SelectorUtils.tools.vid_id_tools import setupVIDSelection
@@ -19,4 +19,4 @@ for id_module_name in my_id_modules:
         if hasattr(item,'idName') and hasattr(item,'cutFlow'):
             setupVIDSelection(egmGsfElectronIDsForScoutingDQM,item)
 
-hltScoutingEGammaDqmOffline = cms.Sequence(egmGsfElectronIDsForScoutingDQM + scoutingMonitoringEGM + scoutingMonitoringTagProbe + scoutingMonitoringPatElectronTagProbe)
+hltScoutingEGammaDqmOffline = cms.Sequence(egmGsfElectronIDsForScoutingDQM + scoutingMonitoringEGMOffline + scoutingMonitoringTagProbeOffline + scoutingMonitoringPatElectronTagProbe)

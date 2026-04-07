@@ -4,7 +4,6 @@
 #include "DataFormats/Portable/interface/PortableCollection.h"
 #include "DataFormats/SoATemplate/interface/SoACommon.h"
 #include "DataFormats/SoATemplate/interface/SoALayout.h"
-#include "DataFormats/SoATemplate/interface/SoAView.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/CopyToHost.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/CopyToDevice.h"
 
@@ -22,7 +21,7 @@ namespace portabletest {
   using TestSoAWithPtr = TestSoALayoutWithPtr<>;
 
   template <typename TDev>
-  using TestProductWithPtr = PortableCollection<TestSoAWithPtr, TDev>;
+  using TestProductWithPtr = PortableCollection<TDev, TestSoAWithPtr>;
 
   ALPAKA_FN_HOST_ACC ALPAKA_FN_INLINE void setPtrInTestProductWithPtr(TestSoAWithPtr::View view) {
     view.ptr() = &view.buffer(0);
@@ -31,10 +30,10 @@ namespace portabletest {
 
 namespace cms::alpakatools {
   template <typename TDev>
-  struct CopyToHost<PortableDeviceCollection<portabletest::TestSoAWithPtr, TDev>> {
+  struct CopyToHost<PortableDeviceCollection<TDev, portabletest::TestSoAWithPtr>> {
     template <typename TQueue>
-    static auto copyAsync(TQueue& queue, PortableDeviceCollection<portabletest::TestSoAWithPtr, TDev> const& src) {
-      PortableHostCollection<portabletest::TestSoAWithPtr> dst(src->metadata().size(), queue);
+    static auto copyAsync(TQueue& queue, PortableDeviceCollection<TDev, portabletest::TestSoAWithPtr> const& src) {
+      PortableHostCollection<portabletest::TestSoAWithPtr> dst(queue, src->metadata().size());
       alpaka::memcpy(queue, dst.buffer(), src.buffer());
       return dst;
     }

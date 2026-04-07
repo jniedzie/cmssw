@@ -8,6 +8,16 @@ configured in the user's main() function, and is set running.
 
 ----------------------------------------------------------------------*/
 
+#include <atomic>
+#include <exception>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include "oneapi/tbb/task_group.h"
+
 #include "DataFormats/Provenance/interface/ProcessHistoryID.h"
 #include "DataFormats/Provenance/interface/RunID.h"
 #include "DataFormats/Provenance/interface/LuminosityBlockID.h"
@@ -34,24 +44,12 @@ configured in the user's main() function, and is set running.
 #include "FWCore/Utilities/interface/get_underlying_safe.h"
 #include "FWCore/Utilities/interface/propagate_const.h"
 
-#include "oneapi/tbb/task_group.h"
-
-#include <atomic>
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-#include <exception>
-#include <mutex>
-
 namespace edm {
 
   class ExceptionCollector;
   class ExceptionToActionTable;
   class BranchIDListHelper;
   class MergeableRunProductMetadata;
-  class ThinnedAssociationsHelper;
   class EDLooperBase;
   class HistoryAppender;
   class ProcessDesc;
@@ -284,12 +282,6 @@ namespace edm {
       return get_underlying_safe(branchIDListHelper_);
     }
     std::shared_ptr<BranchIDListHelper>& branchIDListHelper() { return get_underlying_safe(branchIDListHelper_); }
-    std::shared_ptr<ThinnedAssociationsHelper const> thinnedAssociationsHelper() const {
-      return get_underlying_safe(thinnedAssociationsHelper_);
-    }
-    std::shared_ptr<ThinnedAssociationsHelper>& thinnedAssociationsHelper() {
-      return get_underlying_safe(thinnedAssociationsHelper_);
-    }
     std::shared_ptr<EDLooperBase const> looper() const { return get_underlying_safe(looper_); }
     std::shared_ptr<EDLooperBase>& looper() { return get_underlying_safe(looper_); }
 
@@ -313,7 +305,6 @@ namespace edm {
     edm::propagate_const<std::shared_ptr<ProductRegistry>> preg_;
     edm::propagate_const<std::shared_ptr<BranchIDListHelper>> branchIDListHelper_;
     edm::propagate_const<std::shared_ptr<ProcessBlockHelper>> processBlockHelper_;
-    edm::propagate_const<std::shared_ptr<ThinnedAssociationsHelper>> thinnedAssociationsHelper_;
     ServiceToken serviceToken_;
     edm::propagate_const<std::unique_ptr<InputSource>> input_;
     InputSource::ItemTypeInfo lastSourceTransition_;
@@ -367,10 +358,6 @@ namespace edm {
     PreallocationConfiguration preallocations_;
 
     bool firstEventInBlock_ = true;
-
-    typedef std::set<std::pair<std::string, std::string>> ExcludedData;
-    typedef std::map<std::string, ExcludedData> ExcludedDataMap;
-    ExcludedDataMap eventSetupDataToExcludeFromPrefetching_;
 
     bool printDependencies_ = false;
     bool deleteNonConsumedUnscheduledModules_ = true;

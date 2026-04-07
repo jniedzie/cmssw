@@ -11,7 +11,6 @@ Test of the EventPrincipal class.
 #include "DataFormats/Provenance/interface/ProductRegistry.h"
 #include "DataFormats/Provenance/interface/ProductDescription.h"
 #include "DataFormats/Provenance/interface/BranchIDListHelper.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
 #include "DataFormats/Provenance/interface/Timestamp.h"
 #include "DataFormats/TestObjects/interface/ToyProducts.h"
 
@@ -72,7 +71,6 @@ void testEventGetRefBeforePut::failGetProductNotRegisteredTest() {
   preg->setFrozen();
   auto branchIDListHelper = std::make_shared<edm::BranchIDListHelper>();
   branchIDListHelper->updateFromRegistry(*preg);
-  auto thinnedAssociationsHelper = std::make_shared<edm::ThinnedAssociationsHelper>();
   edm::EventID col(1L, 1L, 1L);
   std::string uuid = edm::createGlobalIdentifier();
   edm::Timestamp fakeTime;
@@ -90,7 +88,6 @@ void testEventGetRefBeforePut::failGetProductNotRegisteredTest() {
   edm::EventPrincipal ep(pregc,
                          edm::productResolversFactory::makePrimary,
                          branchIDListHelper,
-                         thinnedAssociationsHelper,
                          pc,
                          &historyAppender_,
                          edm::StreamID::invalidStreamID());
@@ -143,8 +140,6 @@ void testEventGetRefBeforePut::getRefTest() {
   std::string productInstanceName("Rick");
 
   edmtest::IntProduct dp;
-  edm::TypeWithDict dummytype(typeid(edmtest::IntProduct));
-  std::string className = dummytype.friendlyClassName();
 
   edm::ParameterSet dummyProcessPset;
   dummyProcessPset.registerIt();
@@ -152,16 +147,16 @@ void testEventGetRefBeforePut::getRefTest() {
   processConfiguration->setParameterSetID(dummyProcessPset.id());
 
   edm::ProductDescription product(
-      edm::InEvent, label, processName, dummytype.userClassName(), className, productInstanceName, dummytype);
+      edm::InEvent, label, processName, productInstanceName, edm::TypeID(typeid(edmtest::IntProduct)));
 
   product.init();
 
   auto preg = std::make_unique<edm::SignallingProductRegistryFiller>();
   preg->addProduct(product);
+  preg->setCurrentProcess(processName);
   preg->setFrozen();
   auto branchIDListHelper = std::make_shared<edm::BranchIDListHelper>();
   branchIDListHelper->updateFromRegistry(preg->registry());
-  auto thinnedAssociationsHelper = std::make_shared<edm::ThinnedAssociationsHelper>();
   edm::EventID col(1L, 1L, 1L);
   std::string uuid = edm::createGlobalIdentifier();
   edm::Timestamp fakeTime;
@@ -180,7 +175,6 @@ void testEventGetRefBeforePut::getRefTest() {
   edm::EventPrincipal ep(pregc,
                          edm::productResolversFactory::makePrimary,
                          branchIDListHelper,
-                         thinnedAssociationsHelper,
                          pc,
                          &historyAppender_,
                          edm::StreamID::invalidStreamID());

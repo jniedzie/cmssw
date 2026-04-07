@@ -15,8 +15,8 @@
   <Vector name="LayerCenter" type="numeric" nEntries="47">
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
-    0, 6, 0, 6, 0, 6, 0,
-    2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1
+    0, 0, 0, 0, 0, 0, 0,
+    3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2
   </Vector>
   <Vector name="CalibCellRadius" type="numeric" nEntries="2">
     [hgcal:CalibCellRHD], [hgcal:CalibCellRLD]</Vector>
@@ -45,9 +45,11 @@
     <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessFine]"/>
     <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessCoarse1]"/>
     <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessCoarse2]"/>
+    <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessCoarse1]"/>
     <Parameter name="CellThickness"       value="[hgcal:CellThicknessFine]"/>
     <Parameter name="CellThickness"       value="[hgcal:CellThicknessCoarse1]"/>
     <Parameter name="CellThickness"       value="[hgcal:CellThicknessCoarse2]"/>
+    <Parameter name="CellThickness"       value="[hgcal:CellThicknessCoarse1]"/>
     <Parameter name="FirstMixedLayer"     value="-1"/>
     <Parameter name="LayerOffset"         value="0"/>
     <Parameter name="DetectorType"        value="1"/>
@@ -110,9 +112,11 @@
     <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessFine]"/>
     <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessCoarse1]"/>
     <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessCoarse2]"/>
+    <Parameter name="WaferThickness"      value="[hgcal:WaferThicknessCoarse1]"/>
     <Parameter name="CellThickness"       value="[hgcal:CellThicknessFine]"/>
     <Parameter name="CellThickness"       value="[hgcal:CellThicknessCoarse1]"/>
     <Parameter name="CellThickness"       value="[hgcal:CellThicknessCoarse2]"/>
+    <Parameter name="CellThickness"       value="[hgcal:CellThicknessCoarse1]"/>
     <Parameter name="FirstMixedLayer"     value="[hgcal:FirstMixedLayer]"/>
     <Parameter name="LayerOffset"         value="26"/>
     <Parameter name="DetectorType"        value="2"/>

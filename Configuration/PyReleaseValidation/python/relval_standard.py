@@ -1,5 +1,6 @@
 # import the definition of the steps and input files:
-from  Configuration.PyReleaseValidation.relval_steps import *
+from Configuration.PyReleaseValidation.relval_steps import *
+from .MatrixUtil import Matrix
 
 # here only define the workflows as a combination of the steps defined above:
 workflows = Matrix()
@@ -410,11 +411,15 @@ workflows[136.8861] = ['',['RunEGamma2018Dml1','HLTDR2_2018ml','RECODR2_2018reHL
 workflows[136.8862] = ['',['RunEGamma2018Dml2','HLTDR2_2018ml','RECODR2_2018reHLT_skimEGamma_Prompt_L1TEgDQM','HARVEST2018_L1TEgDQM_Prompt']]
 
 #### Test of tau embedding on RUN2 data ####
-workflows[136.901] = ['', ['RunDoubleMuon2016C', 'TauEmbedding_Selection_2016_HIPM', 'TauEmbedding_Cleaning_2016_HIPM', 'TauEmbedding_GenPreHLT_2016_HIPM', 'TauEmbedding_GenHLT_2016_HIPM', 'TauEmbedding_GenPostHLT_2016_HIPM', 'TauEmbedding_Merging_2016_HIPM']]
-workflows[136.902] = ['', ['RunDoubleMuon2016H', 'TauEmbedding_Selection_2016', 'TauEmbedding_Cleaning_2016', 'TauEmbedding_GenPreHLT_2016', 'TauEmbedding_GenHLT_2016', 'TauEmbedding_GenPostHLT_2016', 'TauEmbedding_Merging_2016']]
-workflows[136.903] = ['', ['RunDoubleMuon2017B', 'TauEmbedding_Selection_2017', 'TauEmbedding_Cleaning_2017', 'TauEmbedding_GenPreHLT_2017', 'TauEmbedding_GenHLT_2017', 'TauEmbedding_GenPostHLT_2017', 'TauEmbedding_Merging_2017']]
-workflows[136.904] = ['', ['RunDoubleMuon2018C', 'TauEmbedding_Selection_2018', 'TauEmbedding_Cleaning_2018', 'TauEmbedding_GenPreHLT_2018', 'TauEmbedding_GenHLT_2018', 'TauEmbedding_GenPostHLT_2018', 'TauEmbedding_Merging_2018']]
-
+workflows[136.901] = ['', ['RunDoubleMuon2016C', 'TauEmbedding_Selection_2016_HIPM', 'TauEmbedding_Cleaning_2016_HIPM', 'TauEmbedding_GenPreHLT_2016_HIPM', 'TauEmbedding_GenHLT_2016_HIPM', 'TauEmbedding_GenPostHLT_2016_HIPM', 'TauEmbedding_Merging_2016_HIPM', 'TauEmbedding_Nano_2016_HIPM']]
+workflows[136.902] = ['', ['RunDoubleMuon2016H', 'TauEmbedding_Selection_2016', 'TauEmbedding_Cleaning_2016', 'TauEmbedding_GenPreHLT_2016', 'TauEmbedding_GenHLT_2016', 'TauEmbedding_GenPostHLT_2016', 'TauEmbedding_Merging_2016', 'TauEmbedding_Nano_2016']]
+workflows[136.903] = ['', ['RunDoubleMuon2017B', 'TauEmbedding_Selection_2017', 'TauEmbedding_Cleaning_2017', 'TauEmbedding_GenPreHLT_2017', 'TauEmbedding_GenHLT_2017', 'TauEmbedding_GenPostHLT_2017', 'TauEmbedding_Merging_2017', 'TauEmbedding_Nano_2017']]
+workflows[136.904] = ['', ['RunDoubleMuon2018C', 'TauEmbedding_Selection_2018', 'TauEmbedding_Cleaning_2018', 'TauEmbedding_GenPreHLT_2018', 'TauEmbedding_GenHLT_2018', 'TauEmbedding_GenPostHLT_2018', 'TauEmbedding_Merging_2018', 'TauEmbedding_Nano_2018']]
+#### Test of tau embedding on RUN3 data ####
+workflows[136.905] = ['', ['RunDoubleMuon2022C', 'TauEmbedding_Selection_2022', 'TauEmbedding_Cleaning_2022', 'TauEmbedding_GenPreHLT_2022', 'TauEmbedding_GenHLT_2022', 'TauEmbedding_GenPostHLT_2022', 'TauEmbedding_Merging_2022', 'TauEmbedding_Nano_2022']]
+workflows[136.906] = ['', ['RunMuon2022E', 'TauEmbedding_Selection_2022_EE', 'TauEmbedding_Cleaning_2022_EE', 'TauEmbedding_GenPreHLT_2022_EE', 'TauEmbedding_GenHLT_2022_EE', 'TauEmbedding_GenPostHLT_2022_EE', 'TauEmbedding_Merging_2022_EE', 'TauEmbedding_Nano_2022_EE']]
+# Input file for 2024 is not there yet, so this will be activated in the future.
+# workflows[136.909] = ['', ['RunMuon2024C', 'TauEmbedding_Selection_2024', 'TauEmbedding_Cleaning_2024', 'TauEmbedding_GenPreHLT_2024', 'TauEmbedding_GenHLT_2024', 'TauEmbedding_GenPostHLT_2024', 'TauEmbedding_Merging_2024']]
 
 ### run 2021 collisions ###
 workflows[139.001] = ['RunMinimumBias2021',['RunMinimumBias2021','HLTDR3_2022','RECODR3_reHLT_MinBiasOffline','HARVESTD2021MB_reHLT']]
@@ -552,62 +557,93 @@ workflows[141.008421] = ['Run3-2023_JetMET2023B_RecoHCALOnlyCPU',['RunJetMET2023
 workflows[141.901] = ['',['RunUPC2023','RECODR3_2023_UPC','HARVESTDPROMPTR3']]
 workflows[141.902] = ['',['RunUPC2023','RECODR3_2023_HIN','HARVESTDPROMPTR3']]
 
+### run3-2023 skim (2023 HI MC temp)
+workflows[141.201] = ['',['HydjetQ_B12_5362GeV_2023_ppReco','DIGIHI2023PPRECO','SKIMHIFORWARDRUN3_2023','HARVESTHI2023PPRECO']]
+workflows[141.202] = ['',['HydjetQ_MinBias_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI23','SKIMHIPHYSICSRAWPRIMERUN3_2023','HARVESTHI2023PPRECO4']]
+
 ### run3-2023 (2023 HI data RawPrime with re-HLT)
-workflows[142.0] = ['',['RunHIPhysicsRawPrime2023A','HLTDR3_HI2023ARawprime','RECOHIRUN3_reHLT_2023','HARVESTRUN3_HI2023A']]
+workflows[141.301] = ['',['RunHIPhysicsRawPrime2023A','HLTDR3_HI2023ARawprime','RECOHIRUN3_reHLT_2023','HARVESTRUN3_HI2023A']]
 
 ### run3-2024 (2024 HI UPC data)
 workflows[142.901] = ['',['RunUPC2024','RECODR3_2024_UPC','HARVESTDPROMPTR3']]
 workflows[142.902] = ['',['RunUPC2024','RECODR3_2024_HIN','HARVESTDPROMPTR3']]
 
 ### run3-2024 skim (2024 HI MC temp)
-workflows[143.201] = ['',['HydjetQ_B12_5362GeV_2024','DIGIHI2024','SKIMHIFORWARDRUN3_2024','HARVESTHI2024']]
-workflows[143.202] = ['',['HydjetQ_MinBias_5362GeV_2024','DIGIHI2024','RAWPRIMESIMHI18','SKIMHIPHYSICSRAWPRIMERUN3_2024','HARVESTHI2024S4']]
+workflows[142.201] = ['',['HydjetQ_B12_5362GeV_2024','DIGIHI2024','SKIMHIFORWARDRUN3_2024','HARVESTHI2024']]
+workflows[142.202] = ['',['HydjetQ_MinBias_5362GeV_2024','DIGIHI2024','RAWPRIMESIMHI24','SKIMHIPHYSICSRAWPRIMERUN3_2024','HARVESTHI2024S4']]
 
 ### run2-2016 (2024 PA UPC rereco data)
 workflows[142.903] = ['',['RunUPC2016PA','RECODR2_2016_UPC','HARVEST2016']]
 
 ### run3-2025 (2025 HI UPC data)
-workflows[143.901] = ['',['RunUPC2024','RECODR3_2025_UPC','HARVESTDPROMPTR3']]
-workflows[143.902] = ['',['RunUPC2024','RECODR3_2025_HIN','HARVESTDPROMPTR3']]
+workflows[143.901] = ['',['RunUPC2025','RECODR3_2025_UPC','HARVESTDPROMPTR3']]
+workflows[143.902] = ['',['RunUPC2025','RECODR3_2025_HIN','HARVESTDPROMPTR3']]
 
 ### run3-2025 (2025 HI OXY data)
-workflows[143.911] = ['',['RunUPC2024','RECODR3_2025_OXY','HARVESTDPROMPTR3']]
-workflows[143.912] = ['',['RunUPC2024','RECODR3_2025_UPC_OXY','HARVESTDPROMPTR3']]
+workflows[143.911] = ['',['RunOXY2025','RECODR3_2025_OXY','HARVESTDPROMPTR3']]
+workflows[143.912] = ['',['RunOXY2025','RECODR3_2025_UPC_OXY','HARVESTDPROMPTR3']]
+workflows[143.921] = ['',['RunOXY2025','RECODR3_2025_OXY_SKIMIONPHYSICS0','HARVESTDPROMPTR3']]
 
+### run3-2025 skim (2025 HI MC temp)
+workflows[143.201] = ['',['HydjetQ_B12_5362GeV_2025','DIGIHI2025','SKIMHIFORWARDRUN3_2025','HARVESTHI2025']]
+workflows[143.202] = ['',['HydjetQ_MinBias_5362GeV_2025','DIGIHI2025','RAWPRIMESIMHI25','SKIMHIPHYSICSRAWPRIMERUN3_2025','HARVESTHI2025S4']]
 
-## Lumi mask fixed 2024 wfs
-base_wf = 145.0
-offset_era = 0.1 # less than 10 eras per year (hopefully)
-offset_pd = 0.001 # less than 100 pds per year
+### run3-2026 (2026 HI UPC data)
+workflows[144.901] = ['',['RunUPC2025','RECODR3_2026_UPC','HARVESTDPROMPTR3']]
+workflows[144.902] = ['',['RunUPC2025','RECODR3_2026_HIN','HARVESTDPROMPTR3']]
+workflows[144.903] = ['',['RunUPC2025','RECONANODR3_2026_UPC','HARVESTDPROMPTR3']]
 
-for e_n,era in enumerate(era_mask_2024):
-    for p_n,pd in enumerate(pds_2024):
-        
-        # JetMET1 PD is used to run the TeVJet skims
-        # we don't really need it here
-        # (also as is the numbering conflicts with 
-        # the scouting wf below, so if we really want to
-        # extend the pds for standar relvals for 2024 data
-        # one needs to change the 145.415 below)
-        if pd == 'JetMET1':
-            continue
-
-        wf_number = round(base_wf + offset_era * e_n + offset_pd * p_n,3)
-        dataset = '/' + pd + '/' + era + '-v1/RAW'
-
-        ## ZeroBias have their own HARVESTING
-        suff = 'ZB_' if 'ZeroBias' in step_name else ''
-
-        # Running C,D,E with the offline GT.
-        # Could be removed once 2025 wfs are in and we'll test the online GT with them
-        recosetup = 'RECONANORUN3_' + suff + 'reHLT_2024' 
-        recosetup = recosetup if era[-1] > 'E' else recosetup + '_Offline'
-
-        step_name = 'Run' + pd.replace('ParkingDouble','Park2') + era.split('Run')[1]
-        workflows[wf_number] = ['',[step_name,'HLTDR3_2024',recosetup,'HARVESTRUN3_' + suff + '2024']]
+### run3-2026 skim (2025 HI MC temp)
+workflows[144.201] = ['',['HydjetQ_B12_5362GeV_2026','DIGIHI2026','SKIMHIFORWARDRUN3_2026','HARVESTHI2026']]
+workflows[144.202] = ['',['HydjetQ_MinBias_5362GeV_2026','DIGIHI2026','RAWPRIMESIMHI26','SKIMHIPHYSICSRAWPRIMERUN3_2026','HARVESTHI2026S4']]
 
 ## special HLT scouting workflow (with hardcoded private input file from ScoutingPFMonitor skimmed to remove all events without scouting)
 workflows[145.415] = ['',['HLTDR3_ScoutingPFMonitor_2024','RECONANORUN3_ScoutingPFMonitor_reHLT_2024','HARVESTRUN3_ScoutingPFMonitor_2024']]
+
+######################################################################################################################################
+######################################################################################################################################
+
+## Run3 Fixed Events for Testing and IBs
+## (with 1k events in input, cut to 100 at step2)
+
+fixed_events_offset = 1e-7 # to have it unique
+
+def addFixedEventsTestingWfs(years, pds, eras):
+
+    for y in years:
+        for era,pd in zip(eras, pds):
+
+            ## ZeroBias have their own HARVESTING
+            suff = 'ZB_' if 'ZeroBias' in pd else ''
+
+            wf_number = round(float(y) + offset_pd * pds.index(pd) + fixed_events_offset, 7)
+            step_name = 'Run' + pd.replace('ParkingDouble','Park2') + y + era + "_10k"
+            
+            # With PAT, standard reconstruction
+            workflows[wf_number] = ['',[step_name,'HLTDR3_' + y,'RECONANORUN3_reHLT_' + y,'HARVESTRUN3_' + suff + y]]
+            # No PAT, for condition validation
+            workflows[round(wf_number + 1e-7,7)] = ['',[step_name,'HLTDR3_' + y,'RECODR3_reHLT_' + y,'HARVESTRUN3_' + suff + y]]
+## 2025 
+pds  = ['ZeroBias', 'JetMET0', 'EGamma0']
+eras = ['B','C','D']
+addFixedEventsTestingWfs(['2025'], pds, eras)
+## 2024 
+pds  = ['ZeroBias', 'JetMET0', 'EGamma0', 'DisplacedJet', 'ParkingDoubleMuonLowMass0', 'BTagMu', 'Muon0', 'Tau']
+eras = ['B','C','D','E','F','G','H','I']
+addFixedEventsTestingWfs(['2024'], pds, eras)
+
+## 2023
+pds  = ['ZeroBias', 'EGamma0', 'JetMET0']
+eras = ['B','C','D']
+addFixedEventsTestingWfs(['2023'], pds, eras)
+
+## 2022
+pds  = ['JetHT', 'Tau', 'BTagMu']
+eras = ['C','D','E']
+addFixedEventsTestingWfs(['2022'], pds, eras)
+
+######################################################################################################################################
+######################################################################################################################################
 
 ##################################################################
 ### run3 (2024) skims - Era F ###
@@ -645,7 +681,6 @@ workflows[135.9] = ['ZMMFS_13',['ZMMFS_13','HARVESTUP15FS','MINIAODMCUP15FS','NA
 workflows[135.11] = ['SMS-T1tttt_mGl-1500_mLSP-100FS_13', ['SMS-T1tttt_mGl-1500_mLSP-100FS_13','HARVESTUP15FS','MINIAODMCUP15FS','NANOUP15FS']]
 workflows[135.12] = ['QCD_Pt_80_120FS_13', ['QCD_Pt_80_120FS_13','HARVESTUP15FS','MINIAODMCUP15FS','NANOUP15FS']]
 workflows[135.13] = ['TTbarFS_13', ['TTbarFS_13_trackingOnlyValidation','HARVESTUP15FS_trackingOnly']]
-workflows[135.14] = ['TTbarFS_13', ['TTbarFS_13','HARVESTUP15FS','MINIAODMCUP15FS','NANOUP15FSrefine']]
 
 ### MinBias fastsim_13 TeV for mixing ###
 workflows[135.8] = ['MinBiasFS_13',['MinBiasFS_13_ForMixing']]
@@ -742,6 +777,8 @@ workflows[7.5] = ['', ['Cosmics_Phase2','DIGICOS_Phase2','RECOCOS_Phase2']] #,'A
 workflows[8]  = ['', ['BeamHalo','DIGICOS','RECOCOS','ALCABH','HARVESTCOS']]
 workflows[8.1] = ['', ['BeamHalo_UP18','DIGICOS_UP18','RECOCOS_UP18','ALCABH_UP18','HARVESTCOS_UP18']]
 workflows[8.2] = ['', ['BeamHalo_UP21','DIGICOS_UP21','RECOCOS_UP21','ALCABH_UP21','HARVESTCOS_UP21']]
+
+workflows[77] = ['', ['HGCal_TestBeam']]
 
 workflows[11] = ['', ['MinBias','DIGI','RECOMIN','HARVEST','ALCAMIN']]
 workflows[28] = ['', ['QCD_Pt_80_120','DIGI','RECO','HARVEST']]
@@ -864,8 +901,8 @@ workflows[158.5] = ['',['Hydjet2Q_MinBias_5020GeV_2018_ppReco','DIGIHI2018PPRECO
 ### Run 3 cond., 2022
 workflows[159] = ['',['HydjetQ_B12_5020GeV_2022_ppReco','DIGIHI2022PPRECO','RECOHI2022PPRECOMB','ALCARECOHI2022PPRECO','HARVESTHI2022PPRECO']]
 workflows[159.01] = ['',['HydjetQ_reminiaodPbPb2022_INPUT','REMINIAODHI2022PPRECOMB','HARVESTHI2022PPRECOMINIAOD']]
-workflows[159.02] = ['',['HydjetQ_B12_5020GeV_2022_ppReco','DIGIHI2022PPRECO','RAWPRIMESIMHI18','RECOHI2022PPRECOMBAPPROXCLUSTERS','ALCARECOHI2022PPRECO','HARVESTHI2022PPRECO4']]
-workflows[159.03] = ['',['HydjetQ_MinBias_5020GeV_2022_ppReco','DIGIHI2022PPRECO','RAWPRIMESIMHI18','RECOHI2022PROD','MINIHI2022PROD']]
+workflows[159.02] = ['',['HydjetQ_B12_5020GeV_2022_ppReco','DIGIHI2022PPRECO','RAWPRIMESIMHI22','RECOHI2022PPRECOMBAPPROXCLUSTERS','ALCARECOHI2022PPRECO','HARVESTHI2022PPRECO4']]
+workflows[159.03] = ['',['HydjetQ_MinBias_5020GeV_2022_ppReco','DIGIHI2022PPRECO','RAWPRIMESIMHI22','RECOHI2022PROD','MINIHI2022PROD']]
 workflows[159.1] = ['',['QCD_Pt_80_120_14_HI_2022','DIGIHI2022PPRECO','RECOHI2022PPRECO','HARVESTHI2022PPRECO']]
 workflows[159.2] = ['',['PhotonJets_Pt_10_14_HI_2022','DIGIHI2022PPRECO','RECOHI2022PPRECO','HARVESTHI2022PPRECO']]
 workflows[159.3] = ['',['ZMM_14_HI_2022','DIGIHI2022PPRECO','RECOHI2022PPRECO','HARVESTHI2022PPRECO']]
@@ -873,23 +910,38 @@ workflows[159.4] = ['',['ZEE_14_HI_2022','DIGIHI2022PPRECO','RECOHI2022PPRECO','
 ### Run 3 cond., 2023
 workflows[160] = ['',['HydjetQ_B12_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RECOHI2023PPRECOMB','ALCARECOHI2023PPRECO','HARVESTHI2023PPRECO']]
 #workflows[160.01] = ['',['HydjetQ_reminiaodPbPb2023_INPUT','REMINIAODHI2023PPRECOMB','HARVESTHI2023PPRECOMINIAOD']]
-workflows[160.02] = ['',['HydjetQ_B12_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI18','RECOHI2023PPRECOMBAPPROXCLUSTERS','ALCARECOHI2023PPRECO','HARVESTHI2023PPRECO4']]
-workflows[160.03] = ['',['HydjetQ_MinBias_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI18','RECOHI2023PROD','MINIHI2023PROD']]
+workflows[160.02] = ['',['HydjetQ_B12_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI23','RECOHI2023PPRECOMBAPPROXCLUSTERS','ALCARECOHI2023PPRECO','HARVESTHI2023PPRECO4']]
+workflows[160.03] = ['',['HydjetQ_MinBias_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI23','RECOHI2023PROD','MINIHI2023PROD']]
 workflows[160.1] = ['',['QCD_Pt_80_120_5362_HI_2023','DIGIHI2023PPRECO','RECOHI2023PPRECO','HARVESTHI2023PPRECO']]
 workflows[160.2] = ['',['PhotonJets_Pt_10_5362_HI_2023','DIGIHI2023PPRECO','RECOHI2023PPRECO','HARVESTHI2023PPRECO']]
 workflows[160.3] = ['',['ZMM_5362_HI_2023','DIGIHI2023PPRECO','RECOHI2023PPRECO','HARVESTHI2023PPRECO']]
 workflows[160.4] = ['',['ZEE_5362_HI_2023','DIGIHI2023PPRECO','RECOHI2023PPRECO','HARVESTHI2023PPRECO']]
 # Patatrack Pixel Tracks on CPU
-workflows[160.401] = ['',['HydjetQ_MinBias_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI18','RECOHI2023PPRECOMB_AlpakaCPU','MINIHI2023PROD']]
+workflows[160.401] = ['',['HydjetQ_MinBias_5362GeV_2023_ppReco','DIGIHI2023PPRECO','RAWPRIMESIMHI23','RECOHI2023PPRECOMB_AlpakaCPU','MINIHI2023PROD']]
 ### Run 3 cond., 2024
 workflows[161] = ['',['HydjetQ_B12_5362GeV_2024','DIGIHI2024','RECOHI2024MB','ALCARECOHI2023PPRECO','HARVESTHI2024']]
-workflows[161.02] = ['',['HydjetQ_B12_5362GeV_2024','DIGIHI2024','RAWPRIMESIMHI18','RECOHI2024MBAPPROXCLUSTERS','ALCARECOHI2024','HARVESTHI2024S4']]
-workflows[161.03] = ['',['HydjetQ_MinBias_5362GeV_2024','DIGIHI2024','RAWPRIMESIMHI18','RECOHI2024PROD','MINIHI2023PROD']]
+workflows[161.02] = ['',['HydjetQ_B12_5362GeV_2024','DIGIHI2024','RAWPRIMESIMHI24','RECOHI2024MBAPPROXCLUSTERS','ALCARECOHI2024','HARVESTHI2024S4']]
+workflows[161.03] = ['',['HydjetQ_MinBias_5362GeV_2024','DIGIHI2024','RAWPRIMESIMHI24','RECOHI2024PROD','MINIHI2024PROD']]
 workflows[161.1] = ['',['QCD_Pt_80_120_5362_HI_2024','DIGIHI2024','RECOHI2024','HARVESTHI2024']]
 workflows[161.2] = ['',['PhotonJets_Pt_10_5362_HI_2024','DIGIHI2024','RECOHI2024','HARVESTHI2024']]
 workflows[161.3] = ['',['ZMM_5362_HI_2024','DIGIHI2024','RECOHI2024','HARVESTHI2024']]
 workflows[161.4] = ['',['ZEE_5362_HI_2024','DIGIHI2024','RECOHI2024','HARVESTHI2024']]
-
+### Run 3 cond., 2025
+workflows[162] = ['',['HydjetQ_B12_5362GeV_2025','DIGIHI2025','RECOHI2025MB','ALCARECOHI2023PPRECO','HARVESTHI2025']]
+workflows[162.02] = ['',['HydjetQ_B12_5362GeV_2025','DIGIHI2025','RAWPRIMESIMHI25','RECOHI2025MBAPPROXCLUSTERS','ALCARECOHI2025','HARVESTHI2025S4']]
+workflows[162.03] = ['',['HydjetQ_MinBias_5362GeV_2025','DIGIHI2025','RAWPRIMESIMHI25','RECOHI2025PROD','MINIHI2025PROD']]
+workflows[162.1] = ['',['QCD_Pt_80_120_5362_HI_2025','DIGIHI2025','RECOHI2025','HARVESTHI2025']]
+workflows[162.2] = ['',['PhotonJets_Pt_10_5362_HI_2025','DIGIHI2025','RECOHI2025','HARVESTHI2025']]
+workflows[162.3] = ['',['ZMM_5362_HI_2025','DIGIHI2025','RECOHI2025','HARVESTHI2025']]
+workflows[162.4] = ['',['ZEE_5362_HI_2025','DIGIHI2025','RECOHI2025','HARVESTHI2025']]
+### Run 3 cond., 2026
+workflows[163] = ['',['HydjetQ_B12_5362GeV_2026','DIGIHI2026','RECOHI2026MB','ALCARECOHI2023PPRECO','HARVESTHI2026']]
+workflows[163.02] = ['',['HydjetQ_B12_5362GeV_2026','DIGIHI2026','RAWPRIMESIMHI26','RECOHI2026MBAPPROXCLUSTERS','ALCARECOHI2026','HARVESTHI2026S4']]
+workflows[163.03] = ['',['HydjetQ_MinBias_5362GeV_2026','DIGIHI2026','RAWPRIMESIMHI26','RECOHI2026PROD','MINIHI2026PROD']]
+workflows[163.1] = ['',['QCD_Pt_80_120_5362_HI_2026','DIGIHI2026','RECOHI2026','HARVESTHI2026']]
+workflows[163.2] = ['',['PhotonJets_Pt_10_5362_HI_2026','DIGIHI2026','RECOHI2026','HARVESTHI2026']]
+workflows[163.3] = ['',['ZMM_5362_HI_2026','DIGIHI2026','RECOHI2026','HARVESTHI2026']]
+workflows[163.4] = ['',['ZEE_5362_HI_2026','DIGIHI2026','RECOHI2026','HARVESTHI2026']]
 
 ### UPC test ###
 workflows[180] = ['',['Pythia8_GammaNucleus_5360_HI_2023','DIGIHI2023PPRECO','RECOUPC2023','ALCARECOUPC2023','HARVESTUPC2023']]
@@ -898,6 +950,9 @@ workflows[181] = ['',['Pythia8_GammaNucleus_5360_UPC_2024','DIGIUPC2024','RECOUP
 workflows[181.1] = ['',['Starlight_DoubleDiffraction_5360_UPC_2024','DIGIUPC2024','RECOUPC2024','ALCARECOUPC2024','HARVESTUPC2024']]
 workflows[182] = ['',['Pythia8_GammaNucleus_5360_UPC_2025','DIGIUPC2025','RECOUPC2025','ALCARECOUPC2025','HARVESTUPC2025']]
 workflows[182.1] = ['',['Starlight_DoubleDiffraction_5360_UPC_2025','DIGIUPC2025','RECOUPC2025','ALCARECOUPC2025','HARVESTUPC2025']]
+workflows[183] = ['',['Pythia8_GammaNucleus_5360_UPC_2026','DIGIUPC2026','RECOUPC2026','ALCARECOUPC2026','HARVESTUPC2026']]
+workflows[183.01] = ['',['Pythia8_GammaNucleus_5360_UPC_2026','DIGIUPC2026','RECONANOUPC2026','ALCARECOUPC2026','HARVESTUPC2026']]
+workflows[183.1] = ['',['Starlight_DoubleDiffraction_5360_UPC_2026','DIGIUPC2026','RECOUPC2026','ALCARECOUPC2026','HARVESTUPC2026']]
 
 ### pp reference test ###
 workflows[149] = ['',['QCD_Pt_80_120_13_PPREF','DIGIPPREF2017','RECOPPREF2017','HARVESTPPREF2017']]

@@ -59,11 +59,6 @@ namespace edm {
       MakeModuleParams const& p,
       signalslot::Signal<void(ModuleDescription const&)>& pre,
       signalslot::Signal<void(ModuleDescription const&)>& post) const {
-    // Add process_name for SwitchProducer
-    if (p.pset_->getParameter<std::string>("@module_type") == "SwitchProducer") {
-      p.pset_->addUntrackedParameter("@process_name", p.processConfiguration_->processName());
-    }
-
     ConfigurationDescriptions descriptions(baseType(), p.pset_->getParameter<std::string>("@module_type"));
     fillDescriptions(descriptions);
     try {
@@ -88,16 +83,16 @@ namespace edm {
     bool postCalled = false;
     try {
       convertException::wrap([&]() {
-        pre(md);
+        pre.emit(md);
         module = makeModule(*(p.pset_));
         module->finishModuleInitialization(md, *p.preallocate_, p.reg_);
         // if exception then post will be called in the catch block
         postCalled = true;
-        post(md);
+        post.emit(md);
       });
     } catch (cms::Exception& iException) {
       if (!postCalled) {
-        CMS_SA_ALLOW try { post(md); } catch (...) {
+        CMS_SA_ALLOW try { post.emit(md); } catch (...) {
           // If post throws an exception ignore it because we are already handling another exception
         }
       }

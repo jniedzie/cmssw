@@ -54,7 +54,6 @@ namespace edm {
   class ModuleCallingContext;
   class PreallocationConfiguration;
   class ActivityRegistry;
-  class ThinnedAssociationsHelper;
   class SignallingProductRegistryFiller;
 
   template <typename T>
@@ -93,10 +92,11 @@ namespace edm {
 
       bool selected(ProductDescription const& desc) const;
 
-      void selectProducts(ProductRegistry const& preg, ThinnedAssociationsHelper const&, ProcessBlockHelperBase const&);
+      void selectProducts(ProductRegistry const& preg, ProcessBlockHelperBase const&);
       std::string const& processName() const { return process_name_; }
       SelectedProductsForBranchType const& keptProducts() const { return keptProducts_; }
       std::array<bool, NumBranchTypes> const& hasNewlyDroppedBranch() const { return hasNewlyDroppedBranch_; }
+      std::vector<std::string> const& orderedProcessNames() const { return orderedProcessNames_; }
 
       static void fillDescription(
           ParameterSetDescription& desc,
@@ -110,8 +110,6 @@ namespace edm {
       BranchIDLists const* branchIDLists() const;
 
       OutputProcessBlockHelper const& outputProcessBlockHelper() const { return outputProcessBlockHelper_; }
-
-      ThinnedAssociationsHelper const* thinnedAssociationsHelper() const;
 
       const ModuleDescription& moduleDescription() const { return moduleDescription_; }
 
@@ -171,6 +169,7 @@ namespace edm {
       // We do not own the ProductDescriptions to which we point.
       SelectedProductsForBranchType keptProducts_;
       std::array<bool, NumBranchTypes> hasNewlyDroppedBranch_;
+      std::vector<std::string> orderedProcessNames_;
 
       std::string process_name_;
       ProductSelectorRules productSelectorRules_;
@@ -190,9 +189,6 @@ namespace edm {
       edm::propagate_const<std::unique_ptr<BranchIDLists>> branchIDLists_;
       BranchIDLists const* origBranchIDLists_;
 
-      edm::propagate_const<std::unique_ptr<ThinnedAssociationsHelper>> thinnedAssociationsHelper_;
-      std::map<BranchID, bool> keepAssociation_;
-
       OutputProcessBlockHelper outputProcessBlockHelper_;
 
       std::function<void(ProductDescription const&)> callWhenNewProductsRegistered_;
@@ -208,8 +204,6 @@ namespace edm {
       void doOpenFile(FileBlock const& fb);
       void doRespondToOpenInputFile(FileBlock const& fb);
       void doRespondToCloseInputFile(FileBlock const& fb);
-      void doRespondToCloseOutputFile() {}
-      void doRegisterThinnedAssociations(ProductRegistry const&, ThinnedAssociationsHelper&) {}
 
       /// Tell the OutputModule that is must end the current file.
       void doCloseFile();
@@ -248,6 +242,8 @@ namespace edm {
       virtual void doRespondToCloseInputFile_(FileBlock const&) {}
 
       virtual void setProcessesWithSelectedMergeableRunProducts(std::set<std::string> const&) {}
+
+      virtual bool finalSelection(ProductDescription const& desc) const;
 
       bool hasAccumulator() const noexcept { return false; }
 

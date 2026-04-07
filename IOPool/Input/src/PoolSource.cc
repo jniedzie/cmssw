@@ -4,12 +4,10 @@
 #include "InputFile.h"
 #include "RootPrimaryFileSequence.h"
 #include "RootSecondaryFileSequence.h"
-#include "RunHelper.h"
-#include "DataFormats/Common/interface/ThinnedAssociation.h"
 #include "DataFormats/Provenance/interface/ProductDescription.h"
 #include "DataFormats/Provenance/interface/IndexIntoFile.h"
 #include "DataFormats/Provenance/interface/ProductRegistry.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
+
 #include "FWCore/Framework/interface/EventPrincipal.h"
 #include "FWCore/Framework/interface/FileBlock.h"
 #include "FWCore/Framework/interface/InputSourceDescription.h"
@@ -19,6 +17,7 @@
 #include "FWCore/Framework/interface/SharedResourcesAcquirer.h"
 #include "FWCore/Framework/interface/RunPrincipal.h"
 #include "FWCore/Framework/interface/ProductResolversFactory.h"
+#include "FWCore/Sources/interface/InputSourceRunHelper.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Utilities/interface/EDMException.h"
@@ -32,7 +31,6 @@ namespace edm {
   class BranchID;
   class LuminosityBlockID;
   class EventID;
-  class ThinnedAssociationsHelper;
 
   namespace {
     void checkHistoryConsistency(Principal const& primary, Principal const& secondary) {
@@ -83,7 +81,7 @@ namespace edm {
         dropDescendants_(pset.getUntrackedParameter<bool>("dropDescendantsOfDroppedBranches")),
         labelRawDataLikeMC_(pset.getUntrackedParameter<bool>("labelRawDataLikeMC")),
         delayReadingEventProducts_(pset.getUntrackedParameter<bool>("delayReadingEventProducts")),
-        runHelper_(makeRunHelper(pset)),
+        runHelper_(makeInputSourceRunHelper(pset)),
         resourceSharedWithDelayedReaderPtr_(),
         // Note: primaryFileSequence_ and secondaryFileSequence_ need to be initialized last, because they use data members
         // initialized previously in their own initialization.
@@ -103,7 +101,6 @@ namespace edm {
         secondaryEventPrincipals_.emplace_back(new EventPrincipal(secondaryFileSequence_->fileProductRegistry(),
                                                                   edm::productResolversFactory::makePrimary,
                                                                   secondaryFileSequence_->fileBranchIDListHelper(),
-                                                                  std::make_shared<ThinnedAssociationsHelper const>(),
                                                                   processConfiguration(),
                                                                   nullptr,
                                                                   index));
@@ -111,15 +108,11 @@ namespace edm {
       std::array<std::set<BranchID>, NumBranchTypes> idsToReplace;
       ProductRegistry::ProductList const& secondary = secondaryFileSequence_->fileProductRegistry()->productList();
       ProductRegistry::ProductList const& primary = primaryFileSequence_->fileProductRegistry()->productList();
-      std::set<BranchID> associationsFromSecondary;
       //this is the registry used by the 'outside' world and only has the primary file information in it at present
       ProductRegistry::ProductList& fullList = productRegistryUpdate().productListUpdator();
       for (auto const& item : secondary) {
         if (item.second.present()) {
           idsToReplace[item.second.branchType()].insert(item.second.branchID());
-          if (item.second.branchType() == InEvent && item.second.unwrappedType() == typeid(ThinnedAssociation)) {
-            associationsFromSecondary.insert(item.second.branchID());
-          }
           //now make sure this is marked as not dropped else the product will not be 'get'table from the Event
           auto itFound = fullList.find(item.first);
           if (itFound != fullList.end()) {
@@ -134,7 +127,6 @@ namespace edm {
       for (auto const& item : primary) {
         if (item.second.present()) {
           idsToReplace[item.second.branchType()].erase(item.second.branchID());
-          associationsFromSecondary.erase(item.second.branchID());
         }
       }
       if (idsToReplace[InEvent].empty() && idsToReplace[InLumi].empty() && idsToReplace[InRun].empty()) {
@@ -146,7 +138,6 @@ namespace edm {
             branchIDsToReplace_[i].push_back(id);
           }
         }
-        secondaryFileSequence_->initAssociationsFromSecondary(associationsFromSecondary);
       }
     }
   }
@@ -329,7 +320,7 @@ namespace edm {
     ProductSelectorRules::fillDescription(desc, "inputCommands");
     InputSource::fillDescription(desc);
     RootPrimaryFileSequence::fillDescription(desc);
-    RunHelperBase::fillDescription(desc);
+    InputSourceRunHelperBase::fillDescription(desc);
 
     descriptions.add("source", desc);
   }
