@@ -108,7 +108,7 @@ const Phase2L1GMT::wordtype MuonStub::hybridStubWord() const {
   return w;
 }
 
-void MuonStub::printHybridStub(std::string module = "MuonStub", uint spaces = 0, bool label = true) const {
+void MuonStub::printHybridStub(const std::string module, const uint spaces, const bool label) const {
   std::string lab = "";
   lab.append(spaces, ' ');
   if (label)
@@ -133,7 +133,7 @@ void MuonStub::printHybridStub(std::string module = "MuonStub", uint spaces = 0,
                        << "tfLayer = " << tfLayer_ << std::flush;
 }
 
-void MuonStub::printHybridStubWord(std::string module = "MuonStub", uint spaces = 0, bool label = true) const {
+void MuonStub::printHybridStubWord(const std::string module, const uint spaces, const bool label) const {
   std::string lab = "";
   lab.append(spaces, ' ');
   if (label)

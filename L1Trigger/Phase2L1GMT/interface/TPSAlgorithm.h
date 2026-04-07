@@ -71,7 +71,7 @@ namespace Phase2L1GMT {
                                                    const std::vector<PreTrackMatchedMuon>& muonsNext,
                                                    bool equality) const;
     std::vector<PreTrackMatchedMuon> cleanAll(std::vector<PreTrackMatchedMuon>& muons) const;
-    std::vector<l1t::TrackerMuon> convert(std::vector<PreTrackMatchedMuon>& muons, uint maximum) const;
+    std::vector<l1t::TrackerMuon> convert(const std::vector<PreTrackMatchedMuon>& muons, const uint maximum) const;
     bool outputGT(std::vector<l1t::TrackerMuon>& muons) const;
     void SetQualityBits(std::vector<l1t::TrackerMuon>& muons) const;
     std::vector<l1t::TrackerMuon> sort(std::vector<l1t::TrackerMuon>& muons, uint maximum) const;

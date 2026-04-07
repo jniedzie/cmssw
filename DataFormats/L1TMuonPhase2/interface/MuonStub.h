@@ -142,8 +142,10 @@ namespace l1t {
     void print() const;
 
     const Phase2L1GMT::wordtype hybridStubWord() const;
-    void printHybridStub(std::string module, uint spaces, bool label) const;
-    void printHybridStubWord(std::string module, uint spaces, bool label) const;
+    void printHybridStub(const std::string module = "MuonStub", const uint spaces = 0, const bool label = true) const;
+    void printHybridStubWord(const std::string module = "MuonStub",
+                             const uint spaces = 0,
+                             const bool label = true) const;
 
   private:
     int etaRegion_;    //In the barrel this is wheel. In the endcap it is 6-ring

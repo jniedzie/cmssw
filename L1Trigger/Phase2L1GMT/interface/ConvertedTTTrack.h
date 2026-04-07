@@ -4,6 +4,7 @@
 #include "DataFormats/L1TMuonPhase2/interface/Constants.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include <ap_int.h>
+#include <iomanip>
 
 namespace Phase2L1GMT {
 
@@ -68,7 +69,7 @@ namespace Phase2L1GMT {
       offline_phi_ = phi;
     }
 
-    void print(std::string module = "ConvertedTTTrack", uint spaces = 0, bool label = true) const {
+    void print(const std::string& module = "ConvertedTTTrack", const uint& spaces = 0, const bool& label = true) const {
       std::string lab = "";
       lab.append(spaces, ' ');
       if (label)
@@ -90,7 +91,9 @@ namespace Phase2L1GMT {
                            << "(curvature = " << curvature_ << ")" << std::flush;
     }
 
-    void printWord(std::string module = "ConvertedTTTrack", uint spaces = 0, bool label = true) const {
+    void printWord(const std::string& module = "ConvertedTTTrack",
+                   const uint& spaces = 0,
+                   const bool& label = true) const {
       std::string lab = "";
       lab.append(spaces, ' ');
       if (label)
