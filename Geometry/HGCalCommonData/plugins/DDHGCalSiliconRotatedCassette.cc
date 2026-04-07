@@ -461,10 +461,11 @@ void DDHGCalSiliconRotatedCassette::positionSensitive(const DDLogicalPart& glog,
                                 << " R " << dely << " dy " << dy << " Shift " << xyoff.first << ":" << xyoff.second
                                 << " WaferSize " << (waferSize_ + waferSepar_) << " index " << firstWafer << ":"
                                 << (lastWafer - 1) << " Layer Center " << layercenter << ":" << layertype;
-  edm::LogVerbatim("HGCalGeom") << "DDHGCalSiliconRotatedCassette: PositionSensitive layer " << glog.ddname() << "  r " << delx << " R " << dely
-                                << " dy " << dy << " Shift " << xyoff.first << ":" << xyoff.second << " WaferSize "
-                                << (waferSize_ + waferSepar_) << " index " << firstWafer << ":" << (lastWafer - 1)
-                                << " Layer Center " << layercenter << ":" << layertype;
+  edm::LogVerbatim("HGCalGeom") << "DDHGCalSiliconRotatedCassette: PositionSensitive layer " << glog.ddname() << "  r "
+                                << delx << " R " << dely << " dy " << dy << " Shift " << xyoff.first << ":"
+                                << xyoff.second << " WaferSize " << (waferSize_ + waferSepar_) << " index "
+                                << firstWafer << ":" << (lastWafer - 1) << " Layer Center " << layercenter << ":"
+                                << layertype;
 #endif
   for (int k = firstWafer; k < lastWafer; ++k) {
     int u = HGCalWaferIndex::waferU(waferIndex_[k]);

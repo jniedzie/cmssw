@@ -131,7 +131,7 @@ private:
   std::vector<double> cassetteShiftScnt_;  // Shifts of the cassetes for scintillators
   std::string nameSpace_;                  // Namespace of this and ALL sub-parts
   std::unordered_set<int> copies_;         // List of copy #'s
-  int forFireworks_;                       // 0 for standard run 1 for fireworks                                                                               
+  int forFireworks_;                       // 0 for standard run 1 for fireworks
   double alpha_, cosAlpha_;
 };
 
@@ -432,7 +432,8 @@ void DDHGCalMixRotatedFineCassette::initialize(const DDNumericArguments& nArgs,
   forFireworks_ = static_cast<int>(nArgs["ForFireWorks"]);
   int testCassette = static_cast<int>(nArgs["TestCassetteShift"]);
 #ifdef EDM_ML_DEBUG
-  edm::LogVerbatim("HGCalGeom") << "DDHGCalMixRotatedFineCassette: forFireworks " << forFireworks_ << " testCassette " << testCassette;
+  edm::LogVerbatim("HGCalGeom") << "DDHGCalMixRotatedFineCassette: forFireworks " << forFireworks_ << " testCassette "
+                                << testCassette;
 #endif
   if (testCassette != 0)
     testCassetteShift();
@@ -649,8 +650,8 @@ void DDHGCalMixRotatedFineCassette::positionMix(const DDLogicalPart& glog,
                                       << fimin << ":" << fimax;
 #endif
         double phi1 = dphi * (fimin - 1);
-	double phi2 = dphi * (fimax - fimin + 1);
-//	double phi2 = (forFireworks_ == 1) ? (dphi * (fimax - fimin + 1)) : ( dphi * fimax);
+        double phi2 = dphi * (fimax - fimin + 1);
+        //	double phi2 = (forFireworks_ == 1) ? (dphi * (fimax - fimin + 1)) : ( dphi * fimax);
         r1 += retract_[layer0 - 1];
         r2 += retract_[layer0 - 1];
 #ifdef EDM_ML_DEBUG
@@ -761,7 +762,7 @@ void DDHGCalMixRotatedFineCassette::positionMix(const DDLogicalPart& glog,
 #endif
       double phi1 = dphi * (fimin - 1);
       double phi2 = dphi * (fimax - fimin + 1);
-//    double phi2 = (forFireworks_ == 1) ? (dphi * (fimax - fimin + 1)) : ( dphi * fimax);
+      //    double phi2 = (forFireworks_ == 1) ? (dphi * (fimax - fimin + 1)) : ( dphi * fimax);
       r1 += retract_[layer0 - 1];
       r2 += retract_[layer0 - 1];
 #ifdef EDM_ML_DEBUG
