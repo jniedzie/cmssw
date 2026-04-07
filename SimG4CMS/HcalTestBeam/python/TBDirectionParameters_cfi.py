@@ -12,4 +12,4 @@ common_beam_direction_parameters = cms.PSet(
 
 common_beam_position_parameters = cms.PSet(
     BeamPosition = cms.double(-800.0)
-}
+)
