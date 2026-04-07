@@ -18,7 +18,6 @@ Test of the EventPrincipal class.
 #include "DataFormats/Provenance/interface/Timestamp.h"
 #include "DataFormats/Provenance/interface/ProductProvenance.h"
 #include "DataFormats/Provenance/interface/RunAuxiliary.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
 #include "DataFormats/TestObjects/interface/ToyProducts.h"
 #include "FWCore/Framework/interface/EventPrincipal.h"
 #include "FWCore/Framework/interface/LuminosityBlockPrincipal.h"
@@ -106,22 +105,15 @@ std::shared_ptr<edm::ProductDescription> test_ep::fake_single_process_branch(std
                                                                              std::string const& productInstanceName) {
   std::string moduleLabel = processName + "dummyMod";
   std::string moduleClass("DummyModule");
-  edm::TypeWithDict dummyType(typeid(edmtest::DummyProduct));
-  std::string productClassName = dummyType.userClassName();
-  std::string friendlyProductClassName = dummyType.friendlyClassName();
+  edm::TypeID dummyType(typeid(edmtest::DummyProduct));
   edm::ParameterSet modParams;
   modParams.addParameter<std::string>("@module_type", moduleClass);
   modParams.addParameter<std::string>("@module_label", moduleLabel);
   modParams.registerIt();
   std::shared_ptr<edm::ProcessConfiguration> process(fake_single_module_process(tag, processName, modParams));
 
-  auto result = std::make_shared<edm::ProductDescription>(edm::InEvent,
-                                                          moduleLabel,
-                                                          processName,
-                                                          productClassName,
-                                                          friendlyProductClassName,
-                                                          productInstanceName,
-                                                          dummyType);
+  auto result =
+      std::make_shared<edm::ProductDescription>(edm::InEvent, moduleLabel, processName, productInstanceName, dummyType);
   productDescriptions_[tag] = result;
   return result;
 }
@@ -138,10 +130,10 @@ void test_ep::setUp() {
   pProductRegistry_->addProduct(*fake_single_process_branch("test", "TEST"));
   pProductRegistry_->addProduct(*fake_single_process_branch("user", "USER"));
   pProductRegistry_->addProduct(*fake_single_process_branch("rick", "USER2", "rick"));
+  pProductRegistry_->setProcessOrder({"USER2", "USER", "TEST", "PROD", "HLT"});
   pProductRegistry_->setFrozen();
   auto branchIDListHelper = std::make_shared<edm::BranchIDListHelper>();
   branchIDListHelper->updateFromRegistry(pProductRegistry_->registry());
-  auto thinnedAssociationsHelper = std::make_shared<edm::ThinnedAssociationsHelper>();
 
   // Put products we'll look for into the EventPrincipal.
   {
@@ -182,7 +174,6 @@ void test_ep::setUp() {
     pEvent_.reset(new edm::EventPrincipal(pRegistry,
                                           edm::productResolversFactory::makePrimary,
                                           branchIDListHelper,
-                                          thinnedAssociationsHelper,
                                           *process,
                                           &historyAppender_,
                                           edm::StreamID::invalidStreamID()));

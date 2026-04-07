@@ -36,9 +36,7 @@ namespace edm {
   struct MakeModuleParams;
   class ModuleDescription;
   class PreallocationConfiguration;
-  namespace maker {
-    class ModuleHolder;
-  }
+  class SignallingProductRegistryFiller;
 
   class ModuleRegistry {
   public:
@@ -74,21 +72,24 @@ namespace edm {
       try {
         std::shared_ptr<T> module;
         convertException::wrap([&]() {
-          iPre(md);
+          iPre.emit(md);
           module = std::make_shared<T>(std::forward<Args>(args)...);
 
           auto holder = std::make_shared<maker::ModuleHolderT<typename T::ModuleType>>(module);
           holder->finishModuleInitialization(md, iPrealloc, iReg);
           labelToModule_.emplace(md.moduleLabel(), std::move(holder));
 
+          if (maxModuleID_ < module->moduleDescription().id()) {
+            maxModuleID_ = module->moduleDescription().id();
+          }
           // if exception then post will be called in the catch block
           postCalled = true;
-          iPost(md);
+          iPost.emit(md);
         });
         return module;
       } catch (cms::Exception& iException) {
         if (!postCalled) {
-          CMS_SA_ALLOW try { iPost(md); } catch (...) {
+          CMS_SA_ALLOW try { iPost.emit(md); } catch (...) {
             // If post throws an exception ignore it because we are already handling another exception
           }
         }
@@ -104,14 +105,20 @@ namespace edm {
       }
     }
 
-    void finishModulesInitialization(ProductRegistry const& iRegistry,
-                                     eventsetup::ESRecordsToProductResolverIndices const& iESIndices,
-                                     ProcessBlockHelperBase const& processBlockHelperBase,
-                                     std::string const& processName);
+    template <typename F>
+    void forAllModuleHolders(F iFunc) const {
+      for (auto& labelMod : labelToModule_) {
+        maker::ModuleHolder const* t = labelMod.second.get();
+        iFunc(t);
+      }
+    }
+
+    unsigned int maxModuleID() const { return maxModuleID_; }
 
   private:
     std::map<std::string, edm::propagate_const<std::shared_ptr<maker::ModuleHolder>>> labelToModule_;
     ModuleTypeResolverMaker const* typeResolverMaker_;
+    unsigned int maxModuleID_ = 0;
   };
 }  // namespace edm
 

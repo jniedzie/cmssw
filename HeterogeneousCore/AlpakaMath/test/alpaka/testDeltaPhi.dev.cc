@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <numbers>
 #include <vector>
 
@@ -12,7 +12,7 @@ using namespace cms::alpakatools;
 using namespace ALPAKA_ACCELERATOR_NAMESPACE;
 
 struct phiFuncsUnitTestsKernel {
-  template <typename TAcc, typename T>
+  template <alpaka::concepts::Acc TAcc, typename T>
   ALPAKA_FN_ACC void operator()(TAcc const& acc, T* out) const {
     // Unit circle typical values
     out[0] = phi<TAcc, T>(acc, 1.0, 0.0);          // x = 1.0, y = 0.0 => phi = 0
@@ -61,7 +61,10 @@ void testPhiFuncs(uint32_t size, std::vector<double> const& res) {
 
     constexpr T eps = 1.e-5;
     for (size_t i = 0; i < size; ++i) {
-      CHECK_THAT(c_h.data()[i], Catch::Matchers::WithinAbs(res[i], eps));
+      // Allow 2pi periodicity to handle +/-pi equivalence at the boundary
+      CHECK_THAT(c_h.data()[i],
+                 Catch::Matchers::WithinAbs(res[i], eps) || Catch::Matchers::WithinAbs(res[i] + 2 * M_PI, eps) ||
+                     Catch::Matchers::WithinAbs(res[i] - 2 * M_PI, eps));
     }
   }
 }

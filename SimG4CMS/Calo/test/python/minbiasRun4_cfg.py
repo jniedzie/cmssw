@@ -36,9 +36,9 @@ elif (options.type == "V17Shift"):
     process = cms.Process("HGCalParametersTest",Phase2C17I13M9)
     geomFile = "Geometry.HGCalCommonData.testHGCal" + options.type + "Reco_cff"
 elif (options.type == "V17"):
-    from Configuration.Eras.Era_Phase2C17I13M9_cff import Phase2C17I13M9
-    process = cms.Process("HGCalParametersTest",Phase2C17I13M9)
-    geomFile = "Configuration.Geometry.GeometryExtendedRun4D110Reco_cff"
+    from Configuration.Eras.Era_Phase2C22I13M9_cff import Phase2C22I13M9
+    process = cms.Process("HGCalParametersTest",Phase2C22I13M9)
+    geomFile = "Configuration.Geometry.GeometryExtendedRun4D121Reco_cff"
 else:
     from Configuration.Eras.Era_Phase2C17I13M9_cff import Phase2C17I13M9
     process = cms.Process("HGCalParametersTest",Phase2C17I13M9)
@@ -61,7 +61,7 @@ process.load('Configuration.StandardSequences.SimIdeal_cff')
 
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T21', '')
+process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T35', '')
 
 if 'MessageLogger' in process.__dict__:
     process.MessageLogger.G4cerr=dict()

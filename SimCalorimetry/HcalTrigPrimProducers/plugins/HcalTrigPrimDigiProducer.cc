@@ -30,10 +30,9 @@
 #include <algorithm>
 #include <vector>
 
-class HcalTrigPrimDigiProducer : public edm::stream::EDProducer<> {
+class HcalTrigPrimDigiProducer : public edm::stream::EDProducer<edm::stream::WatchRuns> {
 public:
   explicit HcalTrigPrimDigiProducer(const edm::ParameterSet& ps);
-  ~HcalTrigPrimDigiProducer() override {}
 
   /**Produces the EDM products,*/
   void beginRun(const edm::Run& r, const edm::EventSetup& c) override;
@@ -87,6 +86,7 @@ HcalTrigPrimDigiProducer::HcalTrigPrimDigiProducer(const edm::ParameterSet& ps)
                ps.getParameter<int>("latency"),
                ps.getParameter<uint32_t>("FG_threshold"),
                ps.getParameter<std::vector<uint32_t> >("FG_HF_thresholds"),
+               ps.getParameter<bool>("useTDCfromDB"),
                ps.getParameter<uint32_t>("ZS_threshold"),
                ps.getParameter<int>("numberOfSamples"),
                ps.getParameter<int>("numberOfPresamples"),
@@ -180,9 +180,6 @@ void HcalTrigPrimDigiProducer::beginRun(const edm::Run& run, const edm::EventSet
       continue;
 
     int aieta = std::abs(hcalTTDetId.ieta());
-    // Do not let ieta 29 in the map
-    if (aieta >= lastHERing)
-      continue;
 
     // Filter weight represented in fixed point 8 bit
     int fixedPointWeight = 255;

@@ -340,7 +340,7 @@ namespace edm {
       ev.put(std::move(finalGenEventInfo3));
 
       std::unique_ptr<HepMC3Product> bare_product(new HepMC3Product());
-      bare_product->addHepMCData(finalEvent3.release());
+      bare_product->addHepMCData(*finalEvent3);
       ev.put(std::move(bare_product), "unsmeared");
     }
 
@@ -471,6 +471,10 @@ namespace edm {
     }
     std::unique_ptr<GenLumiInfoProduct> genLumiInfo(new GenLumiInfoProduct());
     genLumiInfo->setHEPIDWTUP(lheRunInfo->getHEPRUP()->IDWTUP);
+    int overrideHEPID = hadronizer_.getOverrideHEPIDWTUP();
+    if (overrideHEPID != -999) {
+      genLumiInfo->setHEPIDWTUP(overrideHEPID);
+    }
     genLumiInfo->setProcessInfo(GenLumiProcess);
 
     lumi.put(std::move(genLumiInfo));

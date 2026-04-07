@@ -34,7 +34,6 @@ namespace edm {
   class ModuleCallingContext;
   class PreallocationConfiguration;
   class ActivityRegistry;
-  class ThinnedAssociationsHelper;
   class SignallingProductRegistryFiller;
 
   namespace maker {
@@ -95,13 +94,9 @@ namespace edm {
       void doBeginLuminosityBlock(LumiTransitionInfo const&, ModuleCallingContext const*);
       void doEndLuminosityBlock(LumiTransitionInfo const&, ModuleCallingContext const*);
 
-      void doRespondToOpenInputFile(FileBlock const&) {}
-      void doRespondToCloseInputFile(FileBlock const&) {}
       void doRespondToCloseOutputFile() { clearInputProcessBlockCaches(); }
-      void doRegisterThinnedAssociations(ProductRegistry const&, ThinnedAssociationsHelper&) {}
 
       void registerProductsAndCallbacks(EDAnalyzerBase const* module, SignallingProductRegistryFiller* reg);
-      std::string workerType() const { return "WorkerT<EDAnalyzer>"; }
 
       SharedResourcesAcquirer& sharedResourcesAcquirer() { return resourcesAcquirer_; }
 

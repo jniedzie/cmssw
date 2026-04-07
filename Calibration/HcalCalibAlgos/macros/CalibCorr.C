@@ -24,6 +24,16 @@
 //      Prepares a Tchain by chaining several ROOT files specified
 // std::vector<std::string> splitString (fLine)
 //      Splits a string into several items which are separated by blank in i/p
+// double eMipCut(int form)
+//      Provides the MIP threshold fr energy in Ecal
+//        form: 0 gives the default cut value of 1.0 GEV
+//              1..6 sets the cut value of 0.5, 0.75, 1.25, 1.50, 1.75 2.0 GeV
+// CalibThreshold(form)
+//      A class which prvides threshold for HCAL RecHts to conform with PFCuts
+//        double threshold(unsigned int detId): proides the threshold
+//        form: 1-4 some depth dependnt cutoffs
+//              5-6 reads cutoffs from files "PFCuts2025.txt" (2025 defaults)
+//                  and "PFCuts362975.txt" (2023-2024 vakues(
 // CalibCorrFactor(infile, useScale, scale, etamax, debug)
 //      A class which reads a file with correction factors and provides
 //        bool   doCorr() : flag saying if correction is available
@@ -49,6 +59,9 @@
 //      A class for selecting a given set of Read Out Box's and provides
 //        bool isItRBX(detId): if it/they is in the chosen RBXs
 //        bool isItRBX(ieta, iphi): if it is in the chosen RBXs
+// CalibExcludRun(runFile, debug)
+//      A class for rejecting runs among the list of evets in the tree
+//        bool exclude(run): if the run is in the list of runs in runFile
 // CalibDuplicate(infile, flag, debug)
 //      A class for either rejecting duplicate entries or giving depth
 //        dependent weight. flag is 0 for keeping a list of duplicate
@@ -238,28 +251,6 @@ int truncateDepth(int ieta, int depth, int truncateFlag) {
   return d;
 }
 
-double threshold(int subdet, int depth, int form) {
-  double cutHE[4][7] = {{0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2},
-                        {0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2},
-                        {0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2},
-                        {0.2, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}};
-  double cutHB[4][4] = {{0.1, 0.2, 0.3, 0.3}, {0.25, 0.25, 0.3, 0.3}, {0.4, 0.3, 0.3, 0.3}, {0.6, 0.4, 0.4, 0.5}};
-  double thr(0);
-  if (form > 0) {
-    if (subdet == 2)
-      thr = cutHE[form - 1][depth - 1];
-    else
-      thr = cutHB[form - 1][depth - 1];
-  }
-  return thr;
-}
-
-double threshold(unsigned int detId, int form) {
-  int subdet = ((detId >> 25) & (0x7));
-  int depth = ((detId & 0x1000000) == 0) ? ((detId >> 14) & 0x1F) : ((detId >> 20) & 0xF);
-  return threshold(subdet, depth, form);
-}
-
 double puFactor(int type, int ieta, double pmom, double eHcal, double ediff, bool debug = false) {
   double fac(1.0);
   if (debug)
@@ -420,6 +411,23 @@ double puFactor(int type, int ieta, double pmom, double eHcal, double ediff, boo
       if (debug)
         std::cout << " d2p " << d2p << ":" << DELTA_CUT << " coeff " << icor << ":" << CONST_COR_COEF[icor] << ":"
                   << LINEAR_COR_COEF[icor] << ":" << SQUARE_COR_COEF[icor] << " Fac " << fac;
+    } else if (type == 8) {  // Mahi 22pu (Jan, 2022)
+      const double CONST_COR_COEF[6] = {0.995902, 0.991240, 0.981019, 0.788052, 0.597956, 0.538731};
+      const double LINEAR_COR_COEF[6] = {-0.0540563, -0.104361, -0.215936, -0.147801, -0.160845, -0.154359};
+      const double SQUARE_COR_COEF[6] = {0, 0, 0.0365911, 0.0161266, 0.0180053, 0.0184295};
+      const int PU_IETA_1 = 7;
+      const int PU_IETA_2 = 16;
+      const int PU_IETA_3 = 25;
+      const int PU_IETA_4 = 26;
+      const int PU_IETA_5 = 27;
+      unsigned icor = (unsigned(jeta >= PU_IETA_1) + unsigned(jeta >= PU_IETA_2) + unsigned(jeta >= PU_IETA_3) +
+                       unsigned(jeta >= PU_IETA_4) + unsigned(jeta >= PU_IETA_5));
+      double deltaCut = (icor > 2) ? 1.0 : DELTA_CUT;
+      if (d2p > deltaCut)
+        fac = (CONST_COR_COEF[icor] + LINEAR_COR_COEF[icor] * d2p + SQUARE_COR_COEF[icor] * d2p * d2p);
+      if (debug)
+        std::cout << " d2p " << d2p << ":" << DELTA_CUT << " coeff " << icor << ":" << CONST_COR_COEF[icor] << ":"
+                  << LINEAR_COR_COEF[icor] << ":" << SQUARE_COR_COEF[icor] << " Fac " << fac;
     } else if (type == 9) {  // M0 22pu (Jan, 2022)
       const double CONST_COR_COEF[6] = {0.980941, 0.973156, 0.970749, 0.726582, 0.532628, 0.473727};
       const double LINEAR_COR_COEF[6] = {-0.0770642, -0.178295, -0.241338, -0.122956, -0.122346, -0.112574};
@@ -454,10 +462,10 @@ double puFactor(int type, int ieta, double pmom, double eHcal, double ediff, boo
       if (debug)
         std::cout << " d2p " << d2p << ":" << DELTA_CUT << " coeff " << icor << ":" << CONST_COR_COEF[icor] << ":"
                   << LINEAR_COR_COEF[icor] << ":" << SQUARE_COR_COEF[icor] << " Fac " << fac;
-    } else {  // Mahi 22pu (Jan, 2022)
-      const double CONST_COR_COEF[6] = {0.995902, 0.991240, 0.981019, 0.788052, 0.597956, 0.538731};
-      const double LINEAR_COR_COEF[6] = {-0.0540563, -0.104361, -0.215936, -0.147801, -0.160845, -0.154359};
-      const double SQUARE_COR_COEF[6] = {0, 0, 0.0365911, 0.0161266, 0.0180053, 0.0184295};
+    } else {  // (type == 11) Mahi 25pu (Jan, 2025)
+      const double CONST_COR_COEF[6] = {1.00418, 1.00013, 1.02139, 0.670393, 0.497555, 0.380463};
+      const double LINEAR_COR_COEF[6] = {-0.0193499, -0.0160719, -0.364176, -0.148756, -0.127428, -0.0940064};
+      const double SQUARE_COR_COEF[6] = {0, 0, 0.0667812, 0.0156051, 0.0129546, 0.00923415};
       const int PU_IETA_1 = 7;
       const int PU_IETA_2 = 16;
       const int PU_IETA_3 = 25;
@@ -568,6 +576,103 @@ std::vector<std::string> splitString(const std::string& fLine) {
   return result;
 }
 
+double eMipCut(int form) {
+  const double cuts[7] = {1.0, 0.5, 0.75, 1.25, 1.5, 1.75, 2.0};
+  return (((form >= 0) && (form < 7)) ? cuts[form] : 1.0);
+}
+
+class CalibThreshold {
+public:
+  CalibThreshold(int form);
+  ~CalibThreshold() {}
+
+  double threshold(unsigned int detId);
+
+private:
+  double threshold(int subdet, int ieta, int depth);
+  bool fileThreshold(const char* fname);
+
+  int form_;
+  std::map<std::pair<int, int>, double> thresh_;
+  bool ok_;
+};
+
+CalibThreshold::CalibThreshold(int form) : form_(form) {
+  if (form_ == 6)
+    ok_ = fileThreshold("PFCuts362975.txt");
+  else if (form_ == 5)
+    ok_ = fileThreshold("PFCuts2025.txt");
+  else if ((form_ < 1) || (form_ > 6))
+    ok_ = false;
+  else
+    ok_ = true;
+  std::cout << "CalibThreshold initialized with flag " << ok_ << " for form " << form_ << std::endl;
+}
+
+bool CalibThreshold::fileThreshold(const char* fname) {
+  bool ok(false);
+  if (std::string(fname) != "") {
+    std::ifstream fInput(fname);
+    if (!fInput.good()) {
+      std::cout << "Cannot open file " << fname << std::endl;
+    } else {
+      char buffer[1024];
+      unsigned int all(0), good(0), bad(0);
+      while (fInput.getline(buffer, 1024)) {
+        ++all;
+        if (buffer[0] == '#')
+          continue;  //ignore comment
+        std::vector<std::string> items = splitString(std::string(buffer));
+        if (items.size() != 7) {
+          ++bad;
+          std::cout << "Ignore  line: " << buffer << std::endl;
+        } else {
+          ++good;
+          int ieta = std::atoi(items[0].c_str());
+          int depth = std::atoi(items[2].c_str());
+          double thr = std::atof(items[4].c_str());
+          thresh_[std::pair<int, int>(ieta, depth)] = thr;
+        }
+      }
+      fInput.close();
+      std::cout << "Reads " << all << " entries from " << fname << " with " << good << " Good and " << bad
+                << " bad records" << std::endl;
+      if (good > 0)
+        ok = true;
+    }
+  }
+  return ok;
+}
+
+double CalibThreshold::threshold(int subdet, int ieta, int depth) {
+  double cutHE[4][7] = {{0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2},
+                        {0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2},
+                        {0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2},
+                        {0.2, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}};
+  double cutHB[4][4] = {{0.1, 0.2, 0.3, 0.3}, {0.25, 0.25, 0.3, 0.3}, {0.4, 0.3, 0.3, 0.3}, {0.6, 0.4, 0.4, 0.5}};
+
+  double thr(0);
+  if (ok_) {
+    if ((form_ > 0) && (form_ <= 4)) {
+      if (subdet == 2)
+        thr = cutHE[form_ - 1][depth - 1];
+      else
+        thr = cutHB[form_ - 1][depth - 1];
+    } else {
+      std::map<std::pair<int, int>, double>::const_iterator itr = thresh_.find(std::pair<int, int>(ieta, depth));
+      if (itr != thresh_.end())
+        thr = itr->second;
+    }
+  }
+  return thr;
+}
+
+double CalibThreshold::threshold(unsigned int detId) {
+  int subdet, zside, ieta, iphi, depth;
+  unpackDetId(detId, subdet, zside, ieta, iphi, depth);
+  return threshold(subdet, (zside * ieta), depth);
+}
+
 class CalibCorrFactor {
 public:
   CalibCorrFactor(const char* infile, int useScale, double scale, bool etamax, bool marina, bool debug);
@@ -640,6 +745,18 @@ public:
 private:
   bool debug_;
   std::vector<int> zsphis_;
+};
+
+class CalibExcludeRuns {
+public:
+  CalibExcludeRuns(const char* runFile, bool debug = false);
+  ~CalibExcludeRuns() {}
+
+  bool exclude(int run);
+
+private:
+  bool debug_;
+  std::vector<int> runs_;
 };
 
 class CalibDuplicate {
@@ -1303,6 +1420,45 @@ bool CalibSelectRBX::isItRBX(const int ieta, const int iphi) {
     std::cout << "isItRBX: ieta " << ieta << " iphi " << iphi << " OK " << ok << std::endl;
   }
   return ok;
+}
+
+CalibExcludeRuns::CalibExcludeRuns(const char* runFile, bool debug) : debug_(debug) {
+  std::cout << "Enters CalibExcludeRuns for " << runFile << std::endl;
+  unsigned int all(0), good(0);
+  std::ifstream fInput(runFile);
+  if (!fInput.good()) {
+    std::cout << "Cannot open file " << runFile << std::endl;
+  } else {
+    char buffer[1024];
+    while (fInput.getline(buffer, 1024)) {
+      ++all;
+      std::string bufferString(buffer);
+      if (bufferString.substr(0, 1) == "#") {
+        continue;  //ignore other comments
+      } else {
+        std::vector<std::string> items = splitString(bufferString);
+        ++good;
+        for (unsigned int k = 0; k < items.size(); ++k) {
+          int run = std::atoi(items[k].c_str());
+          runs_.push_back(run);
+        }
+      }
+    }
+    fInput.close();
+  }
+  std::cout << "Select a set of " << runs_.size() << " runs to be excluded "
+            << " by reading " << all << ":" << good << " records from " << runFile << std::endl;
+}
+
+bool CalibExcludeRuns::exclude(int run) {
+  bool reject(false);
+  if (runs_.size() > 0) {
+    reject = (std::find(runs_.begin(), runs_.end(), run) != runs_.end());
+
+    if (debug_)
+      std::cout << "CalibExcludeRuns: reject flag " << reject << " for Run " << run << std::endl;
+  }
+  return reject;
 }
 
 CalibDuplicate::CalibDuplicate(const char* fname, int flag, bool debug)

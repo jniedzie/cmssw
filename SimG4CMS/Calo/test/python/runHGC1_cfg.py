@@ -1,7 +1,7 @@
 ###############################################################################
 # Way to use this:
 #   cmsRun runHGC1_cfg.py geometry=V18
-#   Options for geometry V17, V17Shift, V18, V19
+#   Options for geometry V17, V17Shift, V18, V19, V19n
 # 
 ###############################################################################
 import FWCore.ParameterSet.Config as cms
@@ -15,7 +15,7 @@ options.register('geometry',
                  "V18",
                   VarParsing.VarParsing.multiplicity.singleton,
                   VarParsing.VarParsing.varType.string,
-                  "geometry of operations: V17, V17Shift, V18, V19")
+                  "geometry of operations: V17, V17Shift, V18, V19, V19n")
 
 ### get and parse the command line arguments
  
@@ -47,14 +47,15 @@ process.load("Configuration.StandardSequences.MagneticField_cff")
 process.load("Configuration.EventContent.EventContent_cff")
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T21', '')
+process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T35', '')
 
 if hasattr(process,'MessageLogger'):
     process.MessageLogger.G4cout = dict()
     process.MessageLogger.G4cerr = dict()
     process.MessageLogger.HGCalGeom = dict()
+    process.MessageLogger.HGCalGeomT = dict()
     process.MessageLogger.HGCSim = dict()
-    process.MessageLogger.CaloSim = dict()
+#   process.MessageLogger.CaloSim = dict()
 
 process.load("IOMC.RandomEngine.IOMC_cff")
 process.RandomNumberGeneratorService.generator.initialSeed = 456789

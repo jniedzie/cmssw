@@ -49,20 +49,14 @@ namespace edm::streamer {
 
   int StreamSerializer::serializeRegistry(SerializeDataBuffer &data_buffer,
                                           SendJobHeader::ParameterSetMap const &psetMap) const {
-    FDEBUG(6) << "StreamSerializer::serializeRegistry" << std::endl;
     SendJobHeader sd;
-
-    FDEBUG(9) << "Product List: " << std::endl;
 
     for (auto const &selection : *selections_) {
       sd.push_back(*selection.first);
-      FDEBUG(9) << "StreamOutput got product = " << selection.first->className() << std::endl;
     }
     sd.setParameterSetMap(psetMap);
 
     data_buffer.rootbuf_.Reset();
-
-    RootDebug tracer(10, 10);
 
     TClass *tc = getTClass(typeid(SendJobHeader));
     int bres = data_buffer.rootbuf_.WriteObjectAny((char *)&sd, tc);
@@ -130,13 +124,8 @@ namespace edm::streamer {
                                        unsigned int reserveSize) const {
     EventSelectionIDVector selectionIDs = event.eventSelectionIDs();
     selectionIDs.push_back(selectorConfig);
-    SendEvent se(event.eventAuxiliary(),
-                 event.processHistory(),
-                 selectionIDs,
-                 event.branchListIndexes(),
-                 {},
-                 {},
-                 metaDataChecksum);
+    SendEvent se(
+        event.eventAuxiliary(), event.processHistory(), selectionIDs, event.branchListIndexes(), {}, metaDataChecksum);
 
     // Loop over EDProducts, fill the provenance, and write.
 
@@ -176,11 +165,10 @@ namespace edm::streamer {
 
   int StreamSerializer::serializeEventMetaData(SerializeDataBuffer &data_buffer,
                                                const BranchIDLists &branchIDLists,
-                                               ThinnedAssociationsHelper const &thinnedAssociationsHelper,
                                                StreamerCompressionAlgo compressionAlgo,
                                                int compression_level,
                                                unsigned int reserveSize) const {
-    SendEvent se({}, {}, {}, {}, branchIDLists, thinnedAssociationsHelper, 0);
+    SendEvent se({}, {}, {}, {}, branchIDLists, 0);
 
     return serializeEventCommon(data_buffer, se, compressionAlgo, compression_level, reserveSize);
   }
@@ -191,7 +179,6 @@ namespace edm::streamer {
                                              int compression_level,
                                              unsigned int reserveSize) const {
     data_buffer.rootbuf_.Reset();
-    RootDebug tracer(10, 10);
 
     //TClass* tc = getTClass(typeid(SendEvent));
     int bres = data_buffer.rootbuf_.WriteObjectAny(&se, tc_);
@@ -305,8 +292,6 @@ namespace edm::streamer {
       // return the correct length
       resultSize = dest_size;
 
-      FDEBUG(1) << " original size = " << inputSize << " final size = " << dest_size
-                << " ratio = " << double(dest_size) / double(inputSize) << std::endl;
     } else {
       throw cms::Exception("StreamSerializer", "compressBuffer")
           << "Compression Return value: " << ret << " Okay = " << Z_OK << std::endl;
@@ -394,9 +379,6 @@ namespace edm::streamer {
       tgt[3] = 0;  //let's put offset to 4, not 3
     }
 
-    FDEBUG(1) << " LZMA original size = " << inputSize << " final size = " << stream.total_out
-              << " ratio = " << double(stream.total_out) / double(inputSize) << std::endl;
-
     return stream.total_out + hdr_size;
   }
 
@@ -433,8 +415,6 @@ namespace edm::streamer {
       // return the correct length
       resultSize = (unsigned int)dest_size + hdr_size;
 
-      FDEBUG(1) << " original size = " << inputSize << " final size = " << dest_size
-                << " ratio = " << double(dest_size) / double(inputSize) << std::endl;
     } else {
       throw cms::Exception("StreamSerializer", "compressBuffer")
           << "Compression (ZSTD) Error: " << ZSTD_getErrorName(dest_size);

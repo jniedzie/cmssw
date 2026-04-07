@@ -57,8 +57,7 @@ namespace edm {
   class ProvenanceReaderBase;
   class ProvenanceAdaptor;
   class StoredMergeableRunProductMetadata;
-  class RunHelperBase;
-  class ThinnedAssociationsHelper;
+  class InputSourceRunHelperBase;
 
   using EntryDescriptionMap = std::map<EntryDescriptionID, EventEntryDescription>;
 
@@ -93,16 +92,14 @@ namespace edm {
     using TTreeOptions = RootTree::Options;
     struct ProductChoices {
       ProductSelectorRules const& productSelectorRules;
-      std::vector<BranchID> const* associationsFromSecondary = nullptr;
       bool dropDescendantsOfDroppedProducts = false;
       bool labelRawDataLikeMC = false;
     };
 
     struct CrossFileInfo {
-      RunHelperBase* runHelper = nullptr;
+      InputSourceRunHelperBase* runHelper = nullptr;
       std::shared_ptr<BranchIDListHelper> branchIDListHelper{};
       ProcessBlockHelper* processBlockHelper = nullptr;
-      std::shared_ptr<ThinnedAssociationsHelper> thinnedAssociationsHelper{};
       std::shared_ptr<DuplicateChecker> duplicateChecker{};
       std::vector<std::shared_ptr<IndexIntoFile>> const& indexesIntoFiles;  //duplicate checking
       std::vector<std::shared_ptr<IndexIntoFile>>::size_type currentIndexIntoFile;
@@ -155,6 +152,8 @@ namespace edm {
     std::array<bool, NumBranchTypes> const& hasNewlyDroppedBranch() const { return hasNewlyDroppedBranch_; }
     bool branchListIndexesUnchanged() const { return branchListIndexesUnchanged_; }
     bool modifiedIDs() const { return daqProvenanceHelper_.get() != nullptr; }
+    //Are there no data stored in the file?
+    bool empty() const;
     std::shared_ptr<FileBlock> createFileBlock();
     void updateFileBlock(FileBlock&);
 
@@ -197,7 +196,6 @@ namespace edm {
     bool wasFirstEventJustRead() const;
     IndexIntoFile::IndexIntoFileItr indexIntoFileIter() const;
     void setPosition(IndexIntoFile::IndexIntoFileItr const& position);
-    void initAssociationsFromSecondary(std::vector<BranchID> const&);
 
     void setSignals(
         signalslot::Signal<void(StreamContext const&, ModuleCallingContext const&)> const* preEventReadSource,
@@ -303,10 +301,8 @@ namespace edm {
     edm::propagate_const<std::shared_ptr<BranchIDListHelper>> branchIDListHelper_;
     edm::propagate_const<ProcessBlockHelper*> processBlockHelper_;
     edm::propagate_const<std::unique_ptr<StoredProcessBlockHelper>> storedProcessBlockHelper_;
-    edm::propagate_const<std::unique_ptr<ThinnedAssociationsHelper>> fileThinnedAssociationsHelper_;
-    edm::propagate_const<std::shared_ptr<ThinnedAssociationsHelper>> thinnedAssociationsHelper_;
     InputSource::ProcessingMode processingMode_;
-    edm::propagate_const<RunHelperBase*> runHelper_;
+    edm::propagate_const<InputSourceRunHelperBase*> runHelper_;
     std::map<std::string, std::string> newBranchToOldBranch_;
     edm::propagate_const<TTree*> eventHistoryTree_;  // backward compatibility
     EventToProcessBlockIndexes eventToProcessBlockIndexes_;

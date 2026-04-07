@@ -118,14 +118,12 @@ namespace edm {
     BasicHandle getByToken(KindOfType kindOfType,
                            TypeID const& typeID,
                            ProductResolverIndex index,
-                           bool skipCurrentProcess,
                            bool& ambiguous,
                            SharedResourcesAcquirer* sra,
                            ModuleCallingContext const* mcc) const;
 
     void prefetchAsync(WaitingTaskHolder waitTask,
                        ProductResolverIndex index,
-                       bool skipCurrentProcess,
                        ServiceToken const& token,
                        ModuleCallingContext const* mcc) const;
 
@@ -223,15 +221,6 @@ namespace edm {
     void addDroppedProduct(ProductDescription const& bd);
 
     WrapperBase const* getIt(ProductID const&) const override;
-    std::optional<std::tuple<WrapperBase const*, unsigned int>> getThinnedProduct(ProductID const&,
-                                                                                  unsigned int) const override;
-    void getThinnedProducts(ProductID const&,
-                            std::vector<WrapperBase const*>&,
-                            std::vector<unsigned int>&) const override;
-    OptionalThinnedKey getThinnedKeyFrom(ProductID const& parent,
-                                         unsigned int key,
-                                         ProductID const& thinned) const override;
-
     ProductData const* findProductByLabel(KindOfType kindOfType,
                                           TypeID const& typeID,
                                           InputTag const& inputTag,

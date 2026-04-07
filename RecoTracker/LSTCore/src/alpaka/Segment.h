@@ -85,10 +85,49 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     return moduleSeparation;
   }
 
-  template <typename TAcc>
+  // Pre-loaded module data for segment creation, eliminating redundant SoA lookups
+  // in inner loops. Populated once per module (outer/middle loop level).
+  struct ModuleSegData {
+    float drdz;
+    float moduleGapSize;
+    float segMiniTilt2;  // 0.25 * kPixelPSZpitch^2 * drdz^2 / (1+drdz^2) / gap^2; 0 if not tilted
+    float sdMuls;        // kMiniMulsPtScale[iL] * 3 / ptCut
+
+    unsigned int iL;  // layer - 1
+
+    short subdet;
+    short side;
+    short layer;
+    short moduleType;
+
+    bool isTilted;
+  };
+
+  ALPAKA_FN_ACC ALPAKA_FN_INLINE ModuleSegData loadModuleSegData(ModulesConst modules,
+                                                                 uint16_t moduleIndex,
+                                                                 const float ptCut) {
+    ModuleSegData mod;
+    mod.subdet = modules.subdets()[moduleIndex];
+    mod.side = modules.sides()[moduleIndex];
+    mod.layer = modules.layers()[moduleIndex];
+    mod.iL = mod.layer - 1;
+    mod.moduleType = modules.moduleType()[moduleIndex];
+    mod.drdz = modules.drdzs()[moduleIndex];
+    mod.moduleGapSize = moduleGapSize_seg(modules, moduleIndex);
+    mod.isTilted = (mod.subdet == Barrel and mod.side != Center);
+    mod.segMiniTilt2 = mod.isTilted ? (0.25f * (kPixelPSZpitch * kPixelPSZpitch) * (mod.drdz * mod.drdz) /
+                                       (1.f + mod.drdz * mod.drdz) / (mod.moduleGapSize * mod.moduleGapSize))
+                                    : 0.f;
+    mod.sdMuls = (mod.subdet == Barrel) ? kMiniMulsPtScaleBarrel[mod.iL] * 3.f / ptCut
+                                        : kMiniMulsPtScaleEndcap[mod.iL] * 3.f / ptCut;
+    return mod;
+  }
+
+  template <alpaka::concepts::Acc TAcc>
   ALPAKA_FN_ACC ALPAKA_FN_INLINE void dAlphaThreshold(TAcc const& acc,
                                                       float* dAlphaThresholdValues,
-                                                      ModulesConst modules,
+                                                      ModuleSegData const& innerMod,
+                                                      ModuleSegData const& outerMod,
                                                       MiniDoubletsConst mds,
                                                       float xIn,
                                                       float yIn,
@@ -98,14 +137,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                                       float yOut,
                                                       float zOut,
                                                       float rtOut,
-                                                      uint16_t innerLowerModuleIndex,
-                                                      uint16_t outerLowerModuleIndex,
                                                       unsigned int innerMDIndex,
                                                       unsigned int outerMDIndex,
                                                       const float ptCut) {
-    float sdMuls = (modules.subdets()[innerLowerModuleIndex] == Barrel)
-                       ? kMiniMulsPtScaleBarrel[modules.layers()[innerLowerModuleIndex] - 1] * 3.f / ptCut
-                       : kMiniMulsPtScaleEndcap[modules.layers()[innerLowerModuleIndex] - 1] * 3.f / ptCut;
+    const float sdMuls = innerMod.sdMuls;
 
     //more accurate then outer rt - inner rt
     float segmentDr = alpaka::math::sqrt(acc, (yOut - yIn) * (yOut - yIn) + (xOut - xIn) * (xOut - xIn));
@@ -113,62 +148,40 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     const float dAlpha_Bfield =
         alpaka::math::asin(acc, alpaka::math::min(acc, segmentDr * k2Rinv1GeVf / ptCut, kSinAlphaMax));
 
-    bool isInnerTilted =
-        modules.subdets()[innerLowerModuleIndex] == Barrel and modules.sides()[innerLowerModuleIndex] != Center;
-    bool isOuterTilted =
-        modules.subdets()[outerLowerModuleIndex] == Barrel and modules.sides()[outerLowerModuleIndex] != Center;
-
-    float drdzInner = modules.drdzs()[innerLowerModuleIndex];
-    float drdzOuter = modules.drdzs()[outerLowerModuleIndex];
-    float innerModuleGapSize = moduleGapSize_seg(modules, innerLowerModuleIndex);
-    float outerModuleGapSize = moduleGapSize_seg(modules, outerLowerModuleIndex);
-    const float innerminiTilt2 = isInnerTilted
-                                     ? ((0.5f * 0.5f) * (kPixelPSZpitch * kPixelPSZpitch) * (drdzInner * drdzInner) /
-                                        (1.f + drdzInner * drdzInner) / (innerModuleGapSize * innerModuleGapSize))
-                                     : 0;
-
-    const float outerminiTilt2 = isOuterTilted
-                                     ? ((0.5f * 0.5f) * (kPixelPSZpitch * kPixelPSZpitch) * (drdzOuter * drdzOuter) /
-                                        (1.f + drdzOuter * drdzOuter) / (outerModuleGapSize * outerModuleGapSize))
-                                     : 0;
-
-    float miniDelta = innerModuleGapSize;
-
     float sdLumForInnerMini2;
     float sdLumForOuterMini2;
 
-    if (modules.subdets()[innerLowerModuleIndex] == Barrel) {
-      sdLumForInnerMini2 = innerminiTilt2 * (dAlpha_Bfield * dAlpha_Bfield);
+    if (innerMod.subdet == Barrel) {
+      sdLumForInnerMini2 = innerMod.segMiniTilt2 * (dAlpha_Bfield * dAlpha_Bfield);
     } else {
       sdLumForInnerMini2 = (mds.dphis()[innerMDIndex] * mds.dphis()[innerMDIndex]) * (kDeltaZLum * kDeltaZLum) /
                            (mds.dzs()[innerMDIndex] * mds.dzs()[innerMDIndex]);
     }
 
-    if (modules.subdets()[outerLowerModuleIndex] == Barrel) {
-      sdLumForOuterMini2 = outerminiTilt2 * (dAlpha_Bfield * dAlpha_Bfield);
+    if (outerMod.subdet == Barrel) {
+      sdLumForOuterMini2 = outerMod.segMiniTilt2 * (dAlpha_Bfield * dAlpha_Bfield);
     } else {
       sdLumForOuterMini2 = (mds.dphis()[outerMDIndex] * mds.dphis()[outerMDIndex]) * (kDeltaZLum * kDeltaZLum) /
                            (mds.dzs()[outerMDIndex] * mds.dzs()[outerMDIndex]);
     }
 
     // Unique stuff for the segment dudes alone
+    const float miniDelta = innerMod.moduleGapSize;
     float dAlpha_res_inner =
-        0.02f / miniDelta *
-        (modules.subdets()[innerLowerModuleIndex] == Barrel ? 1.0f : alpaka::math::abs(acc, zIn) / rtIn);
+        0.02f / miniDelta * (innerMod.subdet == Barrel ? 1.0f : alpaka::math::abs(acc, zIn) / rtIn);
     float dAlpha_res_outer =
-        0.02f / miniDelta *
-        (modules.subdets()[outerLowerModuleIndex] == Barrel ? 1.0f : alpaka::math::abs(acc, zOut) / rtOut);
+        0.02f / miniDelta * (outerMod.subdet == Barrel ? 1.0f : alpaka::math::abs(acc, zOut) / rtOut);
 
     float dAlpha_res = dAlpha_res_inner + dAlpha_res_outer;
 
-    if (modules.subdets()[innerLowerModuleIndex] == Barrel and modules.sides()[innerLowerModuleIndex] == Center) {
+    if (innerMod.subdet == Barrel and innerMod.side == Center) {
       dAlphaThresholdValues[0] = dAlpha_Bfield + alpaka::math::sqrt(acc, dAlpha_res * dAlpha_res + sdMuls * sdMuls);
     } else {
       dAlphaThresholdValues[0] =
           dAlpha_Bfield + alpaka::math::sqrt(acc, dAlpha_res * dAlpha_res + sdMuls * sdMuls + sdLumForInnerMini2);
     }
 
-    if (modules.subdets()[outerLowerModuleIndex] == Barrel and modules.sides()[outerLowerModuleIndex] == Center) {
+    if (outerMod.subdet == Barrel and outerMod.side == Center) {
       dAlphaThresholdValues[1] = dAlpha_Bfield + alpaka::math::sqrt(acc, dAlpha_res * dAlpha_res + sdMuls * sdMuls);
     } else {
       dAlphaThresholdValues[1] =
@@ -186,12 +199,21 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                                          uint16_t outerLowerModuleIndex,
                                                          unsigned int innerMDAnchorHitIndex,
                                                          unsigned int outerMDAnchorHitIndex,
-                                                         float dPhi,
-                                                         float dPhiMin,
-                                                         float dPhiMax,
                                                          float dPhiChange,
                                                          float dPhiChangeMin,
                                                          float dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                                         float dPhi,
+                                                         float dPhiMin,
+                                                         float dPhiMax,
+                                                         float zHi,
+                                                         float zLo,
+                                                         float rtHi,
+                                                         float rtLo,
+                                                         float dAlphaInner,
+                                                         float dAlphaOuter,
+                                                         float dAlphaInnerOuter,
+#endif
                                                          unsigned int idx) {
     segments.mdIndices()[idx][0] = lowerMDIndex;
     segments.mdIndices()[idx][1] = upperMDIndex;
@@ -200,15 +222,27 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     segments.innerMiniDoubletAnchorHitIndices()[idx] = innerMDAnchorHitIndex;
     segments.outerMiniDoubletAnchorHitIndices()[idx] = outerMDAnchorHitIndex;
 
+    segments.dPhiChanges()[idx] = __F2H(dPhiChange);
+#ifdef CUT_VALUE_DEBUG
     segments.dPhis()[idx] = __F2H(dPhi);
     segments.dPhiMins()[idx] = __F2H(dPhiMin);
     segments.dPhiMaxs()[idx] = __F2H(dPhiMax);
-    segments.dPhiChanges()[idx] = __F2H(dPhiChange);
+#endif
     segments.dPhiChangeMins()[idx] = __F2H(dPhiChangeMin);
     segments.dPhiChangeMaxs()[idx] = __F2H(dPhiChangeMax);
+
+#ifdef CUT_VALUE_DEBUG
+    segments.zHis()[idx] = __F2H(zHi);
+    segments.zLos()[idx] = __F2H(zLo);
+    segments.rtHis()[idx] = __F2H(rtHi);
+    segments.rtLos()[idx] = __F2H(rtLo);
+    segments.dAlphaInners()[idx] = __F2H(dAlphaInner);
+    segments.dAlphaOuters()[idx] = __F2H(dAlphaOuter);
+    segments.dAlphaInnerOuters()[idx] = __F2H(dAlphaInnerOuter);
+#endif
   }
 
-  template <typename TAcc>
+  template <alpaka::concepts::Acc TAcc>
   ALPAKA_FN_ACC ALPAKA_FN_INLINE void addPixelSegmentToMemory(TAcc const& acc,
                                                               Segments segments,
                                                               PixelSegments pixelSegments,
@@ -287,12 +321,105 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     }
   }
 
-  template <typename TAcc>
+  // When LooseOnly=true, returns after the pre-check (used by counting kernel).
+  template <bool LooseOnly = false, alpaka::concepts::Acc TAcc>
+  ALPAKA_FN_ACC ALPAKA_FN_INLINE bool passDeltaPhiCutsBarrel(TAcc const& acc,
+                                                             MiniDoubletsConst mds,
+                                                             unsigned int innerMD,
+                                                             unsigned int outerMD,
+                                                             const float xIn,
+                                                             const float yIn,
+                                                             const float xOut,
+                                                             const float yOut,
+                                                             const float rtIn,
+                                                             const float rtOut,
+                                                             const float sdSlopeSin,
+                                                             const float sdMulsAndPVoff,
+                                                             const float sdCut,
+                                                             float& dPhi,
+                                                             float& dPhiChange) {
+    // Loose sin^2-based pre-check for dPhi and dPhiChange using x/y coordinates
+    // directly, avoiding anchorPhi SoA reads + reducePhiRange for pairs that clearly fail.
+    //
+    // Check: |sin(dPhi)| < L where L = sdSlopeSin + sdMulsAndPVoff (looseCutDPhi).
+    // This is strictly looser than |dPhi| < sdCut because L = s + M >= sin(asin(s) + M)
+    // = sin(sdCut), provable via f(M) = s+M - sin(asin(s)+M), f(0)=0, f'(M)=1-cos(...)>=0.
+    // Using Lagrange identity (cross^2+dot^2 = rtIn^2*rtOut^2): |cross| >= L*rtIn*rtOut.
+    //
+    // The dPhiChange pre-check replaces dotDPhi with dotDPhiChange = dotDPhi - rtIn^2
+    const float crossDPhi = xIn * yOut - xOut * yIn;
+    const float dotDPhi = xIn * xOut + yIn * yOut;
+    if (dotDPhi <= 0.f)
+      return false;
+    // Lagrange identity: crossDPhi^2 + dotDPhi^2 = rtIn^2 * rtOut^2
+    const float looseCutDPhi = sdSlopeSin + sdMulsAndPVoff;
+    if (alpaka::math::abs(acc, crossDPhi) >= looseCutDPhi * rtIn * rtOut)
+      return false;
+    const float dotDPhiChange = dotDPhi - (rtIn * rtIn);
+    if (dotDPhiChange <= 0.f ||
+        crossDPhi * crossDPhi >= looseCutDPhi * looseCutDPhi * (crossDPhi * crossDPhi + dotDPhiChange * dotDPhiChange))
+      return false;
+
+    if constexpr (LooseOnly)
+      return true;
+
+    dPhi = cms::alpakatools::reducePhiRange(acc, mds.anchorPhi()[outerMD] - mds.anchorPhi()[innerMD]);
+
+    if (alpaka::math::abs(acc, dPhi) > sdCut)
+      return false;
+
+    dPhiChange = cms::alpakatools::reducePhiRange(
+        acc, cms::alpakatools::phi(acc, xOut - xIn, yOut - yIn) - mds.anchorPhi()[innerMD]);
+
+    return alpaka::math::abs(acc, dPhiChange) < sdCut;
+  }
+
+  // When LooseOnly=true, returns after the pre-check (used by counting kernel).
+  template <bool LooseOnly = false, alpaka::concepts::Acc TAcc>
+  ALPAKA_FN_ACC ALPAKA_FN_INLINE bool passDeltaPhiCutsEndcap(TAcc const& acc,
+                                                             MiniDoubletsConst mds,
+                                                             unsigned int innerMD,
+                                                             unsigned int outerMD,
+                                                             const float xIn,
+                                                             const float yIn,
+                                                             const float xOut,
+                                                             const float yOut,
+                                                             const float rtIn,
+                                                             const float rtOut,
+                                                             const float sdSlopeSin,
+                                                             float& dPhi,
+                                                             const float sdSlope) {
+    // Phi pre-check: tan^2(dPhi) > tan^2(sdSlope) implies |dPhi| > sdSlope.
+    // Using Lagrange identity: cross^2 + dot^2 = rtIn^2 * rtOut^2, so
+    // |cross|/sqrt(cross^2+dot^2) > sdSlopeSin simplifies to |cross| > sdSlopeSin * rtIn * rtOut.
+    const float crossDPhi = xIn * yOut - xOut * yIn;
+    const float dotDPhi = xIn * xOut + yIn * yOut;
+    if (dotDPhi <= 0.f || alpaka::math::abs(acc, crossDPhi) > sdSlopeSin * rtIn * rtOut)
+      return false;
+
+    if constexpr (LooseOnly)
+      return true;
+
+    dPhi = cms::alpakatools::reducePhiRange(acc, mds.anchorPhi()[outerMD] - mds.anchorPhi()[innerMD]);
+
+    if (alpaka::math::abs(acc, dPhi) > sdSlope)
+      return false;
+
+    const float zIn = mds.anchorZ()[innerMD];
+    const float zOut = mds.anchorZ()[outerMD];
+
+    const float dz = zOut - zIn;
+    const float dzFrac = dz / zIn;
+    const float dPhiChange = dPhi / dzFrac * (1.f + dzFrac);
+
+    return alpaka::math::abs(acc, dPhiChange) < sdSlope;
+  }
+
+  template <alpaka::concepts::Acc TAcc>
   ALPAKA_FN_ACC ALPAKA_FN_INLINE bool runSegmentDefaultAlgoBarrel(TAcc const& acc,
-                                                                  ModulesConst modules,
+                                                                  ModuleSegData const& innerMod,
+                                                                  ModuleSegData const& outerMod,
                                                                   MiniDoubletsConst mds,
-                                                                  uint16_t innerLowerModuleIndex,
-                                                                  uint16_t outerLowerModuleIndex,
                                                                   unsigned int innerMDIndex,
                                                                   unsigned int outerMDIndex,
                                                                   float& dPhi,
@@ -301,11 +428,18 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                                                   float& dPhiChange,
                                                                   float& dPhiChangeMin,
                                                                   float& dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                                                  float& dAlphaInnerMDSegment,
+                                                                  float& dAlphaOuterMDSegment,
+                                                                  float& dAlphaInnerMDOuterMD,
+                                                                  float& zLo,
+                                                                  float& zHi,
+#endif
                                                                   const float ptCut) {
-    float sdMuls = (modules.subdets()[innerLowerModuleIndex] == Barrel)
-                       ? kMiniMulsPtScaleBarrel[modules.layers()[innerLowerModuleIndex] - 1] * 3.f / ptCut
-                       : kMiniMulsPtScaleEndcap[modules.layers()[innerLowerModuleIndex] - 1] * 3.f / ptCut;
-
+#ifndef CUT_VALUE_DEBUG
+    float dAlphaInnerMDSegment, dAlphaOuterMDSegment, dAlphaInnerMDOuterMD;
+    float zLo, zHi;
+#endif
     float xIn, yIn, zIn, rtIn, xOut, yOut, zOut, rtOut;
 
     xIn = mds.anchorX()[innerMDIndex];
@@ -318,36 +452,46 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     zOut = mds.anchorZ()[outerMDIndex];
     rtOut = mds.anchorRt()[outerMDIndex];
 
-    float sdSlope = alpaka::math::asin(acc, alpaka::math::min(acc, rtOut * k2Rinv1GeVf / ptCut, kSinAlphaMax));
-    float sdPVoff = 0.1f / rtOut;
-    float dzDrtScale = alpaka::math::tan(acc, sdSlope) / sdSlope;  //FIXME: need appropriate value
+    const float sdSlopeSin = alpaka::math::min(acc, rtOut * k2Rinv1GeVf / ptCut, kSinAlphaMax);
+    float sdSlope = alpaka::math::asin(acc, sdSlopeSin);
+    // Exact: tan(asin(s))/asin(s) = s/(asin(s)*sqrt(1-s^2)), eliminates tan call
+    float dzDrtScale = sdSlopeSin / (sdSlope * alpaka::math::sqrt(acc, 1.f - sdSlopeSin * sdSlopeSin));
 
-    const float zGeom = modules.layers()[innerLowerModuleIndex] <= 2 ? 2.f * kPixelPSZpitch : 2.f * kStrip2SZpitch;
+    const float zGeom = innerMod.layer <= 2 ? 2.f * kPixelPSZpitch : 2.f * kStrip2SZpitch;
 
-    float zLo = zIn + (zIn - kDeltaZLum) * (rtOut / rtIn - 1.f) * (zIn > 0.f ? 1.f : dzDrtScale) -
-                zGeom;  //slope-correction only on outer end
-    float zHi = zIn + (zIn + kDeltaZLum) * (rtOut / rtIn - 1.f) * (zIn < 0.f ? 1.f : dzDrtScale) + zGeom;
+    //slope-correction only on outer end
+    zLo = zIn + (zIn - kDeltaZLum) * (rtOut / rtIn - 1.f) * (zIn > 0.f ? 1.f : dzDrtScale) - zGeom;
+    zHi = zIn + (zIn + kDeltaZLum) * (rtOut / rtIn - 1.f) * (zIn < 0.f ? 1.f : dzDrtScale) + zGeom;
 
     if ((zOut < zLo) || (zOut > zHi))
       return false;
 
-    float sdCut = sdSlope + alpaka::math::sqrt(acc, sdMuls * sdMuls + sdPVoff * sdPVoff);
+    const float sdPVoff = 0.1f / rtOut;
+    const float sdMulsAndPVoff = alpaka::math::sqrt(acc, innerMod.sdMuls * innerMod.sdMuls + sdPVoff * sdPVoff);
+    const float sdCut = sdSlope + sdMulsAndPVoff;
 
-    dPhi = cms::alpakatools::reducePhiRange(acc, mds.anchorPhi()[outerMDIndex] - mds.anchorPhi()[innerMDIndex]);
-
-    if (alpaka::math::abs(acc, dPhi) > sdCut)
-      return false;
-
-    dPhiChange = cms::alpakatools::reducePhiRange(
-        acc, cms::alpakatools::phi(acc, xOut - xIn, yOut - yIn) - mds.anchorPhi()[innerMDIndex]);
-
-    if (alpaka::math::abs(acc, dPhiChange) > sdCut)
+    if (!passDeltaPhiCutsBarrel(acc,
+                                mds,
+                                innerMDIndex,
+                                outerMDIndex,
+                                xIn,
+                                yIn,
+                                xOut,
+                                yOut,
+                                rtIn,
+                                rtOut,
+                                sdSlopeSin,
+                                sdMulsAndPVoff,
+                                sdCut,
+                                dPhi,
+                                dPhiChange))
       return false;
 
     float dAlphaThresholdValues[3];
     dAlphaThreshold(acc,
                     dAlphaThresholdValues,
-                    modules,
+                    innerMod,
+                    outerMod,
                     mds,
                     xIn,
                     yIn,
@@ -357,17 +501,15 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                     yOut,
                     zOut,
                     rtOut,
-                    innerLowerModuleIndex,
-                    outerLowerModuleIndex,
                     innerMDIndex,
                     outerMDIndex,
                     ptCut);
 
     float innerMDAlpha = mds.dphichanges()[innerMDIndex];
     float outerMDAlpha = mds.dphichanges()[outerMDIndex];
-    float dAlphaInnerMDSegment = innerMDAlpha - dPhiChange;
-    float dAlphaOuterMDSegment = outerMDAlpha - dPhiChange;
-    float dAlphaInnerMDOuterMD = innerMDAlpha - outerMDAlpha;
+    dAlphaInnerMDSegment = innerMDAlpha - dPhiChange;
+    dAlphaOuterMDSegment = outerMDAlpha - dPhiChange;
+    dAlphaInnerMDOuterMD = innerMDAlpha - outerMDAlpha;
 
     float dAlphaInnerMDSegmentThreshold = dAlphaThresholdValues[0];
     float dAlphaOuterMDSegmentThreshold = dAlphaThresholdValues[1];
@@ -380,12 +522,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     return alpaka::math::abs(acc, dAlphaInnerMDOuterMD) < dAlphaInnerMDOuterMDThreshold;
   }
 
-  template <typename TAcc>
+  template <alpaka::concepts::Acc TAcc>
   ALPAKA_FN_ACC ALPAKA_FN_INLINE bool runSegmentDefaultAlgoEndcap(TAcc const& acc,
-                                                                  ModulesConst modules,
+                                                                  ModuleSegData const& innerMod,
+                                                                  ModuleSegData const& outerMod,
                                                                   MiniDoubletsConst mds,
-                                                                  uint16_t innerLowerModuleIndex,
-                                                                  uint16_t outerLowerModuleIndex,
                                                                   unsigned int innerMDIndex,
                                                                   unsigned int outerMDIndex,
                                                                   float& dPhi,
@@ -394,7 +535,18 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                                                   float& dPhiChange,
                                                                   float& dPhiChangeMin,
                                                                   float& dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                                                  float& dAlphaInnerMDSegment,
+                                                                  float& dAlphaOuterMDSegment,
+                                                                  float& dAlphaInnerMDOuterMD,
+                                                                  float& rtLo,
+                                                                  float& rtHi,
+#endif
                                                                   const float ptCut) {
+#ifndef CUT_VALUE_DEBUG
+    float dAlphaInnerMDSegment, dAlphaOuterMDSegment, dAlphaInnerMDOuterMD;
+    float rtLo, rtHi;
+#endif
     float xIn, yIn, zIn, rtIn, xOut, yOut, zOut, rtOut;
 
     xIn = mds.anchorX()[innerMDIndex];
@@ -407,16 +559,13 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     zOut = mds.anchorZ()[outerMDIndex];
     rtOut = mds.anchorRt()[outerMDIndex];
 
-    bool outerLayerEndcapTwoS =
-        (modules.subdets()[outerLowerModuleIndex] == Endcap) && (modules.moduleType()[outerLowerModuleIndex] == TwoS);
+    bool outerLayerEndcapTwoS = (outerMod.subdet == Endcap) && (outerMod.moduleType == TwoS);
 
-    float sdSlope = alpaka::math::asin(acc, alpaka::math::min(acc, rtOut * k2Rinv1GeVf / ptCut, kSinAlphaMax));
-    float disks2SMinRadius = 60.f;
-
-    float rtGeom = ((rtIn < disks2SMinRadius && rtOut < disks2SMinRadius)
+    const float sdSlopeSin = alpaka::math::min(acc, rtOut * k2Rinv1GeVf / ptCut, kSinAlphaMax);
+    float rtGeom = ((rtIn < kDisks2SMinRadius && rtOut < kDisks2SMinRadius)
                         ? (2.f * kPixelPSZpitch)
-                        : ((rtIn < disks2SMinRadius || rtOut < disks2SMinRadius) ? (kPixelPSZpitch + kStrip2SZpitch)
-                                                                                 : (2.f * kStrip2SZpitch)));
+                        : ((rtIn < kDisks2SMinRadius || rtOut < kDisks2SMinRadius) ? (kPixelPSZpitch + kStrip2SZpitch)
+                                                                                   : (2.f * kStrip2SZpitch)));
 
     //cut 0 - z compatibility
     if (zIn * zOut < 0)
@@ -424,47 +573,46 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
 
     float dz = zOut - zIn;
     float dLum = alpaka::math::copysign(acc, kDeltaZLum, zIn);
-    float drtDzScale = sdSlope / alpaka::math::tan(acc, sdSlope);
+    float sdSlope = alpaka::math::asin(acc, sdSlopeSin);
+    // Exact: asin(s)/tan(asin(s)) = asin(s)*sqrt(1-s^2)/s, eliminates tan call
+    float drtDzScale = sdSlope * alpaka::math::sqrt(acc, 1.f - sdSlopeSin * sdSlopeSin) / sdSlopeSin;
 
-    float rtLo = alpaka::math::max(
-        acc, rtIn * (1.f + dz / (zIn + dLum) * drtDzScale) - rtGeom, rtIn - 0.5f * rtGeom);  //rt should increase
-    float rtHi = rtIn * (zOut - dLum) / (zIn - dLum) +
-                 rtGeom;  //dLum for luminous; rGeom for measurement size; no tanTheta_loc(pt) correction
+    //rt should increase
+    rtLo = alpaka::math::max(acc, rtIn * (1.f + dz / (zIn + dLum) * drtDzScale) - rtGeom, rtIn - 0.5f * rtGeom);
+    //dLum for luminous; rGeom for measurement size; no tanTheta_loc(pt) correction
+    rtHi = rtIn * (zOut - dLum) / (zIn - dLum) + rtGeom;
 
     // Completeness
     if ((rtOut < rtLo) || (rtOut > rtHi))
       return false;
 
-    dPhi = cms::alpakatools::reducePhiRange(acc, mds.anchorPhi()[outerMDIndex] - mds.anchorPhi()[innerMDIndex]);
+    if (!passDeltaPhiCutsEndcap(
+            acc, mds, innerMDIndex, outerMDIndex, xIn, yIn, xOut, yOut, rtIn, rtOut, sdSlopeSin, dPhi, sdSlope))
+      return false;
 
-    float sdCut = sdSlope;
     if (outerLayerEndcapTwoS) {
-      float dPhiPos_high =
+      float dPhiPosHigh =
           cms::alpakatools::reducePhiRange(acc, mds.anchorHighEdgePhi()[outerMDIndex] - mds.anchorPhi()[innerMDIndex]);
-      float dPhiPos_low =
+      float dPhiPosLow =
           cms::alpakatools::reducePhiRange(acc, mds.anchorLowEdgePhi()[outerMDIndex] - mds.anchorPhi()[innerMDIndex]);
 
-      dPhiMax = alpaka::math::abs(acc, dPhiPos_high) > alpaka::math::abs(acc, dPhiPos_low) ? dPhiPos_high : dPhiPos_low;
-      dPhiMin = alpaka::math::abs(acc, dPhiPos_high) > alpaka::math::abs(acc, dPhiPos_low) ? dPhiPos_low : dPhiPos_high;
+      dPhiMax = alpaka::math::abs(acc, dPhiPosHigh) > alpaka::math::abs(acc, dPhiPosLow) ? dPhiPosHigh : dPhiPosLow;
+      dPhiMin = alpaka::math::abs(acc, dPhiPosHigh) > alpaka::math::abs(acc, dPhiPosLow) ? dPhiPosLow : dPhiPosHigh;
     } else {
       dPhiMax = dPhi;
       dPhiMin = dPhi;
     }
-    if (alpaka::math::abs(acc, dPhi) > sdCut)
-      return false;
 
     float dzFrac = dz / zIn;
     dPhiChange = dPhi / dzFrac * (1.f + dzFrac);
     dPhiChangeMin = dPhiMin / dzFrac * (1.f + dzFrac);
     dPhiChangeMax = dPhiMax / dzFrac * (1.f + dzFrac);
 
-    if (alpaka::math::abs(acc, dPhiChange) > sdCut)
-      return false;
-
     float dAlphaThresholdValues[3];
     dAlphaThreshold(acc,
                     dAlphaThresholdValues,
-                    modules,
+                    innerMod,
+                    outerMod,
                     mds,
                     xIn,
                     yIn,
@@ -474,17 +622,15 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                     yOut,
                     zOut,
                     rtOut,
-                    innerLowerModuleIndex,
-                    outerLowerModuleIndex,
                     innerMDIndex,
                     outerMDIndex,
                     ptCut);
 
     float innerMDAlpha = mds.dphichanges()[innerMDIndex];
     float outerMDAlpha = mds.dphichanges()[outerMDIndex];
-    float dAlphaInnerMDSegment = innerMDAlpha - dPhiChange;
-    float dAlphaOuterMDSegment = outerMDAlpha - dPhiChange;
-    float dAlphaInnerMDOuterMD = innerMDAlpha - outerMDAlpha;
+    dAlphaInnerMDSegment = innerMDAlpha - dPhiChange;
+    dAlphaOuterMDSegment = outerMDAlpha - dPhiChange;
+    dAlphaInnerMDOuterMD = innerMDAlpha - outerMDAlpha;
 
     float dAlphaInnerMDSegmentThreshold = dAlphaThresholdValues[0];
     float dAlphaOuterMDSegmentThreshold = dAlphaThresholdValues[1];
@@ -497,12 +643,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
     return alpaka::math::abs(acc, dAlphaInnerMDOuterMD) < dAlphaInnerMDOuterMDThreshold;
   }
 
-  template <typename TAcc>
+  template <alpaka::concepts::Acc TAcc>
   ALPAKA_FN_ACC ALPAKA_FN_INLINE bool runSegmentDefaultAlgo(TAcc const& acc,
-                                                            ModulesConst modules,
+                                                            ModuleSegData const& innerMod,
+                                                            ModuleSegData const& outerMod,
                                                             MiniDoubletsConst mds,
-                                                            uint16_t innerLowerModuleIndex,
-                                                            uint16_t outerLowerModuleIndex,
                                                             unsigned int innerMDIndex,
                                                             unsigned int outerMDIndex,
                                                             float& dPhi,
@@ -511,13 +656,25 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                                             float& dPhiChange,
                                                             float& dPhiChangeMin,
                                                             float& dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                                            float& dAlphaInnerMDSegment,
+                                                            float& dAlphaOuterMDSegment,
+                                                            float& dAlphaInnerMDOuterMD,
+                                                            float& zLo,
+                                                            float& zHi,
+                                                            float& rtLo,
+                                                            float& rtHi,
+#endif
                                                             const float ptCut) {
-    if (modules.subdets()[innerLowerModuleIndex] == Barrel and modules.subdets()[outerLowerModuleIndex] == Barrel) {
+    if (innerMod.subdet == Barrel and outerMod.subdet == Barrel) {
+#ifdef CUT_VALUE_DEBUG
+      rtLo = -999.f;
+      rtHi = -999.f;
+#endif
       return runSegmentDefaultAlgoBarrel(acc,
-                                         modules,
+                                         innerMod,
+                                         outerMod,
                                          mds,
-                                         innerLowerModuleIndex,
-                                         outerLowerModuleIndex,
                                          innerMDIndex,
                                          outerMDIndex,
                                          dPhi,
@@ -526,13 +683,23 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                          dPhiChange,
                                          dPhiChangeMin,
                                          dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                         dAlphaInnerMDSegment,
+                                         dAlphaOuterMDSegment,
+                                         dAlphaInnerMDOuterMD,
+                                         zLo,
+                                         zHi,
+#endif
                                          ptCut);
     } else {
+#ifdef CUT_VALUE_DEBUG
+      zLo = -999.f;
+      zHi = -999.f;
+#endif
       return runSegmentDefaultAlgoEndcap(acc,
-                                         modules,
+                                         innerMod,
+                                         outerMod,
                                          mds,
-                                         innerLowerModuleIndex,
-                                         outerLowerModuleIndex,
                                          innerMDIndex,
                                          outerMDIndex,
                                          dPhi,
@@ -541,6 +708,13 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                          dPhiChange,
                                          dPhiChangeMin,
                                          dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                         dAlphaInnerMDSegment,
+                                         dAlphaOuterMDSegment,
+                                         dAlphaInnerMDOuterMD,
+                                         rtLo,
+                                         rtHi,
+#endif
                                          ptCut);
     }
   }
@@ -554,10 +728,14 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                   SegmentsOccupancy segmentsOccupancy,
                                   ObjectRangesConst ranges,
                                   const float ptCut) const {
-      for (uint16_t innerLowerModuleIndex : cms::alpakatools::uniform_elements_z(acc, modules.nLowerModules())) {
+      ALPAKA_ASSERT_ACC((alpaka::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[1] == 1) &&
+                        (alpaka::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[2] == 1));
+      for (uint16_t innerLowerModuleIndex : cms::alpakatools::uniform_groups_z(acc, modules.nLowerModules())) {
         unsigned int nInnerMDs = mdsOccupancy.nMDs()[innerLowerModuleIndex];
         if (nInnerMDs == 0)
           continue;
+
+        ModuleSegData innerMod = loadModuleSegData(modules, innerLowerModuleIndex, ptCut);
 
         unsigned int nConnectedModules = modules.nConnectedModules()[innerLowerModuleIndex];
 
@@ -570,16 +748,21 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
 
           if (limit == 0)
             continue;
+
+          ModuleSegData outerMod = loadModuleSegData(modules, outerLowerModuleIndex, ptCut);
+
           for (unsigned int hitIndex : cms::alpakatools::uniform_elements_x(acc, limit)) {
             unsigned int innerMDArrayIdx = hitIndex / nOuterMDs;
             unsigned int outerMDArrayIdx = hitIndex % nOuterMDs;
-            if (outerMDArrayIdx >= nOuterMDs)
-              continue;
 
             unsigned int innerMDIndex = ranges.mdRanges()[innerLowerModuleIndex][0] + innerMDArrayIdx;
             unsigned int outerMDIndex = ranges.mdRanges()[outerLowerModuleIndex][0] + outerMDArrayIdx;
 
             float dPhi, dPhiMin, dPhiMax, dPhiChange, dPhiChangeMin, dPhiChangeMax;
+
+#ifdef CUT_VALUE_DEBUG
+            float zLo, zHi, rtLo, rtHi, dAlphaInnerMDSegment, dAlphaOuterMDSegment, dAlphaInnerMDOuterMD;
+#endif
 
             unsigned int innerMiniDoubletAnchorHitIndex = mds.anchorHitIndices()[innerMDIndex];
             unsigned int outerMiniDoubletAnchorHitIndex = mds.anchorHitIndices()[outerMDIndex];
@@ -587,20 +770,30 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
             dPhiMax = 0;
             dPhiChangeMin = 0;
             dPhiChangeMax = 0;
-            if (runSegmentDefaultAlgo(acc,
-                                      modules,
-                                      mds,
-                                      innerLowerModuleIndex,
-                                      outerLowerModuleIndex,
-                                      innerMDIndex,
-                                      outerMDIndex,
-                                      dPhi,
-                                      dPhiMin,
-                                      dPhiMax,
-                                      dPhiChange,
-                                      dPhiChangeMin,
-                                      dPhiChangeMax,
-                                      ptCut)) {
+            bool pass = runSegmentDefaultAlgo(acc,
+                                              innerMod,
+                                              outerMod,
+                                              mds,
+                                              innerMDIndex,
+                                              outerMDIndex,
+                                              dPhi,
+                                              dPhiMin,
+                                              dPhiMax,
+                                              dPhiChange,
+                                              dPhiChangeMin,
+                                              dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                              dAlphaInnerMDSegment,
+                                              dAlphaOuterMDSegment,
+                                              dAlphaInnerMDOuterMD,
+                                              zLo,
+                                              zHi,
+                                              rtLo,
+                                              rtHi,
+#endif
+                                              ptCut);
+
+            if (pass) {
               unsigned int totOccupancySegments =
                   alpaka::atomicAdd(acc,
                                     &segmentsOccupancy.totOccupancySegments()[innerLowerModuleIndex],
@@ -624,14 +817,153 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                    outerLowerModuleIndex,
                                    innerMiniDoubletAnchorHitIndex,
                                    outerMiniDoubletAnchorHitIndex,
-                                   dPhi,
-                                   dPhiMin,
-                                   dPhiMax,
                                    dPhiChange,
                                    dPhiChangeMin,
                                    dPhiChangeMax,
+#ifdef CUT_VALUE_DEBUG
+                                   dPhi,
+                                   dPhiMin,
+                                   dPhiMax,
+                                   zHi,
+                                   zLo,
+                                   rtHi,
+                                   rtLo,
+                                   dAlphaInnerMDSegment,
+                                   dAlphaOuterMDSegment,
+                                   dAlphaInnerMDOuterMD,
+#endif
                                    segmentIdx);
               }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  template <alpaka::concepts::Acc TAcc>
+  ALPAKA_FN_ACC ALPAKA_FN_INLINE bool passLooseSegmentCuts(TAcc const& acc,
+                                                           ModuleSegData const& innerMod,
+                                                           ModuleSegData const& outerMod,
+                                                           MiniDoubletsConst mds,
+                                                           unsigned int innerMD,
+                                                           unsigned int outerMD,
+                                                           const float ptCut) {
+    const float rtOut = mds.anchorRt()[outerMD];
+    const float sdSlopeSin = alpaka::math::min(acc, rtOut * k2Rinv1GeVf / ptCut, kSinAlphaMax);
+
+    const float cosSlope = alpaka::math::sqrt(acc, 1.f - sdSlopeSin * sdSlopeSin);
+
+    if (innerMod.subdet == Barrel && outerMod.subdet == Barrel) {
+      const float rtIn = mds.anchorRt()[innerMD];
+      const float zIn = mds.anchorZ()[innerMD];
+      const float zOut = mds.anchorZ()[outerMD];
+
+      // z-window pre-filter: 1/cosSlope >= tan(sdSlope)/sdSlope, so looser than creation kernel.
+      const float dzDrtScale = 1.f / cosSlope;
+      const float zGeom = innerMod.layer <= 2 ? 2.f * kPixelPSZpitch : 2.f * kStrip2SZpitch;
+      const float zLo = zIn + (zIn - kDeltaZLum) * (rtOut / rtIn - 1.f) * (zIn > 0.f ? 1.f : dzDrtScale) - zGeom;
+      const float zHi = zIn + (zIn + kDeltaZLum) * (rtOut / rtIn - 1.f) * (zIn < 0.f ? 1.f : dzDrtScale) + zGeom;
+      if (zOut < zLo || zOut > zHi)
+        return false;
+
+      const float xIn = mds.anchorX()[innerMD];
+      const float yIn = mds.anchorY()[innerMD];
+      const float xOut = mds.anchorX()[outerMD];
+      const float yOut = mds.anchorY()[outerMD];
+      const float sdPVoff = 0.1f / rtOut;
+      const float sdMulsAndPVoff = alpaka::math::sqrt(acc, innerMod.sdMuls * innerMod.sdMuls + sdPVoff * sdPVoff);
+      float dPhi, dPhiChange;  // unused with LooseOnly=true
+      return passDeltaPhiCutsBarrel<true>(acc,
+                                          mds,
+                                          innerMD,
+                                          outerMD,
+                                          xIn,
+                                          yIn,
+                                          xOut,
+                                          yOut,
+                                          rtIn,
+                                          rtOut,
+                                          sdSlopeSin,
+                                          sdMulsAndPVoff,
+                                          0.f /*sdCut unused*/,
+                                          dPhi,
+                                          dPhiChange);
+    } else {
+      const float zIn = mds.anchorZ()[innerMD];
+      const float zOut = mds.anchorZ()[outerMD];
+      if (zIn * zOut < 0.f)
+        return false;
+
+      // rt-range pre-filter: cosSlope <= asin(s)/tan(asin(s)), so looser than creation kernel.
+      const float rtIn = mds.anchorRt()[innerMD];
+      const float dz = zOut - zIn;
+      const float dLum = alpaka::math::copysign(acc, kDeltaZLum, zIn);
+      const float drtDzScale = cosSlope;
+      const float rtGeom =
+          ((rtIn < kDisks2SMinRadius && rtOut < kDisks2SMinRadius)
+               ? (2.f * kPixelPSZpitch)
+               : ((rtIn < kDisks2SMinRadius || rtOut < kDisks2SMinRadius) ? (kPixelPSZpitch + kStrip2SZpitch)
+                                                                          : (2.f * kStrip2SZpitch)));
+      const float rtLo =
+          alpaka::math::max(acc, rtIn * (1.f + dz / (zIn + dLum) * drtDzScale) - rtGeom, rtIn - 0.5f * rtGeom);
+      const float rtHi = rtIn * (zOut - dLum) / (zIn - dLum) + rtGeom;
+      if (rtOut < rtLo || rtOut > rtHi)
+        return false;
+
+      const float xIn = mds.anchorX()[innerMD];
+      const float yIn = mds.anchorY()[innerMD];
+      const float xOut = mds.anchorX()[outerMD];
+      const float yOut = mds.anchorY()[outerMD];
+      float dPhi;  // unused with LooseOnly=true
+      return passDeltaPhiCutsEndcap<true>(
+          acc, mds, innerMD, outerMD, xIn, yIn, xOut, yOut, rtIn, rtOut, sdSlopeSin, dPhi, 0.f /*sdSlope unused*/);
+    }
+  }
+
+  struct CountMiniDoubletConnections {
+    ALPAKA_FN_ACC void operator()(Acc3D const& acc,
+                                  ModulesConst modules,
+                                  MiniDoublets mds,
+                                  MiniDoubletsOccupancyConst mdsOccupancy,
+                                  ObjectRangesConst ranges,
+                                  const float ptCut) const {
+      // The atomicAdd below with hierarchy::Threads{} requires one block in x, y dimensions.
+      ALPAKA_ASSERT_ACC((alpaka::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[1] == 1) &&
+                        (alpaka::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[2] == 1));
+      const auto& mdRanges = ranges.mdRanges();
+
+      for (uint16_t innerLowerModuleIndex : cms::alpakatools::uniform_groups_z(acc, modules.nLowerModules())) {
+        const unsigned int nInnerMDs = mdsOccupancy.nMDs()[innerLowerModuleIndex];
+        if (nInnerMDs == 0)
+          continue;
+
+        const uint16_t nConnectedModules = modules.nConnectedModules()[innerLowerModuleIndex];
+        if (nConnectedModules == 0)
+          continue;
+
+        ModuleSegData innerMod = loadModuleSegData(modules, innerLowerModuleIndex, ptCut);
+
+        for (uint16_t outerLowerModuleArrayIdx : cms::alpakatools::uniform_elements_y(acc, nConnectedModules)) {
+          const uint16_t outerLowerModuleIndex = modules.moduleMap()[innerLowerModuleIndex][outerLowerModuleArrayIdx];
+          const unsigned int nOuterMDs = mdsOccupancy.nMDs()[outerLowerModuleIndex];
+          if (nOuterMDs == 0)
+            continue;
+
+          ModuleSegData outerMod = loadModuleSegData(modules, outerLowerModuleIndex, ptCut);
+
+          const unsigned int limit = nInnerMDs * nOuterMDs;
+
+          for (unsigned int hitIndex : cms::alpakatools::uniform_elements_x(acc, limit)) {
+            const unsigned int innerMDArrayIdx = hitIndex / nOuterMDs;
+            const unsigned int outerMDArrayIdx = hitIndex % nOuterMDs;
+
+            const unsigned int innerMDIndex = mdRanges[innerLowerModuleIndex][0] + innerMDArrayIdx;
+            const unsigned int outerMDIndex = mdRanges[outerLowerModuleIndex][0] + outerMDArrayIdx;
+
+            // Increment the connected max if the LS passes the delta phi cuts.
+            if (passLooseSegmentCuts(acc, innerMod, outerMod, mds, innerMDIndex, outerMDIndex, ptCut)) {
+              alpaka::atomicAdd(acc, &mds.connectedMax()[innerMDIndex], 1u, alpaka::hierarchy::Threads{});
             }
           }
         }
@@ -644,75 +976,34 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::lst {
                                   ModulesConst modules,
                                   ObjectRanges ranges,
                                   MiniDoubletsConst mds,
-                                  MiniDoubletsOccupancyConst mdsOccupancy,
-                                  const float ptCut) const {
-      // implementation is 1D with a single block
+                                  MiniDoubletsOccupancyConst mdsOccupancy) const {
       ALPAKA_ASSERT_ACC((alpaka::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[0] == 1));
 
-      // Initialize variables in shared memory and set to 0
       int& nTotalSegments = alpaka::declareSharedVar<int, __COUNTER__>(acc);
-      if (cms::alpakatools::once_per_block(acc)) {
+      if (cms::alpakatools::once_per_block(acc))
         nTotalSegments = 0;
-      }
       alpaka::syncBlockThreads(acc);
 
-      // Occupancy matrix for 0.8 GeV pT Cut
-      constexpr int p08_occupancy_matrix[4][4] = {
-          {572, 300, 183, 62},  // category 0
-          {191, 128, 0, 0},     // category 1
-          {0, 107, 102, 0},     // category 2
-          {0, 64, 79, 85}       // category 3
-      };
-
-      // Occupancy matrix for 0.6 GeV pT Cut, 99.9%
-      constexpr int p06_occupancy_matrix[4][4] = {
-          {936, 351, 256, 61},  // category 0
-          {1358, 763, 0, 0},    // category 1
-          {0, 210, 268, 0},     // category 2
-          {0, 60, 97, 96}       // category 3
-      };
-
-      // Select the appropriate occupancy matrix based on ptCut
-      const auto& occupancy_matrix = (ptCut < 0.8f) ? p06_occupancy_matrix : p08_occupancy_matrix;
-
-      for (uint16_t i : cms::alpakatools::uniform_elements(acc, modules.nLowerModules())) {
-        if (modules.nConnectedModules()[i] == 0) {
-          ranges.segmentModuleIndices()[i] = nTotalSegments;
-          ranges.segmentModuleOccupancy()[i] = 0;
+      for (uint16_t innerLowerModuleIndex : cms::alpakatools::uniform_elements(acc, modules.nLowerModules())) {
+        if (modules.nConnectedModules()[innerLowerModuleIndex] == 0) {
+          ranges.segmentModuleIndices()[innerLowerModuleIndex] = nTotalSegments;
+          ranges.segmentModuleOccupancy()[innerLowerModuleIndex] = 0;
           continue;
         }
 
-        short module_rings = modules.rings()[i];
-        short module_layers = modules.layers()[i];
-        short module_subdets = modules.subdets()[i];
-        float module_eta = alpaka::math::abs(acc, modules.eta()[i]);
-
-        int category_number = getCategoryNumber(module_layers, module_subdets, module_rings);
-        int eta_number = getEtaBin(module_eta);
-
-        int dynamic_count = 0;
-        // Calculate dynamic limit based on connected modules
-        unsigned int nInnerMDs = mdsOccupancy.nMDs()[i];
-        for (unsigned int c = 0; c < modules.nConnectedModules()[i]; ++c) {
-          uint16_t connectedModule = modules.moduleMap()[i][c];
-          dynamic_count += nInnerMDs * mdsOccupancy.nMDs()[connectedModule];
+        // Sum the connected counts of all MDs in this module.
+        const unsigned int nInnerMDs = mdsOccupancy.nMDs()[innerLowerModuleIndex];
+        int occupancy = 0;
+        if (nInnerMDs != 0) {
+          const unsigned int firstMD = ranges.mdRanges()[innerLowerModuleIndex][0];
+          for (unsigned int j = 0; j < nInnerMDs; ++j) {
+            occupancy += mds.connectedMax()[firstMD + j];
+          }
         }
 
-#ifdef WARNINGS
-        if (category_number == -1 || eta_number == -1) {
-          printf("Unhandled case in createSegmentArrayRanges! Module index = %i\n", i);
-        }
-#endif
-        // Get matrix-based cap
-        int matrix_cap =
-            (category_number != -1 && eta_number != -1) ? occupancy_matrix[category_number][eta_number] : 0;
-
-        // Cap occupancy at minimum of dynamic count and matrix value
-        int occupancy = alpaka::math::min(acc, dynamic_count, matrix_cap);
-
-        int nTotSegs = alpaka::atomicAdd(acc, &nTotalSegments, occupancy, alpaka::hierarchy::Threads{});
-        ranges.segmentModuleIndices()[i] = nTotSegs;
-        ranges.segmentModuleOccupancy()[i] = occupancy;
+        const int nTotSegs = alpaka::atomicAdd(acc, &nTotalSegments, occupancy, alpaka::hierarchy::Threads{});
+        ranges.segmentModuleIndices()[innerLowerModuleIndex] = nTotSegs;
+        ranges.segmentModuleOccupancy()[innerLowerModuleIndex] = occupancy;
       }
 
       // Wait for all threads to finish before reporting final values

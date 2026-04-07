@@ -1,7 +1,6 @@
 #include "Mixing/Base/interface/PileUp.h"
 #include "DataFormats/Provenance/interface/BranchIDListHelper.h"
 #include "DataFormats/Provenance/interface/ModuleDescription.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
 #include "FWCore/Framework/interface/EventPrincipal.h"
 #include "FWCore/Framework/interface/LuminosityBlock.h"
 #include "FWCore/Framework/interface/Run.h"
@@ -70,7 +69,8 @@ namespace edm {
   PileUp::PileUp(ParameterSet const& pset,
                  const std::shared_ptr<PileUpConfig>& config,
                  edm::ConsumesCollector iC,
-                 const bool mixingConfigFromDB)
+                 const bool mixingConfigFromDB,
+                 SciTagCategoryForEmbeddedSources cat)
       : type_(pset.getParameter<std::string>("type")),
         Source_type_(config->sourcename_),
         averageNumber_(config->averageNumber_),
@@ -85,7 +85,8 @@ namespace edm {
         productRegistry_(),
         input_(VectorInputSourceFactory::get()->makeVectorInputSource(
             pset,
-            VectorInputSourceDescription(std::make_shared<edm::ProductRegistry>(), edm::PreallocationConfiguration()))),
+            VectorInputSourceDescription(
+                std::make_shared<edm::ProductRegistry>(), edm::PreallocationConfiguration(), cat))),
         // hardware information is not needed for the "overlay"
         processConfiguration_(std::make_shared<ProcessConfiguration>(
             "@MIXING", getReleaseVersion(), edm::HardwareResourcesDescription())),
@@ -124,6 +125,7 @@ namespace edm {
 
       provider_ = std::make_unique<SecondaryEventProvider>(producers, filler, processConfiguration_);
     }
+    filler.setCurrentProcess(processConfiguration_->processName());
     filler.addFromInput(*input_->productRegistry());
     filler.setFrozen();
     productRegistry_ = std::make_shared<ProductRegistry>(filler.moveTo());
@@ -132,7 +134,6 @@ namespace edm {
     eventPrincipal_ = std::make_unique<EventPrincipal>(productRegistry_,
                                                        edm::productResolversFactory::makePrimary,
                                                        std::make_shared<BranchIDListHelper>(),
-                                                       std::make_shared<ThinnedAssociationsHelper>(),
                                                        *processConfiguration_,
                                                        nullptr);
 

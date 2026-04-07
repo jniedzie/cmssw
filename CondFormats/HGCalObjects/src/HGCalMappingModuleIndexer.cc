@@ -60,7 +60,8 @@ void HGCalMappingModuleIndexer::processNewModule(uint32_t fedid,
 void HGCalMappingModuleIndexer::finalize() {
   //max indices at different levels
   nfeds_ = fedReadoutSequences_.size();
-  maxModulesIdx_ = std::accumulate(globalTypesCounter_.begin(), globalTypesCounter_.end(), 0);
+  maxModulesCount_ = std::accumulate(globalTypesCounter_.begin(), globalTypesCounter_.end(), 0);
+  maxModulesIdx_ = globalTypesCounter_.size();
   maxErxIdx_ = std::inner_product(globalTypesCounter_.begin(), globalTypesCounter_.end(), globalTypesNErx_.begin(), 0);
   maxDataIdx_ =
       std::inner_product(globalTypesCounter_.begin(), globalTypesCounter_.end(), globalTypesNWords_.begin(), 0);
@@ -69,21 +70,20 @@ void HGCalMappingModuleIndexer::finalize() {
   moduleOffsets_.resize(maxModulesIdx_, 0);
   erxOffsets_.resize(maxModulesIdx_, 0);
   dataOffsets_.resize(maxModulesIdx_, 0);
-  for (size_t i = 1; i < globalTypesCounter_.size(); i++) {
-    moduleOffsets_[i] = globalTypesCounter_[i - 1];
-    erxOffsets_[i] = globalTypesCounter_[i - 1] * globalTypesNErx_[i - 1];
-    dataOffsets_[i] = globalTypesCounter_[i - 1] * globalTypesNWords_[i - 1];
+  for (size_t i = 1; i < maxModulesIdx_; i++) {
+    moduleOffsets_[i] = globalTypesCounter_[i - 1] + moduleOffsets_[i - 1];
+    erxOffsets_[i] = globalTypesCounter_[i - 1] * globalTypesNErx_[i - 1] + erxOffsets_[i - 1];
+    dataOffsets_[i] = globalTypesCounter_[i - 1] * globalTypesNWords_[i - 1] + dataOffsets_[i - 1];
   }
-  std::partial_sum(moduleOffsets_.begin(), moduleOffsets_.end(), moduleOffsets_.begin());
-  std::partial_sum(erxOffsets_.begin(), erxOffsets_.end(), erxOffsets_.begin());
-  std::partial_sum(dataOffsets_.begin(), dataOffsets_.end(), dataOffsets_.begin());
 
   //now go through the FEDs and ascribe the offsets per module in the readout sequence
   std::vector<uint32_t> typeCounters(globalTypesCounter_.size(), 0);
   for (auto& fedit : fedReadoutSequences_) {
     //assign the final indexing in the look-up table depending on which ECON-D's are really present
+    //count also the the number of capture blocks present
     size_t nconn(0);
     fedit.moduleLUT_.resize(fedit.readoutTypes_.size(), -1);
+    std::set<uint32_t> uniqueCB;
     for (size_t i = 0; i < fedit.readoutTypes_.size(); i++) {
       if (fedit.readoutTypes_[i] == -1)
         continue;  //unexisting
@@ -91,7 +91,11 @@ void HGCalMappingModuleIndexer::finalize() {
       reassignTypecodeLocation(fedit.id, i, nconn);
       fedit.moduleLUT_[i] = nconn;
       nconn++;
+
+      uniqueCB.insert(modFedIndexer_.unpackDenseIndex(i)[0]);
     }
+    fedit.totalECONs_ = nconn;
+    fedit.totalCBs_ = uniqueCB.size();
 
     //remove unexisting ECONs building a final compact readout sequence
     fedit.readoutTypes_.erase(
@@ -123,8 +127,7 @@ void HGCalMappingModuleIndexer::finalize() {
       uint32_t internalData_offset = globalTypesNWords_[type_val] * typeCounters[type_val];
       fedit.chDataOffsets_[i] = baseData_offset + internalData_offset;
 
-      //enabled erx flags
-      //FIXME: assume all eRx are enabled now
+      //enabled erx flags: by default all available are enabled - configuration may override
       fedit.enabledErx_[i] = (0b1 << globalTypesNErx_[type_val]) - 0b1;
       typeCounters[type_val]++;
     }

@@ -13,6 +13,7 @@
 // system include files
 #include <atomic>
 #include <numeric>
+#include <unordered_set>
 
 // user include files
 #include "PerfTools/AllocMonitor/interface/AllocMonitorBase.h"
@@ -209,9 +210,7 @@ namespace {
 class ModuleEventAllocMonitor {
 public:
   ModuleEventAllocMonitor(edm::ParameterSet const& iPS, edm::ActivityRegistry& iAR)
-      : moduleNames_(iPS.getUntrackedParameter<std::vector<std::string>>("moduleNames")),
-        nEventsToSkip_(iPS.getUntrackedParameter<unsigned int>("nEventsToSkip")),
-        filter_(&moduleIDs_) {
+      : nEventsToSkip_(iPS.getUntrackedParameter<unsigned int>("nEventsToSkip")), filter_(&moduleIDs_) {
     (void)cms::perftools::AllocMonitorRegistry::instance().createAndRegisterMonitor<MonitorAdaptor>();
 
     if (nEventsToSkip_ > 0) {
@@ -239,17 +238,31 @@ public:
            "#D <module ID> <stream #> <total matched deallocations (bytes)> <# matched deallocations>\n";
       file->write(s.str());
     }
-    if (not moduleNames_.empty()) {
+    auto skippedModuleNamesVec = iPS.getUntrackedParameter<std::vector<std::string>>("skippedModuleNames");
+    auto moduleNamesVec = iPS.getUntrackedParameter<std::vector<std::string>>("moduleNames");
+    moduleNamesSet_ = std::unordered_set<std::string>(moduleNamesVec.begin(), moduleNamesVec.end());
+    skippedModuleNamesSet_ =
+        std::unordered_set<std::string>(skippedModuleNamesVec.begin(), skippedModuleNamesVec.end());
+    if (not moduleNamesSet_.empty() or not skippedModuleNamesSet_.empty()) {
       iAR.watchPreModuleConstruction([this, file](auto const& description) {
-        auto found = std::find(moduleNames_.begin(), moduleNames_.end(), description.moduleLabel());
-        if (found != moduleNames_.end()) {
+        bool shouldKeep = false;
+        if (not moduleNamesSet_.empty()) {
+          shouldKeep = moduleNamesSet_.contains(description.moduleLabel());
+        }
+        if (not skippedModuleNamesSet_.empty()) {
+          shouldKeep = not skippedModuleNamesSet_.contains(description.moduleLabel());
+        }
+        std::stringstream s;
+        if (shouldKeep) {
+          s << "@ " << description.moduleLabel() << " " << description.moduleName() << " " << description.id() << "\n";
           moduleIDs_.push_back(description.id());
           nModules_ = moduleIDs_.size();
           std::sort(moduleIDs_.begin(), moduleIDs_.end());
-          std::stringstream s;
-          s << "@ " << description.moduleLabel() << " " << description.moduleName() << " " << description.id() << "\n";
-          file->write(s.str());
+        } else {
+          s << "# Skipping module" << description.moduleLabel() << " " << description.moduleName() << " "
+            << description.id() << " # skipped\n";
         }
+        file->write(s.str());
       });
     } else {
       iAR.watchPreModuleConstruction([this, file](auto const& description) {
@@ -366,14 +379,15 @@ public:
         streamSync_[iStream.streamID().value()].load();
         //search for associated allocs to deallocs in reverse order that modules finished
         auto nRan = streamNFinishedModules_[iStream.streamID().value()].load();
-        auto itBegin = streamModuleFinishOrder_.cbegin() + nModules_ - nRan;
+        auto itBegin =
+            std::reverse_iterator(streamModuleFinishOrder_.begin() + iStream.streamID().value() * nModules_ + nRan);
         auto const itEnd = itBegin + nRan;
         streamNFinishedModules_[iStream.streamID().value()].store(0);
         {
           std::vector<std::size_t> moduleDeallocSize(nModules_);
           std::vector<unsigned int> moduleDeallocCount(nModules_);
           for (auto& address : info->unmatched_) {
-            decltype(streamModuleAllocs_[0].findOffset(address)) offset;
+            decltype(streamModuleAllocs_[0].findOffset(address)) offset = 0;
             auto found = std::find_if(itBegin, itEnd, [&address, &offset, this](auto const& index) {
               auto const& elem = streamModuleAllocs_[index];
               return elem.size() != 0 and (offset = elem.findOffset(address)) != elem.size();
@@ -413,6 +427,8 @@ public:
         ->setComment(
             "Module labels for modules which should have their allocations monitored. If empty all modules will be "
             "monitored.");
+    ps.addUntracked<std::vector<std::string>>("skippedModuleNames", std::vector<std::string>())
+        ->setComment("Module labels for modules which should have their allocations ignored.");
     ps.addUntracked<unsigned int>("nEventsToSkip", 0)
         ->setComment(
             "Number of events to skip before turning on monitoring. If used in a multi-threaded application, "
@@ -432,7 +448,7 @@ private:
   }
 
   bool forThisModule(unsigned int iID) const {
-    return (moduleNames_.empty() or std::binary_search(moduleIDs_.begin(), moduleIDs_.end(), iID));
+    return (moduleNamesSet_.empty() or std::binary_search(moduleIDs_.begin(), moduleIDs_.end(), iID));
   }
   //The size is (#streams)*(#modules)
   CMS_THREAD_GUARD(streamSync_) std::vector<AllocMap> streamModuleAllocs_;
@@ -441,7 +457,8 @@ private:
   CMS_THREAD_GUARD(streamSync_) std::vector<int> streamModuleFinishOrder_;
   std::vector<std::atomic<unsigned int>> streamNFinishedModules_;
   std::vector<std::atomic<unsigned int>> streamSync_;
-  std::vector<std::string> moduleNames_;
+  std::unordered_set<std::string> moduleNamesSet_;
+  std::unordered_set<std::string> skippedModuleNamesSet_;
   std::vector<int> moduleIDs_;
   unsigned int nStreams_ = 0;
   unsigned int nModules_ = 0;

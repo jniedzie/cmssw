@@ -8,6 +8,7 @@
 #include <alpaka/alpaka.hpp>
 
 #include "DataFormats/Common/interface/Uninitialized.h"
+#include "DataFormats/TrivialSerialisation/interface/MemoryCopyTraits.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/host.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/memory.h"
@@ -38,7 +39,7 @@ public:
   PortableHostObject(alpaka_common::DevHost const& host, Args&&... args)
       // allocate pageable host memory
       : buffer_{cms::alpakatools::make_host_buffer<Product>()},
-        product_{new(buffer_->data()) Product(std::forward<Args>(args)...)} {
+        product_{new (buffer_->data()) Product(std::forward<Args>(args)...)} {
     assert(reinterpret_cast<uintptr_t>(product_) % alignof(Product) == 0);
   }
 
@@ -55,7 +56,7 @@ public:
   PortableHostObject(TQueue const& queue, Args&&... args)
       // allocate pinned host memory associated to the given work queue, accessible by the queue's device
       : buffer_{cms::alpakatools::make_host_buffer<Product>(queue)},
-        product_{new(buffer_->data()) Product(std::forward<Args>(args)...)} {
+        product_{new (buffer_->data()) Product(std::forward<Args>(args)...)} {
     assert(reinterpret_cast<uintptr_t>(product_) % alignof(Product) == 0);
   }
 
@@ -112,7 +113,41 @@ public:
 
 private:
   std::optional<Buffer> buffer_;  //!
-  Product* product_;
+  Product* product_ = nullptr;
 };
+
+// Specialize the MemoryCopyTraits for PortableHostObject
+namespace ngt {
+
+  template <typename T>
+  struct MemoryCopyTraits<PortableHostObject<T>> {
+    // This specialisation requires an initialize() method, but does not need to
+    // pass any parameters to it.
+    using Properties = void;
+
+    template <typename TQueue>
+      requires(alpaka::isQueue<TQueue>)
+    static void initialize(TQueue& queue, PortableHostObject<T>& object) {
+      // Replace the default-constructed empty object with one where the buffer
+      // has been allocated in pinned host memory
+      object = PortableHostObject<T>(queue);
+    }
+
+    static void initialize(PortableHostObject<T>& object) {
+      // Replace the default-constructed empty object with one where the buffer
+      // has been allocated in pageable host memory.
+      object = PortableHostObject<T>(cms::alpakatools::host());
+    }
+
+    static std::vector<std::span<std::byte>> regions(PortableHostObject<T>& object) {
+      return {{reinterpret_cast<std::byte*>(object.data()), sizeof(T)}};
+    }
+
+    static std::vector<std::span<const std::byte>> regions(PortableHostObject<T> const& object) {
+      return {{reinterpret_cast<std::byte const*>(object.data()), sizeof(T)}};
+    }
+  };
+
+}  // namespace ngt
 
 #endif  // DataFormats_Portable_interface_PortableHostObject_h

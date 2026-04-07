@@ -15,6 +15,7 @@
 #include "DataFormats/ForwardDetId/interface/HGCScintillatorDetId.h"
 #include "DataFormats/ForwardDetId/interface/HGCSiliconDetId.h"
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "Geometry/HGCalCommonData/interface/HGCalCassette.h"
 #include "Geometry/HGCalCommonData/interface/HGCalCell.h"
 #include "Geometry/HGCalCommonData/interface/HGCalCellOffset.h"
@@ -42,6 +43,7 @@ public:
   std::array<int, 5> assignCellHex(float x, float y, int zside, int lay, bool reco, bool extend, bool debug) const;
   std::array<int, 3> assignCellTrap(float x, float y, float z, int lay, bool reco) const;
   std::vector<int> calibCells(bool hd, bool full) const {
+    edm::LogVerbatim("HGCal") << "hd " << hd << " full " << full;
     if (hd) {
       return (full ? hgpar_->calibCellFullHD_ : hgpar_->calibCellPartHD_);
     } else {
@@ -67,6 +69,7 @@ public:
   inline std::pair<double, double> cellSizeTrap(int type, int irad) const {
     return std::make_pair(hgpar_->radiusLayer_[type][irad - 1], hgpar_->radiusLayer_[type][irad]);
   }
+  std::vector<double> cellThickness() const;
   double cellThickness(int layer, int waferU, int waferV) const;
   int32_t cellType(int type, int waferU, int waferV, int iz, int fwdBack, int orient) const;
   double distFromEdgeHex(double x, double y, double z) const;
@@ -148,6 +151,7 @@ public:
   int numberCellsHexagon(int wafer) const;
   int numberCellsHexagon(int lay, int waferU, int waferV, bool flag) const;
   inline int partialWaferType(int lay, int waferU, int waferV) const {
+    // Works for zside = -1
     int indx = HGCalWaferIndex::waferIndex(lay, waferU, waferV);
     auto ktr = hgpar_->waferInfoMap_.find(indx);
     int part = (ktr != hgpar_->waferInfoMap_.end()) ? (ktr->second).part : HGCalTypes::WaferFull;
@@ -175,14 +179,24 @@ public:
             (mode_ == HGCalGeometryMode::TrapezoidFineCell));
   }
   std::pair<int, int> tileType(int layer, int ring, int phi) const;
+  bool tileTrapezoidCassette() const {
+    return ((mode_ == HGCalGeometryMode::TrapezoidCassette) || (mode_ == HGCalGeometryMode::TrapezoidFineCell));
+  }
   inline bool trapezoidFile() const {
     return ((mode_ == HGCalGeometryMode::TrapezoidFile) || (mode_ == HGCalGeometryMode::TrapezoidModule) ||
             (mode_ == HGCalGeometryMode::TrapezoidCassette) || (mode_ == HGCalGeometryMode::TrapezoidFineCell));
   }
+  inline bool trapeoidFine() const { return (mode_ == HGCalGeometryMode::Hexagon8FineCell); }
+  bool tileTrapezoidModule() const {
+    return ((mode_ == HGCalGeometryMode::TrapezoidModule) || (mode_ == HGCalGeometryMode::TrapezoidCassette) ||
+            (mode_ == HGCalGeometryMode::TrapezoidFineCell));
+  }
   inline bool v16OrLess() const { return (mode_ < HGCalGeometryMode::Hexagon8Cassette); }
   inline bool v17OrLess() const { return (mode_ < HGCalGeometryMode::Hexagon8CalibCell); }
   inline bool v18OrLess() const { return (mode_ < HGCalGeometryMode::Hexagon8FineCell); }
+  inline bool v18OrMore() const { return (mode_ >= HGCalGeometryMode::Hexagon8CalibCell); }
   inline unsigned int volumes() const { return hgpar_->moduleLayR_.size(); }
+  inline bool waferExist(int layer, int waferU, int waferV) const { return hgpar_->waferExist(layer, waferU, waferV); }
   int waferFromCopy(int copy) const;
   void waferFromPosition(const double x, const double y, int& wafer, int& icell, int& celltyp) const;
   void waferFromPosition(const double x,
@@ -218,7 +232,7 @@ public:
             (mode_ == HGCalGeometryMode::Hexagon8Cassette) || (mode_ == HGCalGeometryMode::Hexagon8CalibCell) ||
             (mode_ == HGCalGeometryMode::Hexagon8FineCell));
   }
-  inline bool waferHexagon8Fine() const { return ((mode_ == HGCalGeometryMode::Hexagon8FineCell)); }
+  inline bool waferHexagon8Fine() const { return ((mode_ >= HGCalGeometryMode::Hexagon8FineCell)); }
   inline bool waferHexagon8Module() const {
     return ((mode_ == HGCalGeometryMode::Hexagon8Module) || (mode_ == HGCalGeometryMode::Hexagon8Cassette) ||
             (mode_ == HGCalGeometryMode::Hexagon8CalibCell) || (mode_ == HGCalGeometryMode::Hexagon8FineCell));
@@ -227,9 +241,16 @@ public:
   bool waferFullInLayer(int wafer, int lay, bool reco) const;
   inline int waferCount(const int type) const { return ((type == 0) ? waferMax_[2] : waferMax_[3]); }
   HGCalParameters::waferInfo waferInfo(int lay, int waferU, int waferV) const;
+  inline bool waferIsHD(int layer, int waferU, int waferV) const { return hgpar_->waferIsHD(layer, waferU, waferV); }
   inline int waferMax() const { return waferMax_[1]; }
   inline int waferMin() const { return waferMax_[0]; }
   std::pair<double, double> waferParameters(bool reco) const;
+  inline bool waferPartial(int layer, int waferU, int waferV) const {
+    return hgpar_->waferPartial(layer, waferU, waferV);
+  }
+  inline int waferPlacementIndex(int zside, int layer, int waferU, int waferV) const {
+    return hgpar_->waferPlacementIndex(zside, layer, waferU, waferV);
+  }
   std::pair<double, double> waferPosition(int wafer, bool reco) const;
   std::pair<double, double> waferPosition(int lay, int waferU, int waferV, bool reco, bool debug) const;
   std::pair<double, double> waferPositionWithCshift(
@@ -266,6 +287,10 @@ public:
   }
   int waferType(DetId const& id, bool fromFile) const;
   int waferType(int layer, int waferU, int waferV, bool fromFile) const;
+  inline int waferTypes() const {
+    return ((waferHexagon8()) ? (hgpar_->cellThickness_.size()) : ((waferHexagon6()) ? 3 : 0));
+    ;
+  }
   std::tuple<int, int, int> waferType(HGCSiliconDetId const& id, bool fromFile) const;
   std::pair<int, int> waferTypeRotation(int layer, int waferU, int waferV, bool fromFile, bool debug) const;
   inline int waferUVMax() const { return hgpar_->waferUVMax_; }

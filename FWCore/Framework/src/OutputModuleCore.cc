@@ -17,12 +17,11 @@
 #include "FWCore/Framework/interface/OutputModuleCore.h"
 
 #include "DataFormats/Common/interface/Handle.h"
-#include "DataFormats/Common/interface/ThinnedAssociation.h"
 #include "DataFormats/Common/interface/EndPathStatus.h"
 #include "DataFormats/Provenance/interface/ProductDescription.h"
 #include "DataFormats/Provenance/interface/BranchKey.h"
 #include "DataFormats/Provenance/interface/ProductRegistry.h"
-#include "DataFormats/Provenance/interface/ThinnedAssociationsHelper.h"
+
 #include "FWCore/Framework/interface/SignallingProductRegistryFiller.h"
 #include "FWCore/Framework/interface/EventForOutput.h"
 #include "FWCore/Framework/interface/EventPrincipal.h"
@@ -38,7 +37,6 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
-#include "FWCore/Utilities/interface/DebugMacros.h"
 #include "FWCore/Reflection/interface/DictionaryTools.h"
 
 namespace edm {
@@ -59,8 +57,7 @@ namespace edm {
           selector_config_id_(),
           droppedBranchIDToKeptBranchID_(),
           branchIDLists_(new BranchIDLists),
-          origBranchIDLists_(nullptr),
-          thinnedAssociationsHelper_(new ThinnedAssociationsHelper) {
+          origBranchIDLists_(nullptr) {
       hasNewlyDroppedBranch_.fill(false);
 
       Service<service::TriggerNamesService> tns;
@@ -84,8 +81,12 @@ namespace edm {
       origBranchIDLists_ = desc.branchIDLists_;
     }
 
+    bool OutputModuleCore::finalSelection(ProductDescription const& desc) const {
+      // by defauilt, if the class of the branch is marked transient, output nothing
+      return desc.transient() == false;
+    }
+
     void OutputModuleCore::selectProducts(ProductRegistry const& preg,
-                                          ThinnedAssociationsHelper const& thinnedAssociationsHelper,
                                           ProcessBlockHelperBase const& processBlockHelper) {
       if (productSelector_.initialized())
         return;
@@ -103,17 +104,16 @@ namespace edm {
 
       for (auto const& it : preg.productList()) {
         ProductDescription const& desc = it.second;
-        if (desc.transient()) {
-          // if the class of the branch is marked transient, output nothing
-        } else if (!desc.present() && !desc.produced()) {
+        if (!desc.present() && !desc.produced()) {
           // else if the branch containing the product has been previously dropped,
           // output nothing
-        } else if (desc.unwrappedType() == typeid(ThinnedAssociation)) {
-          associationDescriptions.push_back(&desc);
         } else if (selected(desc)) {
-          keepThisBranch(desc, trueBranchIDToKeptBranchDesc, keptProductsInEvent);
-          insertSelectedProcesses(
-              desc, processesWithSelectedMergeableRunProducts, processesWithKeptProcessBlockProducts);
+          //allow inheriting classes to have final say on selection
+          if (finalSelection(desc)) {
+            keepThisBranch(desc, trueBranchIDToKeptBranchDesc, keptProductsInEvent);
+            insertSelectedProcesses(
+                desc, processesWithSelectedMergeableRunProducts, processesWithKeptProcessBlockProducts);
+          }
         } else {
           // otherwise, output nothing,
           // and mark the fact that there is a newly dropped branch of this type.
@@ -123,24 +123,12 @@ namespace edm {
 
       setProcessesWithSelectedMergeableRunProducts(processesWithSelectedMergeableRunProducts);
 
-      thinnedAssociationsHelper.selectAssociationProducts(
-          associationDescriptions, keptProductsInEvent, keepAssociation_);
-
-      for (auto association : associationDescriptions) {
-        if (keepAssociation_[association->branchID()]) {
-          keepThisBranch(*association, trueBranchIDToKeptBranchDesc, keptProductsInEvent);
-        } else {
-          hasNewlyDroppedBranch_[association->branchType()] = true;
-        }
-      }
-
       // Now fill in a mapping needed in the case that a branch was dropped while its EDAlias was kept.
       ProductSelector::fillDroppedToKept(preg, trueBranchIDToKeptBranchDesc, droppedBranchIDToKeptBranchID_);
 
-      thinnedAssociationsHelper_->updateFromParentProcess(
-          thinnedAssociationsHelper, keepAssociation_, droppedBranchIDToKeptBranchID_);
       outputProcessBlockHelper_.updateAfterProductSelection(processesWithKeptProcessBlockProducts, processBlockHelper);
 
+      orderedProcessNames_ = preg.processOrder();
       initialRegistry(preg);
     }
 
@@ -352,10 +340,6 @@ namespace edm {
         return branchIDLists_.get();
       }
       return origBranchIDLists_;
-    }
-
-    ThinnedAssociationsHelper const* OutputModuleCore::thinnedAssociationsHelper() const {
-      return thinnedAssociationsHelper_.get();
     }
 
     ModuleDescription const& OutputModuleCore::description() const { return moduleDescription_; }

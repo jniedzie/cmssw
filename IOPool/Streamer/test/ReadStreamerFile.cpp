@@ -28,14 +28,15 @@ Disclaimer: Most of the code here is randomly written during
 #include "IOPool/Streamer/interface/EventMessage.h"
 #include "IOPool/Streamer/interface/InitMessage.h"
 #include "IOPool/Streamer/interface/StreamerInputFile.h"
-#include "FWCore/Catalog/interface/InputFileCatalog.h"
-#include "FWCore/Catalog/interface/SiteLocalConfig.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/PluginManager/interface/PluginManager.h"
 #include "FWCore/PluginManager/interface/standard.h"
-#include "FWCore/Services/interface/setupSiteLocalConfig.h"
 #include "FWCore/ServiceRegistry/interface/ServiceRegistry.h"
-
+#include "FWStorage/Catalog/interface/InputFileCatalog.h"
+#include "FWStorage/Catalog/interface/SiteLocalConfig.h"
+#include "FWStorage/Catalog/interface/StorageURLModifier.h"
+#include "FWStorage/Services/interface/setupSiteLocalConfig.h"
+#
 #include <iostream>
 
 using namespace edm::streamer;
@@ -80,7 +81,7 @@ int readMultipleStreams(bool verbose) {
     streamFiles.push_back("file:teststreamfile.dat");
     streamFiles.push_back("file:teststreamfile.dat");
 
-    edm::InputFileCatalog catalog(streamFiles, "");
+    edm::InputFileCatalog catalog(streamFiles, "", false, edm::SciTagCategory::Undefined);
 
     StreamerInputFile stream_reader(catalog.fileCatalogItems());
 
@@ -126,7 +127,7 @@ int readInvalidLFN(bool verbose) {
     std::vector<std::string> streamFiles;
     streamFiles.push_back("teststreamfile.dat");
 
-    edm::InputFileCatalog catalog(streamFiles, "");
+    edm::InputFileCatalog catalog(streamFiles, "", false, edm::SciTagCategory::Undefined);
 
     StreamerInputFile stream_reader(catalog.fileCatalogItems());
 

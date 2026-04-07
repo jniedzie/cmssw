@@ -148,8 +148,8 @@ public:
     edm::Handle<edm::ValueMap<TIn>> vmap;
     iEvent.getByToken(token_, vmap);
     std::vector<ValType> vals;
+    vals.resize(selptrs.size());
     if (vmap.isValid() || !skipNonExistingSrc_) {
-      vals.resize(selptrs.size());
       for (unsigned int i = 0, n = vals.size(); i < n; ++i) {
         // calls the overloaded method to either get the valuemap value directly, or a function of the object value.
         vals[i] = this->eval(vmap, selptrs[i]);
@@ -255,7 +255,7 @@ public:
 
   static edm::ParameterSetDescription baseDescriptions() {
     edm::ParameterSetDescription desc;
-    std::string classname = ClassName<T>::name();
+    const std::string &classname = ClassName<T>::name();
     desc.add<std::string>("name")->setComment("name of the branch in the flat table output for " + classname);
     desc.add<std::string>("doc", "")->setComment("few words of self documentation");
     desc.add<bool>("extension", false)->setComment("whether or not to extend an existing same table");

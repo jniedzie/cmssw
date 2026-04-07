@@ -164,7 +164,7 @@ namespace {
   }
 
   //Contents of a message which should be reported as an INFO not a ERROR
-  constexpr std::array<const char* const, 11> in_message{
+  constexpr std::array<const char* const, 12> in_message{
       {"no dictionary for class",
        "already in TClassTable",
        "matrix not positive definite",
@@ -175,7 +175,8 @@ namespace {
        "nbinsy is <=0 - set to nbinsy = 1",
        "oneapi::tbb::global_control is limiting",
        "ufirst < fXmin, fXmin is used",
-       "ulast > fXmax, fXmax is used"}};
+       "ulast > fXmax, fXmax is used",
+       "Inspection for auto_ptr"}};
 
   //Location generating messages which should be reported as an INFO not a ERROR
   constexpr std::array<const char* const, 7> in_location{{"Fit",
@@ -371,9 +372,7 @@ namespace {
     }
     while (count) {
       if (timeout_s >= 0) {
-        struct pollfd poll_info {
-          fd, POLLIN, 0
-        };
+        struct pollfd poll_info{fd, POLLIN, 0};
         int ms_remaining =
             std::chrono::duration_cast<std::chrono::milliseconds>(end_time - std::chrono::steady_clock::now()).count();
         if (ms_remaining > 0) {
@@ -786,6 +785,12 @@ namespace edm {
           }
         });
       }
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6, 39, 0)
+      auto const printAutoParsed = pset.getUntrackedParameter<bool>("PrintAutoParsed");
+      if (printAutoParsed) {
+        iReg.watchPostEndJob([]() { gInterpreter->Print("autoparsed"); });
+      }
+#endif
 
       if (unloadSigHandler_) {
         // Deactivate all the Root signal handlers and restore the system defaults
@@ -921,6 +926,10 @@ namespace edm {
               "missing is disable during module construction. The current implementation of disabling the parsing is "
               "fragile, and may work only in a single-thread job that does not use reco::parser::cutParser() or "
               "reco::parser::expressionParser() (and it certainly does not work on multiple threads).");
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6, 39, 0)
+      desc.addUntracked<bool>("PrintAutoParsed", false)
+          ->setComment("If True, ask ROOT to print at the end of the job all classes for which headers were parsed");
+#endif
       desc.addUntracked<bool>("LoadAllDictionaries", false)->setComment("If True, loads all ROOT dictionaries.");
       desc.addUntracked<bool>("EnableIMT", true)->setComment("If True, calls ROOT::EnableImplicitMT().");
       desc.addUntracked<bool>("AbortOnSignal", true)

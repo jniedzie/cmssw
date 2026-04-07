@@ -39,18 +39,26 @@ SinglePhotonL1 = [
   'L1_SingleIsoEG34er2p5'
 ]
 
-ScoutingEGammaCollectionMonitoring = DQMEDAnalyzer('ScoutingEGammaCollectionMonitoring',
-                                                   OutputInternalPath = cms.string('/HLT/ScoutingOffline/EGamma/Collection'),
-                                                   TriggerResultTag   = cms.InputTag("TriggerResults", "", "HLT"),
-                                                   AlgInputTag  = cms.InputTag("gtStage2Digis"),
-                                                   l1tAlgBlkInputTag  = cms.InputTag("gtStage2Digis"),
-                                                   l1tExtBlkInputTag  = cms.InputTag("gtStage2Digis"),
-                                                   ReadPrescalesFromFile = cms.bool(False),
-                                                   triggerSelection   = cms.vstring(["DST_PFScouting_ZeroBias_v", "DST_PFScouting_DoubleEG_v", "DST_PFScouting_SinglePhotonEB_v"]),
-                                                   L1Seeds            = cms.vstring(DoubleEGL1 + SinglePhotonL1),
-                                                   ElectronCollection = cms.InputTag('slimmedElectrons'),
-                                                   ScoutingElectronCollection = cms.InputTag("hltScoutingEgammaPacker"),
-                                                   eleIdMapTight = cms.InputTag('egmGsfElectronIDsForScoutingDQM:cutBasedElectronID-RunIIIWinter22-V1-loose')
-                                                   )
+ScoutingEGammaCollectionMonitoringOffline = DQMEDAnalyzer('ScoutingEGammaCollectionMonitoring',
+                                                          OutputInternalPath = cms.string('/HLT/ScoutingOffline/EGamma/Collection'),
+                                                          TriggerResultTag   = cms.InputTag("TriggerResults", "", "HLT"),
+                                                          AlgInputTag  = cms.InputTag("gtStage2Digis"),
+                                                          l1tAlgBlkInputTag  = cms.InputTag("gtStage2Digis"),
+                                                          l1tExtBlkInputTag  = cms.InputTag("gtStage2Digis"),
+                                                          ReadPrescalesFromFile = cms.bool(False),
+                                                          triggerSelection   = cms.vstring(["DST_PFScouting_ZeroBias_v", "DST_PFScouting_DoubleEG_v", "DST_PFScouting_SinglePhotonEB_v"]),
+                                                          L1Seeds            = cms.vstring(DoubleEGL1 + SinglePhotonL1),
+                                                          ElectronCollection = cms.InputTag('slimmedElectrons'),
+                                                          ScoutingElectronCollection = cms.InputTag("hltScoutingEgammaPacker"),
+                                                          eleIdMapTight = cms.InputTag('egmGsfElectronIDsForScoutingDQM:cutBasedElectronID-RunIIIWinter22-V1-loose'),
+                                                          useOfflineObject  = cms.bool(True)
+                                                          )
 
-scoutingMonitoringEGM = cms.Sequence(ScoutingEGammaCollectionMonitoring)
+ScoutingEGammaCollectionMonitoringOnline = ScoutingEGammaCollectionMonitoringOffline.clone(
+    OutputInternalPath = '/HLT/ScoutingOnline/EGamma/Collection',
+    triggerSelection   = cms.vstring(["DST_PFScouting_DoubleEGMonitorZ_v", "DST_PFScouting_SinglePhotonEBMonitorJPsi_v", "DST_PFScouting_SinglePhotonEBMonitorZ_v"]),
+    useOfflineObject = False
+)
+
+scoutingMonitoringEGMOffline= cms.Sequence(ScoutingEGammaCollectionMonitoringOffline)
+scoutingMonitoringEGMOnline= cms.Sequence(ScoutingEGammaCollectionMonitoringOnline)

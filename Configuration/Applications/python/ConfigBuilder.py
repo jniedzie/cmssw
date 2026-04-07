@@ -76,6 +76,7 @@ defaultOptions.prefix = None
 defaultOptions.profile = None
 defaultOptions.heap_profile = None
 defaultOptions.maxmem_profile = None
+defaultOptions.alloc_monitor = None
 defaultOptions.isRepacked = False
 defaultOptions.restoreRNDSeeds = False
 defaultOptions.donotDropOnInput = ''
@@ -381,13 +382,13 @@ class ConfigBuilder(object):
         self.addedObjects.append(("","options"))
 
         if self._options.lazy_download:
-            self.process.AdaptorConfig = cms.Service("AdaptorConfig",
+            self.process.TFileAdaptor = cms.Service("TFileAdaptor",
                                                      stats = cms.untracked.bool(True),
                                                      enable = cms.untracked.bool(True),
                                                      cacheHint = cms.untracked.string("lazy-download"),
                                                      readHint = cms.untracked.string("read-ahead-buffered")
                                                      )
-            self.addedObjects.append(("Setup lazy download","AdaptorConfig"))
+            self.addedObjects.append(("Setup lazy download","TFileAdaptor"))
 
         #self.process.cmsDriverCommand = cms.untracked.PSet( command=cms.untracked.string('cmsDriver.py '+self._options.arguments) )
         #self.addedObjects.append(("what cmsDriver command was used","cmsDriverCommand"))
@@ -439,7 +440,7 @@ class ConfigBuilder(object):
                     self.process.source.fileNames.append(self._options.dirin+entry)
             if self._options.secondfilein:
                 if not hasattr(self.process.source,"secondaryFileNames"):
-                    raise Exception("--secondfilein not compatible with "+self._options.filetype+"input type")
+                    raise Exception("--secondfilein not compatible with "+self._options.filetype+" input type")
                 for entry in self._options.secondfilein.split(','):
                     print("entry",entry)
                     if entry.startswith("filelist:"):
@@ -457,9 +458,9 @@ class ConfigBuilder(object):
                                                secondaryFileNames= cms.untracked.vstring())
                 filesFromOption(self)
             if self._options.filetype == "EDM_RNTUPLE":
-                self.process.source=cms.Source("RNTupleSource",
-                                               fileNames = cms.untracked.vstring())#, 2ndary not supported yet
-                                               #secondaryFileNames= cms.untracked.vstring())
+                self.process.source=cms.Source("RNTupleTempSource",
+                                               fileNames = cms.untracked.vstring(),
+                                               secondaryFileNames= cms.untracked.vstring())
                 filesFromOption(self)
             elif self._options.filetype == "DAT":
                 self.process.source=cms.Source("NewEventStreamFileReader",fileNames = cms.untracked.vstring())
@@ -711,11 +712,6 @@ class ConfigBuilder(object):
             output = self._createOutputModuleInAddOutput(tier=tier, streamType=streamType, eventContent=theEventContent, fileName = theFileName, filterName = theFilterName, ignoreNano = False)
             self._updateOutputSelectEvents(output, streamType)
 
-            if "MINIAOD" in streamType:
-                ## we should definitely get rid of this customization by now
-                from PhysicsTools.PatAlgos.slimming.miniAOD_tools import miniAOD_customizeOutput
-                miniAOD_customizeOutput(output)
-
             outputModuleName=streamType+streamQualifier+'output'
             outputModule = self._addOutputModuleAndPathToProcess(output, outputModuleName)
 
@@ -732,14 +728,16 @@ class ConfigBuilder(object):
         CppType='PoolOutputModule'
         if self._options.timeoutOutput:
             CppType='TimeoutPoolOutputModule'
-        if streamType=='DQM' and tier=='DQMIO':
+        elif streamType=='DQM' and tier=='DQMIO':
             CppType='DQMRootOutputModule'
+        elif not ignoreNano and "NANOAOD" in streamType:
+            CppType='NanoAODRNTupleOutputModule' if self._options.rntuple_out else 'NanoAODOutputModule'
+        elif self._options.rntuple_out:
+            CppType='RNTupleTempOutputModule'
+        if 'RNTuple' in CppType:
+            fileName = fileName.replace('.root', '.rntpl')
+        else:
             fileName = fileName.replace('.rntpl', '.root')
-        if not ignoreNano and "NANOAOD" in streamType : CppType='NanoAODOutputModule'
-        if self._options.rntuple_out and CppType == 'PoolOutputModule':
-            CppType='RNTupleOutputModule'
-            if len(fileName) > 5 and fileName[-5:] == '.root':
-                fileName = fileName.replace('.root', '.rntpl')
         output = cms.OutputModule(CppType,
                                   eventContent.clone(),
                                   fileName = cms.untracked.string(fileName),
@@ -819,6 +817,8 @@ class ConfigBuilder(object):
                         mixingDict['F']=(filesFromList(self._options.pileup_input[9:]))[0]
                     else:
                         mixingDict['F']=self._options.pileup_input.split(',')
+
+                self.customizeMixingModuleForRNTuple(mixingDict.get('F', []), 'mix')
                 specialization=defineMixing(mixingDict)
                 for command in specialization:
                     self.executeAndRemember(command)
@@ -829,14 +829,18 @@ class ConfigBuilder(object):
         # load the geometry file
         try:
             if len(self.stepMap):
-                self.loadAndRemember(self.GeometryCFF)
-                if (self.GeometryCFF == 'Configuration/StandardSequences/GeometryRecoDB_cff' and not self.geometryDBLabel):
-                    print("Warning: The default GeometryRecoDB_cff is being used; however, the DB geometry is not applied. You may need to verify your cmsDriver.")
-                if ('SIM' in self.stepMap or 'reSIM' in self.stepMap) and not self._options.fast:
-                    self.loadAndRemember(self.SimGeometryCFF)
-                    if self.geometryDBLabel:
-                        self.executeAndRemember('if hasattr(process, "XMLFromDBSource"): process.XMLFromDBSource.label="%s"'%(self.geometryDBLabel))
-                        self.executeAndRemember('if hasattr(process, "DDDetectorESProducerFromDB"): process.DDDetectorESProducerFromDB.label="%s"'%(self.geometryDBLabel))
+                if isinstance(self.GeometryCFF, list):
+                    for cff in self.GeometryCFF:
+                        self.loadAndRemember(cff)
+                else:
+                    self.loadAndRemember(self.GeometryCFF)
+                    if (self.GeometryCFF == 'Configuration/StandardSequences/GeometryRecoDB_cff' and not self.geometryDBLabel):
+                        print("Warning: The default GeometryRecoDB_cff is being used; however, the DB geometry is not applied. You may need to verify your cmsDriver.")
+                    if ('SIM' in self.stepMap or 'reSIM' in self.stepMap) and not self._options.fast:
+                        self.loadAndRemember(self.SimGeometryCFF)
+                        if self.geometryDBLabel:
+                            self.executeAndRemember('if hasattr(process, "XMLFromDBSource"): process.XMLFromDBSource.label="%s"'%(self.geometryDBLabel))
+                            self.executeAndRemember('if hasattr(process, "DDDetectorESProducerFromDB"): process.DDDetectorESProducerFromDB.label="%s"'%(self.geometryDBLabel))
 
         except ImportError:
             print("Geometry option",self._options.geometry,"unknown.")
@@ -874,6 +878,20 @@ class ConfigBuilder(object):
                 else:
                     self._options.inputCommands='keep *_randomEngineStateProducer_*_*,'
 
+    def customizeMixingModuleForRNTuple(self, files, mixingModuleLabel):
+        # Do we want a command-line option as well to switch the input type?
+        # Naively the 'filetype' looks attractive, but it would
+        # couple the primary Source and the SecSource to the same
+        # file format, which is not strictly necessary
+        useRNTuple= len(files) > 0 and files[0].lower().endswith(".rntpl")
+        if useRNTuple:
+            rntupleSrc = cms.SecSource("EmbeddedRNTupleRootSource")
+            mixingModule = getattr(self.process, mixingModuleLabel)
+            rntupleSrc.update_(mixingModule.input.parameters_())
+            mixingModule.input = rntupleSrc
+            self.additionalCommands.append('rntupleSrc = cms.SecSource("EmbeddedRNTupleTempSource")')
+            self.additionalCommands.append(f'rntupleSrc.update_(process.{mixingModuleLabel}.input.parameters_())')
+            self.additionalCommands.append(f'process.{mixingModuleLabel}.input = rntupleSrc')
 
     def completeInputCommand(self):
         if self._options.inputEventContent:
@@ -1095,7 +1113,7 @@ class ConfigBuilder(object):
         self.VALIDATIONDefaultSeq=''
         self.ENDJOBDefaultSeq='endOfProcess'
         self.REPACKDefaultSeq='DigiToRawRepack'
-        self.PATDefaultSeq='miniAOD'
+        self.PATDefaultSeq='patTask'
         self.PATGENDefaultSeq='miniGEN'
         #TODO: Check based of file input
         self.NANODefaultSeq='nanoSequence'
@@ -1115,7 +1133,6 @@ class ConfigBuilder(object):
         if self._options.isMC==True:
             self.RAW2DIGIDefaultCFF="Configuration/StandardSequences/RawToDigi_cff"
             self.RECODefaultCFF="Configuration/StandardSequences/Reconstruction_cff"
-            self.PATDefaultCFF="Configuration/StandardSequences/PATMC_cff"
             self.PATGENDefaultCFF="Configuration/StandardSequences/PATGEN_cff"
             self.DQMOFFLINEDefaultCFF="DQMOffline/Configuration/DQMOfflineMC_cff"
             self.ALCADefaultCFF="Configuration/StandardSequences/AlCaRecoStreamsMC_cff"
@@ -1170,44 +1187,39 @@ class ConfigBuilder(object):
         self.GeometryCFF='Configuration/StandardSequences/GeometryRecoDB_cff'
         self.geometryDBLabel=None
         simGeometry=''
-        if self._options.fast:
-            if 'start' in self._options.conditions.lower():
-                self.GeometryCFF='FastSimulation/Configuration/Geometries_START_cff'
+
+        def inGeometryKeys(opt):
+            from Configuration.StandardSequences.GeometryConf import GeometryConf
+            if opt in GeometryConf:
+                return GeometryConf[opt]
             else:
-                self.GeometryCFF='FastSimulation/Configuration/Geometries_MC_cff'
+                if (opt=='SimDB' or opt.startswith('DB:')):
+                    return opt
+                else:
+                    raise Exception("Geometry "+opt+" does not exist!")
+
+        geoms=self._options.geometry.split(',')
+        if len(geoms)==1: geoms=inGeometryKeys(geoms[0]).split(',')
+        if len(geoms)==2:
+            #may specify the reco geometry
+            if '/' in geoms[1] or '_cff' in geoms[1]:
+                self.GeometryCFF=geoms[1]
+            else:
+                self.GeometryCFF='Configuration/Geometry/Geometry'+geoms[1]+'_cff'
+
+        if (geoms[0].startswith('DB:')):
+            self.SimGeometryCFF='Configuration/StandardSequences/GeometrySimDB_cff'
+            self.geometryDBLabel=geoms[0][3:]
+            print("with DB:")
         else:
-            def inGeometryKeys(opt):
-                from Configuration.StandardSequences.GeometryConf import GeometryConf
-                if opt in GeometryConf:
-                    return GeometryConf[opt]
-                else:
-                    if (opt=='SimDB' or opt.startswith('DB:')):
-                        return opt
-                    else:
-                        raise Exception("Geometry "+opt+" does not exist!")
-
-            geoms=self._options.geometry.split(',')
-            if len(geoms)==1: geoms=inGeometryKeys(geoms[0]).split(',')
-            if len(geoms)==2:
-                #may specify the reco geometry
-                if '/' in geoms[1] or '_cff' in geoms[1]:
-                    self.GeometryCFF=geoms[1]
-                else:
-                    self.GeometryCFF='Configuration/Geometry/Geometry'+geoms[1]+'_cff'
-
-            if (geoms[0].startswith('DB:')):
-                self.SimGeometryCFF='Configuration/StandardSequences/GeometrySimDB_cff'
-                self.geometryDBLabel=geoms[0][3:]
-                print("with DB:")
+            if '/' in geoms[0] or '_cff' in geoms[0]:
+                self.SimGeometryCFF=geoms[0]
             else:
-                if '/' in geoms[0] or '_cff' in geoms[0]:
-                    self.SimGeometryCFF=geoms[0]
+                simGeometry=geoms[0]
+                if self._options.gflash==True:
+                    self.SimGeometryCFF='Configuration/Geometry/Geometry'+geoms[0]+'GFlash_cff'
                 else:
-                    simGeometry=geoms[0]
-                    if self._options.gflash==True:
-                        self.SimGeometryCFF='Configuration/Geometry/Geometry'+geoms[0]+'GFlash_cff'
-                    else:
-                        self.SimGeometryCFF='Configuration/Geometry/Geometry'+geoms[0]+'_cff'
+                    self.SimGeometryCFF='Configuration/Geometry/Geometry'+geoms[0]+'_cff'
 
         # synchronize the geometry configuration and the FullSimulation sequence to be used
         if simGeometry not in defaultOptions.geometryExtendedOptions:
@@ -1219,6 +1231,21 @@ class ConfigBuilder(object):
 
         # fastsim requires some changes to the default cff files and sequences
         if self._options.fast:
+            # always use reco geometry for xml (includes sim components)
+            if 'Reco' not in self.GeometryCFF and 'DB' not in self.GeometryCFF:
+                self.GeometryCFF = self.GeometryCFF.replace("_cff","Reco_cff")
+            if 'DB' in self.GeometryCFF:
+                self.GeometryCFF = 'Configuration/StandardSequences/GeometryDB_cff'
+            self.GeometryCFF = [self.GeometryCFF]
+
+            if 'DB' in self.GeometryCFF[0]:
+                self.GeometryCFF.append('FastSimulation/Configuration/GeometryDB_cff')
+            else:
+                self.GeometryCFF.append('FastSimulation/Configuration/GeometryXML_cff')
+            if 'start' in self._options.conditions.lower():
+                from FastSimulation.Configuration.Geometries_cff import _fastSimGeometryCustomStart
+                self.executeAndRemember(_fastSimGeometryCustomStart)
+
             self.SIMDefaultCFF = 'FastSimulation.Configuration.SimIdeal_cff'
             self.RECODefaultCFF= 'FastSimulation.Configuration.Reconstruction_AftMix_cff'
             self.RECOBEFMIXDefaultCFF = 'FastSimulation.Configuration.Reconstruction_BefMix_cff'
@@ -1244,7 +1271,7 @@ class ConfigBuilder(object):
             # define output module and go from there
         if self._options.rntuple_out:
             extension = '.rntpl'
-            output = cms.OutputModule('RNTupleOutputModule')
+            output = cms.OutputModule('RNTupleTempOutputModule')
         else:
             extension = '.root'
             output = cms.OutputModule("PoolOutputModule")
@@ -1594,6 +1621,8 @@ class ConfigBuilder(object):
                 theFiles= (filesFromList(self._options.pileup_input[9:]))[0]
             else:
                 theFiles=self._options.pileup_input.split(',')
+
+            self.customizeMixingModuleForRNTuple(theFiles, 'mixData')
             #print theFiles
             self.executeAndRemember( "process.mixData.input.fileNames = cms.untracked.vstring(%s)"%(  theFiles ) )
 
@@ -1697,6 +1726,12 @@ class ConfigBuilder(object):
             else:
                 self.executeAndRemember('process.loadHltConfiguration("%s",%s)'%(stepSpec.replace(',',':'),optionsForHLTConfig))
         else:
+            # case where HLT:something was provided (most of the cases)
+            if '+' in stepSpec:
+                # case where HLT:menu+customisation+customisation+... was provided
+                # the customiser allows to modify parts of the HLT menu
+                stepSpec, *hltcustomiser = stepSpec.rsplit('+')
+                self._options.customisation_file_unsch = hltcustomiser + self._options.customisation_file_unsch
             self.loadAndRemember('HLTrigger/Configuration/HLT_%s_cff' % stepSpec)
 
         if self._options.isMC:
@@ -1735,12 +1770,6 @@ class ConfigBuilder(object):
         _,_raw2digiSeq,_ = self.loadDefaultOrSpecifiedCFF(stepSpec,self.RAW2DIGIDefaultCFF)
         self.scheduleSequence(_raw2digiSeq,'raw2digi_step')
         return
-
-    def prepare_PATFILTER(self, stepSpec = None):
-        self.loadAndRemember("PhysicsTools/PatAlgos/slimming/metFilterPaths_cff")
-        from PhysicsTools.PatAlgos.slimming.metFilterPaths_cff import allMetFilterPaths
-        for filt in allMetFilterPaths:
-            self.schedule.append(getattr(self.process,'Flag_'+filt))
 
     def prepare_L1HwVal(self, stepSpec = 'L1HwVal'):
         ''' Enrich the schedule with L1 HW validation '''
@@ -1813,18 +1842,61 @@ class ConfigBuilder(object):
         self.scheduleSequence(_recobefmixSeq,'reconstruction_befmix_step')
         return
 
-    def prepare_PAT(self, stepSpec = "miniAOD"):
+    def prepare_PAT(self, stepSpec = "patTask"):
         ''' Enrich the schedule with PAT '''
-        self.prepare_PATFILTER(self)
-        self.loadDefaultOrSpecifiedCFF(stepSpec,self.PATDefaultCFF)
-        self.labelsToAssociate.append('patTask')
+
+        # Handle @-prefixed flavors (e.g., @Scout for scouting MiniAOD)
+        if '@' in stepSpec:
+            from PhysicsTools.PatFromScouting.autoPAT import autoPAT, expandPATMapping
+
+            _patSeq = stepSpec.split('+')
+            _patCustoms = stepSpec.split('+')
+            expandPATMapping(_patSeq, autoPAT, 'sequence')
+            expandPATMapping(_patCustoms, autoPAT, 'customize')
+
+            # Remove duplicates while preserving order
+            _patSeq = list(sorted(set(_patSeq), key=_patSeq.index))
+            _patCustoms = list(sorted(set(_patCustoms), key=_patCustoms.index))
+            # Remove empty strings
+            _patSeq = [s for s in _patSeq if s]
+            _patCustoms = [c for c in _patCustoms if c]
+
+            # Load and schedule sequences
+            _seqToSchedule = []
+            for _subSeq in _patSeq:
+                if '.' in _subSeq:
+                    _cff, _seq = _subSeq.rsplit('.', 1)
+                    print(f"PAT: scheduling: {_seq} from {_cff}")
+                    self.loadAndRemember(_cff)
+                    _seqToSchedule.append(_seq)
+                elif '/' in _subSeq:
+                    self.loadAndRemember(_subSeq)
+
+            if _seqToSchedule:
+                self.scheduleSequence('+'.join(_seqToSchedule), 'patMiniAOD_step')
+
+            # Add customizations
+            for custom in _patCustoms:
+                self._options.customisation_file.append(custom)
+
+            # cpu efficiency boost when running PAT by itself
+            if self.stepKeys[0] == 'PAT':
+                self._customise_coms.append( 'process.source.delayReadingEventProducts = cms.untracked.bool(False)')
+
+            return
+
+        _,pat_sequence,pat_cff = self.loadDefaultOrSpecifiedCFF(stepSpec,self.PATDefaultCFF)
+        ## handle the noise filters as Flag_* path that were loaded
+        for existing_path,path_ in self.process.paths_().items():
+            if existing_path.startswith('Flag_'):
+                print(f'scheduling {existing_path} as part of PAT configuration')
+                self.schedule.append( path_ )
+
+        self.labelsToAssociate.append(pat_sequence)
         if self._options.isData:
-            self._options.customisation_file_unsch.insert(0,"PhysicsTools/PatAlgos/slimming/miniAOD_tools.miniAOD_customizeAllData")
+            self._options.customisation_file_unsch.insert(0,f"{pat_cff}.miniAOD_customizeAllData")
         else:
-            if self._options.fast:
-                self._options.customisation_file_unsch.insert(0,"PhysicsTools/PatAlgos/slimming/miniAOD_tools.miniAOD_customizeAllMCFastSim")
-            else:
-                self._options.customisation_file_unsch.insert(0,"PhysicsTools/PatAlgos/slimming/miniAOD_tools.miniAOD_customizeAllMC")
+            self._options.customisation_file_unsch.insert(0,f"{pat_cff}.miniAOD_customizeAllMC")
 
         if self._options.hltProcess:
             self._customise_coms.append( f'process.patTrigger.processName = "{self._options.hltProcess}"')
@@ -1857,6 +1929,12 @@ class ConfigBuilder(object):
         print(_nanoSeq)
         # create full specified sequence using autoNANO
         from PhysicsTools.NanoAOD.autoNANO import autoNANO, expandNanoMapping
+        # Extend with scouting-specific NANO flavors if available
+        try:
+            from PhysicsTools.PatFromScouting.autoPAT import autoNANO_scouting
+            autoNANO.update(autoNANO_scouting)
+        except ImportError:
+            pass  # PatFromScouting not available
         # if not a autoNANO mapping, load an empty customization, which later will be converted into the default.
         _nanoCustoms = _nanoSeq.split('+') if '@' in stepSpec else ['']
         _nanoSeq = _nanoSeq.split('+')
@@ -1909,9 +1987,15 @@ class ConfigBuilder(object):
             print("replacing %s process name - step SKIM:%s will use '%s'" % (stdHLTProcName, sequence, newHLTProcName))
 
         ## support @Mu+DiJet+@Electron configuration via autoSkim.py
-        from Configuration.Skimming.autoSkim import autoSkim
+        from Configuration.Skimming.autoSkim import autoSkim, autoSkimRunI
         skimlist = sequence.split('+')
         self.expandMapping(skimlist,autoSkim)
+
+        autoSkimRunIList = list(set(
+            item
+            for v in autoSkimRunI.values()
+            for item in v.split('+')
+        ))
 
         #print("dictionary for skims:", skimConfig.__dict__)
         for skim in skimConfig.__dict__:
@@ -1931,6 +2015,10 @@ class ConfigBuilder(object):
             shortname = skim.replace('SKIMStream','')
             if (sequence=="all"):
                 self.addExtraStream(skim,skimstream)
+            elif (sequence=="allRun1"):
+                if not shortname in autoSkimRunIList:
+                    continue
+                self.addExtraStream(skim,skimstream)
             elif (shortname in skimlist):
                 self.addExtraStream(skim,skimstream)
                 #add a DQM eventcontent for this guy
@@ -1948,7 +2036,7 @@ class ConfigBuilder(object):
                 for i in range(skimlist.count(shortname)):
                     skimlist.remove(shortname)
 
-        if (skimlist.__len__()!=0 and sequence!="all"):
+        if (skimlist.__len__()!=0 and sequence!="all" and sequence!="allRun1"):
             print('WARNING, possible typo with SKIM:'+'+'.join(skimlist))
             raise Exception('WARNING, possible typo with SKIM:'+'+'.join(skimlist))
 

@@ -6,7 +6,6 @@
 #include "FWCore/Framework/interface/EventSelector.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
-#include "FWCore/Utilities/interface/DebugMacros.h"
 #include "FWCore/Version/interface/GetReleaseVersion.h"
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "DataFormats/Provenance/interface/ModuleDescription.h"
@@ -47,9 +46,8 @@ namespace edm::streamer {
     return builders_.serializeEvent(buffer_, e, triggerResults, selectorCfg, eventMetaDataChecksum_);
   }
 
-  std::unique_ptr<EventMsgBuilder> StreamerOutputModuleCommon::serializeEventMetaData(
-      BranchIDLists const& branchLists, ThinnedAssociationsHelper const& helper) {
-    auto ret = builders_.serializeEventMetaData(buffer_, branchLists, helper);
+  std::unique_ptr<EventMsgBuilder> StreamerOutputModuleCommon::serializeEventMetaData(BranchIDLists const& branchLists) {
+    auto ret = builders_.serializeEventMetaData(buffer_, branchLists);
     eventMetaDataChecksum_ = ret.second;
     return std::move(ret.first);
   }

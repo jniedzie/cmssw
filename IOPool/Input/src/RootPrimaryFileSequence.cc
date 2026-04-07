@@ -9,14 +9,15 @@
 
 #include "DataFormats/Provenance/interface/BranchID.h"
 #include "DataFormats/Provenance/interface/ProductRegistry.h"
-#include "FWCore/Catalog/interface/InputFileCatalog.h"
-#include "FWCore/Catalog/interface/SiteLocalConfig.h"
+#include "DataFormats/Provenance/interface/ProcessHistoryRegistry.h"
 #include "FWCore/Framework/interface/FileBlock.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
-#include "Utilities/StorageFactory/interface/StorageFactory.h"
+#include "FWStorage/Catalog/interface/InputFileCatalog.h"
+#include "FWStorage/Catalog/interface/SiteLocalConfig.h"
+#include "FWStorage/StorageFactory/interface/StorageFactory.h"
 
 namespace edm {
   RootPrimaryFileSequence::RootPrimaryFileSequence(ParameterSet const& pset,
@@ -65,11 +66,14 @@ namespace edm {
     // Open the first file.
     for (setAtFirstFile(); !noMoreFiles(); setAtNextFile()) {
       initFile(input_.skipBadFiles());
-      if (rootFile())
+      if (rootFile() and not rootFile()->empty())
         break;
     }
     if (rootFile()) {
-      input_.productRegistryUpdate().updateFromInput(rootFile()->productRegistry()->productList());
+      std::vector<std::string> processOrder;
+      processingOrderMerge(input_.processHistoryRegistry(), processOrder);
+
+      input_.productRegistryUpdate().updateFromInput(rootFile()->productRegistry()->productList(), processOrder);
       if (initialNumberOfEventsToSkip_ != 0) {
         skipEventsAtBeginning(initialNumberOfEventsToSkip_);
       }
@@ -165,13 +169,11 @@ namespace edm {
                                .enablePrefetching = enablePrefetching_,
                                .promptReading = not input_.delayReadingEventProducts()},
         RootFile::ProductChoices{.productSelectorRules = input_.productSelectorRules(),
-                                 .associationsFromSecondary = nullptr,  // associationsFromSecondary
                                  .dropDescendantsOfDroppedProducts = input_.dropDescendants(),
                                  .labelRawDataLikeMC = input_.labelRawDataLikeMC()},
         RootFile::CrossFileInfo{.runHelper = input_.runHelper(),
                                 .branchIDListHelper = input_.branchIDListHelper(),
                                 .processBlockHelper = input_.processBlockHelper().get(),
-                                .thinnedAssociationsHelper = input_.thinnedAssociationsHelper(),
                                 .duplicateChecker = duplicateChecker(),
                                 .indexesIntoFiles = indexesIntoFiles(),
                                 .currentIndexIntoFile = currentIndexIntoFile},
