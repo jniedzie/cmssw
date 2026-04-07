@@ -32,16 +32,12 @@
 
 #include "PhysicsTools/NanoAOD/interface/DisTauTagScaling.h"
 
-void test_vector(std::vector<float>& values) {
-  for (auto& value : values) {
-    if (std::isnan(value)) {
-      throw std::runtime_error("DisTauTag score output: NaN detected.");
-    } else if (std::isinf(value)) {
-      throw std::runtime_error("DisTauTag score output: Infinity detected.");
-    } else if (!std::isfinite(value)) {
-      throw std::runtime_error("DisTauTag score output: Non-standard value detected.");
-    }
+std::optional<float> test_score(float value) {
+  if (!std::isfinite(value)) {
+    edm::LogWarning("DisTauTag") << "Non-finite score detected (" << value << "); dropping value.";
+    return std::nullopt;
   }
+  return value;
 }
 
 class DisTauTag : public edm::global::EDProducer<> {
@@ -285,15 +281,13 @@ void DisTauTag::produce(edm::StreamID, edm::Event& event, const edm::EventSetup&
 
     // Running inference on batch
     std::vector<tensorflow::Tensor> outputs;
-    {
-      tensorflow::run(session_, {{"input_1", input_1}, {"input_2", input_2}}, {"final_out"}, &outputs);
-    }
+    { tensorflow::run(session_, {{"input_1", input_1}, {"input_2", input_2}}, {"final_out"}, &outputs); }
 
     // Storing results
     for (size_t batch_jet_idx = 0; batch_jet_idx < current_batch_size; ++batch_jet_idx) {
       const size_t jetIndex = jet_start + batch_jet_idx;
-      v_score0[jetIndex] = outputs[0].matrix<float>()(batch_jet_idx, 0);
-      v_score1[jetIndex] = outputs[0].matrix<float>()(batch_jet_idx, 1);
+      v_score0[jetIndex] = test_score(outputs[0].matrix<float>()(batch_jet_idx, 0)).value_or(-9.f);
+      v_score1[jetIndex] = test_score(outputs[0].matrix<float>()(batch_jet_idx, 1)).value_or(-9.f);
     }
 
     // Save inputs if requested (for debugging)
@@ -320,9 +314,6 @@ void DisTauTag::produce(edm::StreamID, edm::Event& event, const edm::EventSetup&
       }
     }
   }
-
-  test_vector(v_score0);
-  test_vector(v_score1);
 
   std::unique_ptr<edm::ValueMap<float>> vm_score0(new edm::ValueMap<float>());
   edm::ValueMap<float>::Filler filler_score0(*vm_score0);
