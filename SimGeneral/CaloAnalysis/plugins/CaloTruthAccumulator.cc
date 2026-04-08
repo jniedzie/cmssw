@@ -733,6 +733,7 @@ void CaloTruthAccumulator::finalizeEvent(edm::Event &event, edm::EventSetup cons
   } else {
     applyToSimClusterConfig(
         [this](auto &config) { normalizeCollection(config.outputClusters, m_detIdToTotalSimEnergy); });
+    normalizeCollection(outputCaloParticles_, m_detIdToTotalSimEnergy);
   }
 
   if (produceLegacySimCluster_) {
