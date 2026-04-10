@@ -10,8 +10,8 @@
 // Authors: J.Bendavid
 //--------------------------------------------------------------------------------------------------
 
-#ifndef EgammaReco_ConversionTrack_h
-#define EgammaReco_ConversionTrack_h
+#ifndef EgammaTools_ConversionTrack_h
+#define EgammaTools_ConversionTrack_h
 
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 class Trajectory;
