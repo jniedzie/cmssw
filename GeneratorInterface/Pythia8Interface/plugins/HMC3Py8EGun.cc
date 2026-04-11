@@ -47,7 +47,6 @@ namespace gen {
       for (unsigned int i = 0; i < evtgenUserFiles.size(); i++)
         evtgenDecays->readDecayFile(evtgenUserFiles.at(i));
     }
-
   }
 
   bool HMC3Py8EGun::generatePartonsAndHadronize() {
