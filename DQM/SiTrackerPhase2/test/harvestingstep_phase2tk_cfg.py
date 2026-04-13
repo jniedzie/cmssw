@@ -81,11 +81,13 @@ process.configurationMetadata = cms.untracked.PSet(
 # Other statements
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T35', '')
-process.trackerphase2ValidationHarvesting_standalone += process.phase2OTEffClientSeq
 
 # Path and EndPath definitions
-process.trackerphase2ValidationHarvesting_step = cms.Path(process.trackerphase2ValidationHarvesting_standalone)
+#process.trackerphase2ValidationHarvesting_step = cms.Path(process.trackerphase2ValidationHarvesting_standalone)
+##default path in production
+#process.trackerphase2ValidationHarvesting_step = cms.Path(process.trackerphase2ValidationHarvesting)
 process.dqmsave_step = cms.Path(process.DQMSaver)
 
 # Schedule definition
-process.schedule = cms.Schedule(process.trackerphase2ValidationHarvesting_step, process.dqmsave_step)
+#process.schedule = cms.Schedule(process.trackerphase2ValidationHarvesting_step, process.dqmsave_step)
+process.schedule = cms.Schedule(process.dqmsave_step)
