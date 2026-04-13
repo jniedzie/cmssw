@@ -1,0 +1,5 @@
+<bin name="testJobReportXMLUtils" file="testJobReportXMLUtils.cpp">
+  <use name="catch2"/>
+  <use name="tinyxml2"/>
+  <use name="FWCore/MessageLogger" source_only="1"/>
+</bin>
