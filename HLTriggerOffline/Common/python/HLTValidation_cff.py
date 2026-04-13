@@ -130,7 +130,7 @@ hltvalidation = cms.Sequence(
 )
 
 # from Configuration.StandardSequences.Validation_cff import prevalidation
-# ImportError: cannot import name 'prevalidation' from partially initialized module 'Configuration.StandardSequences.Validation_cff' (most likely due to a circular import) (/shared/CMSSW_15_1_X_2025-07-16-2300/src/Configuration/StandardSequences/python/Validation_cff.py)
+# ImportError: cannot import name 'prevalidation' from partially initialized module 'Configuration.StandardSequences.Validation_cff' (most likely due to a circular import)
 hltprevalidation = cms.Sequence( cms.SequencePlaceholder("mix") * globalPrevalidation * hltassociation * metPreValidSeq * jetPreValidSeq )
 phase2_common.toReplaceWith(hltprevalidation, hltprevalidation.copyAndExclude([cms.SequencePlaceholder("mix"),globalPrevalidation,metPreValidSeq,jetPreValidSeq]))
 
