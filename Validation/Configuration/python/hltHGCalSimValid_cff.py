@@ -30,26 +30,6 @@ from Configuration.ProcessModifiers.ticl_barrel_cff import ticl_barrel
                                        hits = [*hgcal_hits, *barrel_hits],
                                        )
 
-hltLcAssocByEnergyScoreProducer = _lcAssocByEnergyScoreProducer.clone(
-    hits = 'hltHGCalRecHitMapProducer:RefProdVectorHGCRecHitCollection',
-    hitMapTag = 'hltHGCalRecHitMapProducer:hgcalRecHitMap'
-)
-
-hltScAssocByEnergyScoreProducer = _scAssocByEnergyScoreProducer.clone(
-    hits = 'hltHGCalRecHitMapProducer:RefProdVectorHGCRecHitCollection',
-    hitMapTag = 'hltHGCalRecHitMapProducer:hgcalRecHitMap',
-)
-
-hltLayerClusterCaloParticleAssociationProducer = _layerClusterCaloParticleAssociationProducer.clone(
-    associator = 'hltLcAssocByEnergyScoreProducer',
-    label_lc = 'hltMergeLayerClusters'
-)
-
-hltLayerClusterSimClusterAssociationProducer = _layerClusterSimClusterAssociationProducer.clone(
-    associator = 'hltScAssocByEnergyScoreProducer',
-    label_lcl = 'hltMergeLayerClusters'
-)
-
 from SimCalorimetry.HGCalAssociatorProducers.AllLayerClusterToTracksterAssociatorsProducer_cfi import AllLayerClusterToTracksterAssociatorsProducer as _AllLayerClusterToTracksterAssociatorsProducer
 
 hltAllLayerClusterToTracksterAssociations = _AllLayerClusterToTracksterAssociatorsProducer.clone(
@@ -107,23 +87,23 @@ hltAllTrackstersToSimTrackstersAssociationsByHits = _AllTracksterToSimTracksterA
     ),
 )
 
+from SimCalorimetry.HGCalAssociatorProducers.hltLCToCPAssociation_cfi import (hltHGCalLCToCPAssociatorByEnergyScoreProducer,
+                                                                              hltHGCalLayerClusterCaloParticleAssociation)
+from SimCalorimetry.HGCalAssociatorProducers.hltLCToSCAssociation_cfi import (hltHGCalLCToSCAssociatorByEnergyScoreProducer,
+                                                                              hltHGCalLayerClusterSimClusterAssociation)
+
 hltHgcalAssociatorsTask = cms.Task(hltHGCalRecHitMapProducer,
-                                   hltLcAssocByEnergyScoreProducer,
-                                   hltScAssocByEnergyScoreProducer,
+                                   hltHGCalLCToCPAssociatorByEnergyScoreProducer,
+                                   hltHGCalLCToSCAssociatorByEnergyScoreProducer,
                                    SimClusterToCaloParticleAssociation,
-                                   hltLayerClusterCaloParticleAssociationProducer,
-                                   hltLayerClusterSimClusterAssociationProducer,
+                                   hltHGCalLayerClusterCaloParticleAssociation,
+                                   hltHGCalLayerClusterSimClusterAssociation,
                                    hltAllLayerClusterToTracksterAssociations,
                                    hltAllTrackstersToSimTrackstersAssociationsByLCs,
                                    hltAllHitToTracksterAssociations,
                                    hltHitToSimClusterCaloParticleAssociator,
                                    hltAllTrackstersToSimTrackstersAssociationsByHits
                                    )
-
-from SimCalorimetry.HGCalAssociatorProducers.hltLCToCPAssociation_cfi import (hltHGCalLCToCPAssociatorByEnergyScoreProducer,
-                                                                              hltHGCalLayerClusterCaloParticleAssociation)
-from SimCalorimetry.HGCalAssociatorProducers.hltLCToSCAssociation_cfi import (hltHGCalLCToSCAssociatorByEnergyScoreProducer,
-                                                                              hltHGCalLayerClusterSimClusterAssociation)
 
 hltHgcalPrevalidation = cms.Sequence(
     hltHGCalLCToCPAssociatorByEnergyScoreProducer *
