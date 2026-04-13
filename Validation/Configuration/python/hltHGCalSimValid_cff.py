@@ -34,23 +34,14 @@ from SimCalorimetry.HGCalAssociatorProducers.AllLayerClusterToTracksterAssociato
 
 hltAllLayerClusterToTracksterAssociations = _AllLayerClusterToTracksterAssociatorsProducer.clone(
     layer_clusters = 'hltMergeLayerClusters',
-    tracksterCollections = cms.VInputTag(
-        *[cms.InputTag(label) for label in _hltTiclIterLabels],
-        cms.InputTag("hltTiclSimTracksters"),
-        cms.InputTag("hltTiclSimTracksters", "fromCPs"),
-    )
+    tracksterCollections = [*[cms.InputTag(label) for label in _hltTiclIterLabels], 'hltTiclSimTracksters', 'hltTiclSimTracksters:fromCPs']
 )
 
 hltAllTrackstersToSimTrackstersAssociationsByLCs = _allTrackstersToSimTrackstersAssociationsByLCs.clone(
     allLCtoTSAccoc = 'hltAllLayerClusterToTracksterAssociations',
     layerClusters = 'hltMergeLayerClusters',
-    tracksterCollections = cms.VInputTag(
-        *[cms.InputTag(label) for label in _hltTiclIterLabels]
-    ),
-    simTracksterCollections = cms.VInputTag(
-      cms.InputTag('hltTiclSimTracksters'),
-      cms.InputTag('hltTiclSimTracksters','fromCPs')
-    ),
+    tracksterCollections = [*[cms.InputTag(label) for label in _hltTiclIterLabels]],
+    simTracksterCollections = ['hltTiclSimTracksters', 'hltTiclSimTracksters:fromCPs']
 )
 
 from SimCalorimetry.HGCalAssociatorProducers.AllTracksterToSimTracksterAssociatorsByHitsProducer_cfi import AllTracksterToSimTracksterAssociatorsByHitsProducer as _AllTracksterToSimTracksterAssociatorsByHitsProducer
@@ -66,11 +57,7 @@ hltAllHitToTracksterAssociations =  _AllHitToTracksterAssociatorsProducer.clone(
     hitMapTag = 'hltHGCalRecHitMapProducer:hgcalRecHitMap',
     hits = 'hltHGCalRecHitMapProducer:RefProdVectorHGCRecHitCollection',
     layerClusters = 'hltMergeLayerClusters',
-    tracksterCollections = cms.VInputTag(
-        *[cms.InputTag(label) for label in _hltTiclIterLabels],
-        cms.InputTag("hltTiclSimTracksters"),
-        cms.InputTag("hltTiclSimTracksters", "fromCPs"),
-    )
+    tracksterCollections = [*[cms.InputTag(label) for label in _hltTiclIterLabels], 'hltTiclSimTracksters', 'hltTiclSimTracksters:fromCPs']
 )
 
 hltAllTrackstersToSimTrackstersAssociationsByHits = _AllTracksterToSimTracksterAssociatorsByHitsProducer.clone(
@@ -78,13 +65,8 @@ hltAllTrackstersToSimTrackstersAssociationsByHits = _AllTracksterToSimTracksterA
     hitToCaloParticleMap = 'hltHitToSimClusterCaloParticleAssociator:hitToCaloParticleMap',
     hitToSimClusterMap = 'hltHitToSimClusterCaloParticleAssociator:hitToSimClusterMap',
     hits = 'hltHGCalRecHitMapProducer:RefProdVectorHGCRecHitCollection',
-    tracksterCollections = cms.VInputTag(
-        *[cms.InputTag(label) for label in _hltTiclIterLabels]
-    ),
-    simTracksterCollections = cms.VInputTag(
-      'hltTiclSimTracksters',
-      'hltTiclSimTracksters:fromCPs'
-    ),
+    tracksterCollections = [*[cms.InputTag(label) for label in _hltTiclIterLabels]],
+    simTracksterCollections = ['hltTiclSimTracksters', 'hltTiclSimTracksters:fromCPs']
 )
 
 from SimCalorimetry.HGCalAssociatorProducers.hltLCToCPAssociation_cfi import (hltHGCalLCToCPAssociatorByEnergyScoreProducer,
