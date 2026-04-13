@@ -1,6 +1,6 @@
 #include <catch2/catch_all.hpp>
 
-#include "FWCore/MessageLogger/interface/private/xmlUtils.h"
+#include "FWCore/MessageLogger/src/xmlUtils.h"
 
 #include <sstream>
 
