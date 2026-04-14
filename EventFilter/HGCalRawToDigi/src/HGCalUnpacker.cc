@@ -324,8 +324,8 @@ uint16_t HGCalUnpacker::parseFEDData(unsigned fedId,
                                       << erxHeader << ", cmSum = " << std::dec << cmSum;
           iword += 2;
 
-          const auto mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
-          int32_t delta = (static_cast<int>(mux) == -1) ? 0 : (static_cast<int>(mux) - static_cast<int>(erxIdx)) * 37;
+          const int32_t mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
+          int32_t delta = (mux == -1) ? 0 : (mux - erxIdx) * 37;
 
           // parse erx body (channel data)
           uint32_t iBit = 0;
@@ -398,8 +398,8 @@ uint16_t HGCalUnpacker::parseFEDData(unsigned fedId,
                                       << erxHeader << ", cmSum = " << std::dec << cmSum;
           iword += 2;
 
-          const auto mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
-          int32_t delta = (static_cast<int>(mux) == -1) ? 0 : (static_cast<int>(mux) - static_cast<int>(erxIdx)) * 37;
+          const int32_t mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
+          int32_t delta = (mux == -1) ? 0 : (mux - erxIdx) * 37;
 
           // parse erx body (channel data)
           for (uint32_t channelIdx = 0; channelIdx < HGCalMappingCellIndexer::maxChPerErx_; channelIdx++) {
