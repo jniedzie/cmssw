@@ -325,12 +325,12 @@ uint16_t HGCalUnpacker::parseFEDData(unsigned fedId,
           iword += 2;
 
           const auto mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
-          uint32_t delta = (mux - erxIdx) * 37;
-          // parse erx body (channel data)
+	  int32_t delta = (static_cast<int>(mux) == -1) ? 0 : (static_cast<int>(mux) - static_cast<int>(erxIdx)) * 37;
+
+	  // parse erx body (channel data)
           uint32_t iBit = 0;
           for (uint32_t channelIdx = 0; channelIdx < HGCalMappingCellIndexer::maxChPerErx_; channelIdx++) {
             uint32_t denseIdx = moduleIndexer.getIndexForModuleData(fedId, globalECONDIdx, erxIdx, channelIdx) + delta;
-
             // check if the channel has data
             if (((erxHeader >> channelIdx) & 1) == 0) {
               continue;
@@ -399,17 +399,15 @@ uint16_t HGCalUnpacker::parseFEDData(unsigned fedId,
           iword += 2;
 
           const auto mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
-          uint32_t delta = (mux - erxIdx) * 37;
-
-          // parse erx body (channel data)
+          int32_t delta = (static_cast<int>(mux) == -1) ? 0 : (static_cast<int>(mux) - static_cast<int>(erxIdx)) * 37;
+	  
+	  // parse erx body (channel data)
           for (uint32_t channelIdx = 0; channelIdx < HGCalMappingCellIndexer::maxChPerErx_; channelIdx++) {
             uint32_t denseIdx = moduleIndexer.getIndexForModuleData(fedId, globalECONDIdx, erxIdx, channelIdx) + delta;
-
             // check if the channel has data
             if (((erxHeader >> channelIdx) & 1) == 0) {
               continue;
             }
-
             // check if in characterization mode
             if (fedConfig.econds[globalECONDIdx].rocs[erxIdx / 2].charMode) {
               //characterization mode
