@@ -325,7 +325,7 @@ uint16_t HGCalUnpacker::parseFEDData(unsigned fedId,
           iword += 2;
 
           const int32_t mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
-          int32_t delta = (mux == -1) ? 0 : (mux - erxIdx) * 37;
+          int32_t delta = (mux == -1) ? 0 : (mux - static_cast<int>(erxIdx)) * 37;
 
           // parse erx body (channel data)
           uint32_t iBit = 0;
@@ -399,7 +399,7 @@ uint16_t HGCalUnpacker::parseFEDData(unsigned fedId,
           iword += 2;
 
           const int32_t mux = fedConfig.econds[globalECONDIdx].rocs[erxIdx].muxMode;
-          int32_t delta = (mux == -1) ? 0 : (mux - erxIdx) * 37;
+          int32_t delta = (mux == -1) ? 0 : (mux - static_cast<int>(erxIdx)) * 37;
 
           // parse erx body (channel data)
           for (uint32_t channelIdx = 0; channelIdx < HGCalMappingCellIndexer::maxChPerErx_; channelIdx++) {
