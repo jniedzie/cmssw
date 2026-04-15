@@ -177,7 +177,8 @@ uint32_t HGCalNumberingScheme::getUnitID(int layer, int module, int cell, int iz
       }
       detId.setGranularity(hgcons_.tileGranularity(layer));
 #ifdef EDM_ML_DEBUG
-      edm::LogVerbatim("HGCSim") << "Trapezoid : Type " << typm.first << " SiPM " << typm.second << " Granularity " << hgcons_.tileGranularity(layer);
+      edm::LogVerbatim("HGCSim") << "Trapezoid : Type " << typm.first << " SiPM " << typm.second << " Granularity "
+                                 << hgcons_.tileGranularity(layer);
 #endif
       index = detId.rawId();
       bool debug(false);
