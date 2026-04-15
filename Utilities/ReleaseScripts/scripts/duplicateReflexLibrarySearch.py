@@ -259,7 +259,7 @@ def searchDuplicatePlugins ():
     output = getoutput (cmd).split('\n')
     for line in output:
         if line in ignoreEdmDP: continue
-        line = line.replace("*","\*")
+        line = line.replace("*",r"\*")
         cmd = "cat %s | grep ' %s ' | awk '{print $1}' | sort | uniq " % (edmpluginFile,line)
         out1 = getoutput (cmd).split('\n')
         print(line)
