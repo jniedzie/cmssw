@@ -83,6 +83,7 @@ for iterLabel in hltTiclIterLabels:
             src=cms.InputTag(
                 f"hltAllTrackstersToSimTrackstersAssociationsByHits:{iterLabelSim}To{iterLabel}"
             ),
+            skipNonExistingSrc=cms.bool(True),
             name=cms.string(f"Sim{CP_SC_label}2{iterLabel}ByHits"),
             doc=cms.string(
                 f"Association between SimTracksters and {iterLabel}, by hits."),
@@ -116,6 +117,7 @@ for iterLabel in hltTiclIterLabels:
             src=cms.InputTag(
                 f"hltAllTrackstersToSimTrackstersAssociationsByHits:{iterLabel}To{iterLabelSim}"
             ),
+            skipNonExistingSrc=cms.bool(True),
             name=cms.string(f"Reco{iterLabel}2Sim{CP_SC_label}ByHits"),
             doc=cms.string(
                 f"Association between {iterLabel} and SimTracksters, by hits."),
@@ -245,6 +247,7 @@ hltSimCl2CPOneToOneFlatTable = cms.EDProducer(
     src=cms.InputTag(
         "SimClusterToCaloParticleAssociation:simClusterToCaloParticleMap"),
     name=cms.string("SimCl2CPWithFraction"),
+    skipNonExistingSrc=cms.bool(True),
     doc=cms.string("Association between SimClusters and CaloParticles."),
     variables=cms.PSet(
         index=Var("index", "int", doc="Index of linked CaloParticle."),
