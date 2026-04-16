@@ -2205,6 +2205,16 @@ upgradeWFs['NGTScoutingWithNanoValid'].step2 = {
     '--eventcontent':'FEVTDEBUGHLT,NANOAODSIM'
 }
 
+upgradeWFs['HLTPhase2WithNanoValid'] = deepcopy(upgradeWFs['HLTPhase2WithNano'])
+upgradeWFs['HLTPhase2WithNanoValid'].suffix = '_HLTPhase2WithNanoValid'
+upgradeWFs['HLTPhase2WithNanoValid'].offset = 0.774
+upgradeWFs['HLTPhase2WithNanoValid'].step2 = {
+    '-s':'DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:75e33,NANO:@Phase2HLTVal',
+    '--datatier':'GEN-SIM-DIGI-RAW,NANOAODSIM',
+    '--eventcontent':'FEVTDEBUGHLT,NANOAODSIM'
+}
+
+
 class UpgradeWorkflow_HLTwDIGI75e33(UpgradeWorkflow):
     def setup_(self, step, stepName, stepDict, k, properties):
         if 'DigiTrigger' in step:
