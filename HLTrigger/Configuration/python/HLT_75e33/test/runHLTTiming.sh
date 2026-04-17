@@ -190,6 +190,7 @@ run_benchmark() {
             --slot "numa=0-3:mem=0-3" \
             --event-skip 100 \
             --event-resolution 10 \
+            --debug-logs \
             -k Phase2Timing_resources.json \
             -- ${cfg} > "$TMP_LOG_FILE" 2>&1 &
 
@@ -265,6 +266,7 @@ run_benchmark() {
             --slot "numa=0-3:mem=0-3" \
             --event-skip 100 \
             --event-resolution 10 \
+            --debug-logs \
             -k Phase2Timing_resources.json \
             -- ${cfg} | tee "${logdir}/output.log"
     fi
