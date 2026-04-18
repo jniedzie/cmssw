@@ -269,11 +269,12 @@ GlobalPoint HGCalGeometry::getPosition(const DetId& detid, bool cog, bool debug)
     st1 << "Cannot recognize " << std::hex << detid.rawId() << std::dec;
     if (m_topology.tileTrapezoid())
       st1 << " " << HGCScintillatorDetId(detid);
-    else if  ((detid.det() == DetId::HGCalEE) || (detid.det() == DetId::HGCalHSi))
+    else if ((detid.det() == DetId::HGCalEE) || (detid.det() == DetId::HGCalHSi))
       st1 << " " << HGCSiliconDetId(detid);
     else
       st1 << " " << HGCalDetId(detid);
-    edm::LogVerbatim("HGCalGeom") << st1.str() << " cellIndex " << cellIndex << ":" << maxSize << " Type " << detid.det() << ":" << detid.subdetId();
+    edm::LogVerbatim("HGCalGeom") << st1.str() << " cellIndex " << cellIndex << ":" << maxSize << " Type "
+                                  << detid.det() << ":" << detid.subdetId();
   }
   return glob;
 }

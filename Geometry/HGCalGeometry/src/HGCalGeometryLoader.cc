@@ -105,16 +105,17 @@ HGCalGeometry* HGCalGeometryLoader::build(const HGCalTopology& topology) {
             id.setType(typm.first);
             id.setSiPM(typm.second);
           }
-	  int granul = topology.dddConstants().tileGranularity(layer);
-	  id.setGranularity(granul);
+          int granul = topology.dddConstants().tileGranularity(layer);
+          id.setGranularity(granul);
           bool ok = test ? topology.dddConstants().tileExist(zside, layer, ring, iphi) : true;
 #ifdef EDM_ML_DEBUG
           edm::LogVerbatim("HGCalGeom") << "HGCalGeometryLoader::layer:rad:phi:type:sipm " << layer << ":"
                                         << ring * zside << ":" << iphi << ":" << type << ":" << typm.first << ":"
-                                        << typm.second << " Granularity " << granul << " Test " << test << ":" << ok << " ID " << id;
+                                        << typm.second << " Granularity " << granul << " Test " << test << ":" << ok
+                                        << " ID " << id;
 #endif
           if (ok) {
-	    int layer0(layer);
+            int layer0(layer);
             DetId detId = static_cast<DetId>(id);
             const auto& w = topology.dddConstants().locateCellTrap(zside, layer0, ring, iphi, true, false);
             double xx = (zside > 0) ? w.first : -w.first;
