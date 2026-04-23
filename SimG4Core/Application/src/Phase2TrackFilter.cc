@@ -14,8 +14,7 @@
 #include "G4VSolid.hh"
 #include "G4TransportationManager.hh"
 
-Phase2TrackFilter::Phase2TrackFilter(const edm::ParameterSet& p, const CMSSteppingVerbose* sv)
-    : steppingVerbose(sv) {
+Phase2TrackFilter::Phase2TrackFilter(const edm::ParameterSet& p, const CMSSteppingVerbose* sv) : steppingVerbose(sv) {
   trackNeutrino = p.getParameter<bool>("TrackNeutrino");
   killHeavy = p.getParameter<bool>("KillHeavy");
   killGamma = p.getParameter<bool>("KillGamma");
@@ -159,10 +158,8 @@ G4ClassificationOfNewTrack Phase2TrackFilter::ClassifyNewTrack(const G4Track* aT
   const G4VProcess* creatorProc = aTrack->GetCreatorProcess();
   if (creatorProc == nullptr) {
     edm::LogWarning("Phase2TrackFilter::ClassifyNewTrack")
-        << "No creator process for TrackID=" << aTrack->GetTrackID()
-	<< " ParentID=" << aTrack->GetParentID() << " "
-        << aTrack->GetDefinition()->GetParticleName()
-	<< " Ekin(MeV)=" << aTrack->GetKineticEnergy();
+        << "No creator process for TrackID=" << aTrack->GetTrackID() << " ParentID=" << aTrack->GetParentID() << " "
+        << aTrack->GetDefinition()->GetParticleName() << " Ekin(MeV)=" << aTrack->GetKineticEnergy();
   }
   const G4Region* reg = aTrack->GetVolume()->GetLogicalVolume()->GetRegion();
   const double time = aTrack->GetGlobalTime();
@@ -189,119 +186,117 @@ G4ClassificationOfNewTrack Phase2TrackFilter::ClassifyNewTrack(const G4Track* aT
     const double ke = aTrack->GetKineticEnergy();
     G4int subType = (nullptr != creatorProc) ? creatorProc->GetProcessSubType() : 0;
 
-    LogDebug("SimG4CoreApplication")
-        << "##Phase2TrackFilter Classify Track " << aTrack->GetTrackID() << " Parent "
-	<< aTrack->GetParentID() << " " << aTrack->GetDefinition()->GetParticleName()
-	<< " Ekin(MeV)=" << ke / CLHEP::MeV << " subType=" << subType << " ";
+    LogDebug("SimG4CoreApplication") << "##Phase2TrackFilter Classify Track " << aTrack->GetTrackID() << " Parent "
+                                     << aTrack->GetParentID() << " " << aTrack->GetDefinition()->GetParticleName()
+                                     << " Ekin(MeV)=" << ke / CLHEP::MeV << " subType=" << subType << " ";
 
     if (classification != fKill) {
       // kill tracks in specific regions
       if (isThisRegion(reg, deadRegions)) {
-	classification = fKill;
+        classification = fKill;
       } else if (ke <= limitEnergyForVacuum && isThisRegion(reg, lowdensRegions)) {
-	classification = fKill;
-	// very low-energy gamma
+        classification = fKill;
+        // very low-energy gamma
       } else if (pdg == 22 && killGamma && ke < kmaxGamma) {
-	classification = fKill;
+        classification = fKill;
       }
     }
     // specific track killing - not for production
     if (killExtra && classification != fKill) {
       if (killHeavy) {
-	if (((pdg / 1000000000 == 1) && (((pdg / 10000) % 100) > 0) && (((pdg / 10) % 100) > 0) &&
-	     (ke < kmaxIon)) ||
-	    ((pdg == 2212) && (ke < kmaxProton)) || ((pdg == 2112) && (ke < kmaxNeutron))) {
-	  classification = fKill;
-	}
+        if (((pdg / 1000000000 == 1) && (((pdg / 10000) % 100) > 0) && (((pdg / 10) % 100) > 0) && (ke < kmaxIon)) ||
+            ((pdg == 2212) && (ke < kmaxProton)) || ((pdg == 2112) && (ke < kmaxNeutron))) {
+          classification = fKill;
+        }
       } else if (killDeltaRay && 11 == abspdg) {
-	classification = fKill;
+        classification = fKill;
       }
 
       if (killInCalo && classification != fKill && isThisRegion(reg, caloRegions)) {
-	classification = fKill;
+        classification = fKill;
       }
       if (killInCaloEfH && classification != fKill) {
-	int pdgMother = mother->GetDefinition()->GetPDGEncoding();
-	if ((pdg == 22 || abspdg == 11) && pdgMother != 11 && pdgMother != 22 && isThisRegion(reg, caloRegions)) {
-	  classification = fKill;
-	}
+        int pdgMother = mother->GetDefinition()->GetPDGEncoding();
+        if ((pdg == 22 || abspdg == 11) && pdgMother != 11 && pdgMother != 22 && isThisRegion(reg, caloRegions)) {
+          classification = fKill;
+        }
       }
     }
 
     // Russian roulette && MC truth
     if (classification != fKill) {
       if (savePDandCinAll) {
-	flag = isItPrimaryDecayProductOrConversion(subType);
+        flag = isItPrimaryDecayProductOrConversion(subType);
       } else {
-	if ((savePDandCinTracker && isThisRegion(reg, trackerRegions)) ||
-	    (savePDandCinCalo && isThisRegion(reg, caloRegions)) ||
-	    (savePDandCinMuon && isThisRegion(reg, muonRegions))) {
-	  flag = isItPrimaryDecayProductOrConversion(subType);
-	}
+        if ((savePDandCinTracker && isThisRegion(reg, trackerRegions)) ||
+            (savePDandCinCalo && isThisRegion(reg, caloRegions)) ||
+            (savePDandCinMuon && isThisRegion(reg, muonRegions))) {
+          flag = isItPrimaryDecayProductOrConversion(subType);
+        }
       }
       if (saveFirstSecondary && 0 == flag) {
-	flag = isItFromPrimary(flag);
+        flag = isItFromPrimary(flag);
       }
 
       // Russian roulette
       if (2112 == pdg || 22 == pdg) {
-	double currentWeight = aTrack->GetWeight();
-	if (1.0 >= currentWeight) {
-	  double prob = 1.001;
-	  double elim = 0.0;
-	  // neutron
-	  if (nRRactive && pdg == 2112) {
-	    elim = nRusRoEnerLim;
-	    if (reg == regionEcal) {
-	      prob = nRusRoEcal;
-	    } else if (reg == regionHcal) {
-	      prob = nRusRoHcal;
-	    } else if (reg == regionMuonIron) {
-	      prob = nRusRoMuonIron;
-	    } else if (reg == regionHGcal) {
-	      prob = nRusRoHGcal;
-	    } else if (reg == regionZDC) {
-	      prob = nRusRoZDC;
-	    } else if (reg == regionWorld) {
-	      prob = nRusRoWorld;
-	    }
+        double currentWeight = aTrack->GetWeight();
+        if (1.0 >= currentWeight) {
+          double prob = 1.001;
+          double elim = 0.0;
+          // neutron
+          if (nRRactive && pdg == 2112) {
+            elim = nRusRoEnerLim;
+            if (reg == regionEcal) {
+              prob = nRusRoEcal;
+            } else if (reg == regionHcal) {
+              prob = nRusRoHcal;
+            } else if (reg == regionMuonIron) {
+              prob = nRusRoMuonIron;
+            } else if (reg == regionHGcal) {
+              prob = nRusRoHGcal;
+            } else if (reg == regionZDC) {
+              prob = nRusRoZDC;
+            } else if (reg == regionWorld) {
+              prob = nRusRoWorld;
+            }
 
-	    // gamma
-	  } else if (gRRactive && pdg == 22) {
-	    elim = gRusRoEnerLim;
-	    if (reg == regionEcal) {
-	      if (rrApplicable(aTrack)) { prob = gRusRoEcal; }
-	    } else {
-	      if (reg == regionHcal) {
-		prob = gRusRoHcal;
-	      } else if (reg == regionMuonIron) {
-		prob = gRusRoMuonIron;
-	      } else if (reg == regionHGcal) {
-		prob = gRusRoHGcal;
-	      } else if (reg == regionZDC) {
-		prob = gRusRoZDC;
-	      } else if (reg == regionWorld) {
-		prob = gRusRoWorld;
-	      }
-	    }
-	  }
-	  if (prob < 1.0 && aTrack->GetKineticEnergy() < elim) {
-	    if (G4UniformRand() < prob) {
-	      track->SetWeight(currentWeight / prob);
-	    } else {
-	      classification = fKill;
-	      track->SetKineticEnergy(0.0);
-	    }
-	  }
-	}
+            // gamma
+          } else if (gRRactive && pdg == 22) {
+            elim = gRusRoEnerLim;
+            if (reg == regionEcal) {
+              if (rrApplicable(aTrack)) {
+                prob = gRusRoEcal;
+              }
+            } else {
+              if (reg == regionHcal) {
+                prob = gRusRoHcal;
+              } else if (reg == regionMuonIron) {
+                prob = gRusRoMuonIron;
+              } else if (reg == regionHGcal) {
+                prob = gRusRoHGcal;
+              } else if (reg == regionZDC) {
+                prob = gRusRoZDC;
+              } else if (reg == regionWorld) {
+                prob = gRusRoWorld;
+              }
+            }
+          }
+          if (prob < 1.0 && aTrack->GetKineticEnergy() < elim) {
+            if (G4UniformRand() < prob) {
+              track->SetWeight(currentWeight / prob);
+            } else {
+              classification = fKill;
+              track->SetKineticEnergy(0.0);
+            }
+          }
+        }
       }
-      LogDebug("SimG4CoreApplication")
-	  << "Phase2TrackFilter: Classify Track " << aTrack->GetTrackID()
-	  << " Parent " << aTrack->GetParentID()
-	  << " Type " << aTrack->GetDefinition()->GetParticleName()
-	  << " Ekin=" << ke / CLHEP::MeV
-	  << " MeV from process subType=" << subType
-	  << " as " << (fKill != classification) << " Flag=" << flag;
+      LogDebug("SimG4CoreApplication") << "Phase2TrackFilter: Classify Track " << aTrack->GetTrackID() << " Parent "
+                                       << aTrack->GetParentID() << " Type "
+                                       << aTrack->GetDefinition()->GetParticleName() << " Ekin=" << ke / CLHEP::MeV
+                                       << " MeV from process subType=" << subType << " as " << (fKill != classification)
+                                       << " Flag=" << flag;
     }
   }
 
@@ -358,8 +353,8 @@ void Phase2TrackFilter::initPointer() {
          rname == "FastTimerRegionSensETL")) {
       trackerRegions.push_back(reg);
     }
-    if (savePDandCinCalo && (rname == "HcalRegion" || rname == "EcalRegion" ||
-                             rname == "APDRegion" || rname == "HGCalRegion")) {
+    if (savePDandCinCalo &&
+        (rname == "HcalRegion" || rname == "EcalRegion" || rname == "APDRegion" || rname == "HGCalRegion")) {
       caloRegions.push_back(reg);
     }
     if (savePDandCinMuon && (rname == "MuonChamber" || rname == "MuonSensitive_RPC" || rname == "MuonIron" ||
@@ -369,7 +364,7 @@ void Phase2TrackFilter::initPointer() {
     if (rname == "BeamPipeOutside" || rname == "BeamPipeVacuum") {
       lowdensRegions.push_back(reg);
     }
-    for (auto const & dead : deadRegionNames) {
+    for (auto const& dead : deadRegionNames) {
       if (rname == (G4String)(dead)) {
         deadRegions.push_back(reg);
       }
@@ -379,7 +374,7 @@ void Phase2TrackFilter::initPointer() {
 
 bool Phase2TrackFilter::isThisRegion(const G4Region* reg, std::vector<const G4Region*>& regions) const {
   bool flag = false;
-  for (auto const & region : regions) {
+  for (auto const& region : regions) {
     if (reg == region) {
       flag = true;
       break;

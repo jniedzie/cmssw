@@ -22,7 +22,7 @@ public:
 
   G4ClassificationOfNewTrack ClassifyNewTrack(const G4Track* aTrack);
 
-  inline void setMother(const G4Track*); 
+  inline void setMother(const G4Track*);
 
 private:
   void initPointer();
@@ -100,8 +100,6 @@ private:
   bool nRRactive{false};
 };
 
-inline void Phase2TrackFilter::setMother(const G4Track* p) {
-  mother = p;
-}
+inline void Phase2TrackFilter::setMother(const G4Track* p) { mother = p; }
 
 #endif

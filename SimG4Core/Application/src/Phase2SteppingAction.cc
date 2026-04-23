@@ -14,11 +14,8 @@
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Utilities/interface/isFinite.h"
 
-Phase2SteppingAction::Phase2SteppingAction(const CMSSteppingVerbose* sv,
-                                           const edm::ParameterSet& p,
-                                           const edm::ParameterSet& pstack,
-                                           bool hasW,
-                                           bool dd4hep)
+Phase2SteppingAction::Phase2SteppingAction(
+    const CMSSteppingVerbose* sv, const edm::ParameterSet& p, const edm::ParameterSet& pstack, bool hasW, bool dd4hep)
     : steppingVerbose(sv), hasWatcher(hasW), dd4hep_(dd4hep) {
   theCriticalEnergyForVacuum = (p.getParameter<double>("CriticalEnergyForVacuum") * CLHEP::MeV);
   if (0.0 < theCriticalEnergyForVacuum) {
@@ -43,7 +40,7 @@ Phase2SteppingAction::Phase2SteppingAction(const CMSSteppingVerbose* sv,
   doFineCalo_ = (p.getParameter<bool>("DoFineCalo"));
 
   filter = new Phase2TrackFilter(pstack, sv);
-  
+
   edm::LogVerbatim("SimG4CoreApplication")
       << "Phase2SteppingAction:: KillBeamPipe = " << killBeamPipe
       << " CriticalDensity = " << theCriticalDensity * CLHEP::cm3 / CLHEP::g << " g/cm3\n"
@@ -107,18 +104,18 @@ void Phase2SteppingAction::UserSteppingAction(const G4Step* aStep) {
   std::size_t nn = aStep->GetNumberOfSecondariesInCurrentStep();
   if (0 < nn) {
     filter->setMother(theTrack);
-    auto step =	const_cast<G4Step*>(aStep);
+    auto step = const_cast<G4Step*>(aStep);
     auto sec = step->GetfSecondary();
     std::size_t n0 = sec->size() - nn;
     for (std::size_t i = n0; i < sec->size(); ++i) {
       auto track = (*sec)[i];
       if (nullptr != track) {
-	auto status = filter->ClassifyNewTrack(track);
-	if (status == fKill) {
-	  step->AddTotalEnergyDeposit(track->GetKineticEnergy());
-	  sec->erase(sec->begin() + i);
-	  delete track;
-	}
+        auto status = filter->ClassifyNewTrack(track);
+        if (status == fKill) {
+          step->AddTotalEnergyDeposit(track->GetKineticEnergy());
+          sec->erase(sec->begin() + i);
+          delete track;
+        }
       }
     }
   }

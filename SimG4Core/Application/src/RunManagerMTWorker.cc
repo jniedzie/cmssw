@@ -470,8 +470,7 @@ void RunManagerMTWorker::initializeUserActions() {
   G4UserSteppingAction* userSteppingAction;
   bool dd4hep = m_p.getParameter<bool>("g4GeometryDD4hepSource");
   if (m_isPhase2) {
-    auto ptr = new Phase2SteppingAction(m_sVerbose.get(), m_pSteppingAction,
-					m_pStackingAction, m_hasWatchers, dd4hep);
+    auto ptr = new Phase2SteppingAction(m_sVerbose.get(), m_pSteppingAction, m_pStackingAction, m_hasWatchers, dd4hep);
     Connect(ptr);
     userSteppingAction = (G4UserSteppingAction*)ptr;
   } else {

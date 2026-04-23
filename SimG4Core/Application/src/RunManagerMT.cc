@@ -370,12 +370,16 @@ void RunManagerMT::runForPhase2() {
 // and to add a new production cuts for these regions
 void RunManagerMT::addRegions() {
   // add HF region
-  std::vector<G4LogicalVolume*> lvnew;  
+  std::vector<G4LogicalVolume*> lvnew;
   const auto lvs = G4LogicalVolumeStore::GetInstance();
   auto ptr1 = lvs->GetVolume("HVQF", false);
-  if (nullptr != ptr1) { lvnew.push_back(ptr1); }
+  if (nullptr != ptr1) {
+    lvnew.push_back(ptr1);
+  }
   auto ptr2 = lvs->GetVolume("HVQX", false);
-  if (nullptr != ptr2) { lvnew.push_back(ptr2); }
+  if (nullptr != ptr2) {
+    lvnew.push_back(ptr2);
+  }
   if (!lvnew.empty()) {
     G4double cut = CLHEP::mm;
     addG4Region(lvnew, "RegionHF", cut, cut, cut, cut);

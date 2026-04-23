@@ -20,8 +20,8 @@ class Phase2TrackFilter;
 
 class Phase2SteppingAction : public G4UserSteppingAction {
 public:
-  explicit Phase2SteppingAction(const CMSSteppingVerbose*, const edm::ParameterSet&,
-				const edm::ParameterSet&, bool, bool);
+  explicit Phase2SteppingAction(
+      const CMSSteppingVerbose*, const edm::ParameterSet&, const edm::ParameterSet&, bool, bool);
   ~Phase2SteppingAction() override = default;
 
   void UserSteppingAction(const G4Step* aStep) final;

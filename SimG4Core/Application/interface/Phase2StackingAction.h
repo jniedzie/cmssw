@@ -18,7 +18,6 @@ public:
   G4ClassificationOfNewTrack ClassifyNewTrack(const G4Track* aTrack) override;
 
 private:
-
   const CMSSteppingVerbose* steppingVerbose;
   G4VSolid* worldSolid;
   bool trackNeutrino;

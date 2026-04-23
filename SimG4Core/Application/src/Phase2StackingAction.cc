@@ -29,8 +29,7 @@ G4ClassificationOfNewTrack Phase2StackingAction::ClassifyNewTrack(const G4Track*
   const int pdg = aTrack->GetDefinition()->GetPDGEncoding();
   const int abspdg = std::abs(pdg);
 
-  if (classification != fKill && !trackNeutrino &&
-      (abspdg == 12 || abspdg == 14 || abspdg == 16 || abspdg == 18)) {
+  if (classification != fKill && !trackNeutrino && (abspdg == 12 || abspdg == 14 || abspdg == 16 || abspdg == 18)) {
     classification = fKill;
   }
 
