@@ -188,7 +188,9 @@ uint32_t HGCalNumberingScheme::getUnitID(int layer, int module, int cell, int iz
           debug = true;
       }
       if (debug)
-        edm::LogVerbatim("HGCSim") << "Radius/Phi " << id[0] << ":" << id[1] << " Type " << id[2] << ":" << typm.first << " SiPM " << typm.second << " Layer " << layer << " z " << iz << " ID " << detId << " wt " << wt << " position " << pos << " R " << pos.perp();
+        edm::LogVerbatim("HGCSim") << "Radius/Phi " << id[0] << ":" << id[1] << " Type " << id[2] << ":" << typm.first
+                                   << " SiPM " << typm.second << " Layer " << layer << " z " << iz << " ID " << detId
+                                   << " wt " << wt << " position " << pos << " R " << pos.perp();
 #ifdef EDM_ML_DEBUG
     } else {
       edm::LogVerbatim("HGCSim") << "Radius/Phi " << id[0] << ":" << id[1] << " Type " << id[2] << " Layer|iz " << layer

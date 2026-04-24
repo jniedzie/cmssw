@@ -261,7 +261,8 @@ std::array<int, 3> HGCalDDDConstants::assignCellTrap(float x, float y, float z, 
 #ifdef EDM_ML_DEBUG
   edm::LogVerbatim("HGCalGeomT") << "assignCellTrap Input " << x << ":" << y << ":" << z << ":" << layer << ":" << reco
                                  << " x|y|r " << xx << ":" << yy << ":" << r << " phi " << phi << ":"
-                                 << convertRadToDeg(phi) << " o/p " << irad << ":" << iphi << ":" << type << ":" << hgpar_->scintFine(indx.first);
+                                 << convertRadToDeg(phi) << " o/p " << irad << ":" << iphi << ":" << type << ":"
+                                 << hgpar_->scintFine(indx.first);
 #endif
   if (!tileExist(zside, layer, irad, iphi)) {
     if (tileRingEdge(r, layer, irad)) {
@@ -313,10 +314,12 @@ std::array<int, 3> HGCalDDDConstants::assignCellTrap(float x, float y, float z, 
     }
   }
 #ifdef EDM_ML_DEBUG
-  edm::LogVerbatim("HGCalGeomT") << "assignCellTrap:irad " << irad << " iphi " << iphi << " type " << type << " for layer " << layer;
+  edm::LogVerbatim("HGCalGeomT") << "assignCellTrap:irad " << irad << " iphi " << iphi << " type " << type
+                                 << " for layer " << layer;
   if (type) {
     auto xy = locateCellTrap(zside, layer, irad, iphi, false, true);
-    edm::LogVerbatim("HGCalGeomT") << "assignCellTrap:xy " << xy.first << ":" << xy.second << " Original " << x << ":" << y;
+    edm::LogVerbatim("HGCalGeomT") << "assignCellTrap:xy " << xy.first << ":" << xy.second << " Original " << x << ":"
+                                   << y;
   }
 #endif
   return std::array<int, 3>{{irad, iphi, type}};
@@ -1517,12 +1520,12 @@ int HGCalDDDConstants::tileCount(int layer, int ring) const {
     if (ring < 0) {
       int ll = lay - hgpar_->firstLayer_;
       if (scintFine(lay)) {
-	ringmin = hgpar_->tileRingFineRange_[ll].first;
-	ringmax = hgpar_->tileRingFineRange_[ll].second;
+        ringmin = hgpar_->tileRingFineRange_[ll].first;
+        ringmax = hgpar_->tileRingFineRange_[ll].second;
       } else {
-	ll -= hgpar_->tileRingFineRange_.size();
-	ringmin = hgpar_->tileRingRange_[ll].first;
-	ringmax = hgpar_->tileRingRange_[ll].second;
+        ll -= hgpar_->tileRingFineRange_.size();
+        ringmin = hgpar_->tileRingRange_[ll].first;
+        ringmax = hgpar_->tileRingRange_[ll].second;
       }
     }
 #ifdef EDM_ML_DEBUG
@@ -1647,11 +1650,11 @@ std::pair<int, int> HGCalDDDConstants::tileRings(int layer) const {
     int ll = layer - hgpar_->firstLayer_;
     if (scintFine(layer)) {
       if (ll >= 0 && ll < static_cast<int>(hgpar_->tileRingFineRange_.size()))
-	return hgpar_->tileRingFineRange_[ll];
+        return hgpar_->tileRingFineRange_[ll];
     } else {
       ll -= hgpar_->tileRingFineRange_.size();
       if (ll >= 0 && ll < static_cast<int>(hgpar_->tileRingRange_.size()))
-	return hgpar_->tileRingRange_[ll];
+        return hgpar_->tileRingRange_[ll];
     }
   }
   return std::make_pair(0, 0);
