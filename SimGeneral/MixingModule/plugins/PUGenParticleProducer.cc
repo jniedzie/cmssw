@@ -95,9 +95,7 @@ public:
   void globalEndRun(edm::Run const&, edm::EventSetup const&) const override {}
 
 private:
-  void convertParticle(reco::GenParticle& cand,
-                       const HepMC::GenParticle* part,
-                       const IDto3Charge& id2Charge) const;
+  void convertParticle(reco::GenParticle& cand, const HepMC::GenParticle* part, const IDto3Charge& id2Charge) const;
 
   void fillDaughters(reco::GenParticleCollection& cands,
                      const HepMC::GenParticle* part,
@@ -124,16 +122,13 @@ PUGenParticleProducer::PUGenParticleProducer(const edm::ParameterSet& cfg)
 }
 
 // ---- Run-level charge table setup ----
-std::shared_ptr<IDto3Charge> PUGenParticleProducer::globalBeginRun(const edm::Run&,
-                                                                    const edm::EventSetup& es) const {
+std::shared_ptr<IDto3Charge> PUGenParticleProducer::globalBeginRun(const edm::Run&, const edm::EventSetup& es) const {
   edm::ESHandle<HepPDT::ParticleDataTable> pdt = es.getHandle(pdtToken_);
   return std::make_shared<IDto3Charge>(*pdt, false);  // don't abort on unknown PDG codes
 }
 
 // ---- Per-event produce ----
-void PUGenParticleProducer::produce(edm::StreamID,
-                                    edm::Event& evt,
-                                    const edm::EventSetup& es) const {
+void PUGenParticleProducer::produce(edm::StreamID, edm::Event& evt, const edm::EventSetup& es) const {
   edm::Handle<CrossingFrame<edm::HepMCProduct>> cfHandle;
   evt.getByToken(cfToken_, cfHandle);
 
@@ -212,8 +207,8 @@ void PUGenParticleProducer::produce(edm::StreamID,
 
 // ---- Convert a single HepMC particle to reco::GenParticle ----
 void PUGenParticleProducer::convertParticle(reco::GenParticle& cand,
-                                             const HepMC::GenParticle* part,
-                                             const IDto3Charge& id2Charge) const {
+                                            const HepMC::GenParticle* part,
+                                            const IDto3Charge& id2Charge) const {
   reco::Candidate::LorentzVector p4(part->momentum());
   int pdgId = part->pdg_id();
 
@@ -237,10 +232,10 @@ void PUGenParticleProducer::convertParticle(reco::GenParticle& cand,
 
 // ---- Fill mother/daughter Refs for a particle ----
 void PUGenParticleProducer::fillDaughters(reco::GenParticleCollection& cands,
-                                           const HepMC::GenParticle* part,
-                                           reco::GenParticleRefProd const& ref,
-                                           size_t index,
-                                           std::unordered_map<int, size_t>& barcodes) const {
+                                          const HepMC::GenParticle* part,
+                                          reco::GenParticleRefProd const& ref,
+                                          size_t index,
+                                          std::unordered_map<int, size_t>& barcodes) const {
   const HepMC::GenVertex* productionVertex = part->production_vertex();
   size_t numberOfMothers = productionVertex->particles_in_size();
   if (numberOfMothers > 0) {
@@ -260,9 +255,9 @@ void PUGenParticleProducer::fillDaughters(reco::GenParticleCollection& cands,
 
 // ---- Build barcode -> index map and fill particle pointer array ----
 void PUGenParticleProducer::fillIndices(const HepMC::GenEvent* mc,
-                                         std::vector<const HepMC::GenParticle*>& particles,
-                                         int offset,
-                                         std::unordered_map<int, size_t>& barcodes) const {
+                                        std::vector<const HepMC::GenParticle*>& particles,
+                                        int offset,
+                                        std::unordered_map<int, size_t>& barcodes) const {
   size_t idx = offset;
   for (auto p = mc->particles_begin(); p != mc->particles_end(); ++p) {
     const HepMC::GenParticle* particle = *p;
