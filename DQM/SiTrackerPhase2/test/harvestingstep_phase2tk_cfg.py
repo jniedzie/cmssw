@@ -27,7 +27,7 @@ process.load('Configuration.StandardSequences.MagneticField_cff')
 process.load('Configuration.StandardSequences.DQMSaverAtRunEnd_cff')
 process.load('Configuration.StandardSequences.Harvesting_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
-process.load('Validation.SiTrackerPhase2V.Phase2OTEffClient_cff')
+#process.load('Validation.SiTrackerPhase2V.Phase2OTEffClient_cff')
 
 process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(8000),
