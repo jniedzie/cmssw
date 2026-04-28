@@ -20,6 +20,16 @@ transitionTypes = [
     "stream begin luminosity block",
     "event",
     EVENTSETUP_TRANSITION,
+    "get next transition",
+    "clear event",
+    "global end lumi",
+    "global end run",
+    "global write lumi",
+    "global write run",
+    "write process block",
+    "end stream",
+    "end job",
+    "destruction",
 ]
 allocTypes = ["added", "nAlloc", "nDealloc", "maxTemp", "max1Alloc"]
 
