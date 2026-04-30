@@ -92,8 +92,10 @@ HGCalGeometry* HGCalGeometryLoader::build(const HGCalTopology& topology) {
       int nphi = topology.dddConstants().getParameter()->scintCells(layer);
       int type = topology.dddConstants().getParameter()->scintType(layer);
 #ifdef EDM_ML_DEBUG
-      edm::LogVerbatim("HGCalGeom") << "Trap::Layer " << layer << ":" << indx << " Ring " << ring << ":"
-                                    << rings.second << " Phi " << nphi << " Type " << type << " Modules " << topology.dddConstants().getParameter()->firstModule_[indx] << ":" << topology.dddConstants().getParameter()->lastModule_[indx];
+      edm::LogVerbatim("HGCalGeom") << "Trap::Layer " << layer << ":" << indx << " Ring " << ring << ":" << rings.second
+                                    << " Phi " << nphi << " Type " << type << " Modules "
+                                    << topology.dddConstants().getParameter()->firstModule_[indx] << ":"
+                                    << topology.dddConstants().getParameter()->lastModule_[indx];
 #endif
       for (int md = topology.dddConstants().getParameter()->firstModule_[indx];
            md <= topology.dddConstants().getParameter()->lastModule_[indx];
