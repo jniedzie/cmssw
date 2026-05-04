@@ -196,6 +196,9 @@ run_benchmark() {
 
         local PID=$!
 
+        # Ensure cleanup on failure
+        trap 'kill $PID 2>/dev/null || true' EXIT
+        
         # Live output
         tail -f --pid=$PID "$TMP_LOG_FILE" &
         local TAIL_PID=$!
