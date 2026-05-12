@@ -1,6 +1,6 @@
-# hltGetConfiguration /dev/CMSSW_16_0_0/GRun --cff --data --type GRun
+# hltGetConfiguration /dev/CMSSW_16_1_0/GRun --cff --data --type GRun
 
-# /dev/CMSSW_16_0_0/GRun/V62 (CMSSW_16_0_6)
+# /dev/CMSSW_16_1_0/GRun/V11 (CMSSW_16_1_0)
 
 import FWCore.ParameterSet.Config as cms
 
@@ -9,7 +9,7 @@ fragment = cms.ProcessFragment( "HLT" )
 fragment.load("Configuration.StandardSequences.Accelerators_cff")
 
 fragment.HLTConfigVersion = cms.PSet(
-  tableName = cms.string("/dev/CMSSW_16_0_0/GRun/V62")
+  tableName = cms.string("/dev/CMSSW_16_1_0/GRun/V11")
 )
 
 fragment.HLTGroupedCkfTrajectoryBuilderP5 = cms.PSet( 
@@ -8687,6 +8687,8 @@ fragment.hltIter0PFlowCkfTrackCandidates = cms.EDProducer( "MkFitOutputConverter
     candCutSel = cms.bool( False ),
     candMinPtCut = cms.double( 0.0 ),
     candMinNHitsCut = cms.int32( 0 ),
+    candMinPtRelaxedCut = cms.double( 0.0 ),
+    candMinAbsEtaForRelaxedCut = cms.double( 0.0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -8898,6 +8900,8 @@ fragment.hltDoubletRecoveryPFlowCkfTrackCandidates = cms.EDProducer( "MkFitOutpu
     candCutSel = cms.bool( False ),
     candMinPtCut = cms.double( 0.0 ),
     candMinNHitsCut = cms.int32( 0 ),
+    candMinPtRelaxedCut = cms.double( 0.0 ),
+    candMinAbsEtaForRelaxedCut = cms.double( 0.0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -14980,6 +14984,8 @@ fragment.hltIter0PFlowCkfTrackCandidatesSerialSync = cms.EDProducer( "MkFitOutpu
     candCutSel = cms.bool( False ),
     candMinPtCut = cms.double( 0.0 ),
     candMinNHitsCut = cms.int32( 0 ),
+    candMinPtRelaxedCut = cms.double( 0.0 ),
+    candMinAbsEtaForRelaxedCut = cms.double( 0.0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -15191,6 +15197,8 @@ fragment.hltDoubletRecoveryPFlowCkfTrackCandidatesSerialSync = cms.EDProducer( "
     candCutSel = cms.bool( False ),
     candMinPtCut = cms.double( 0.0 ),
     candMinNHitsCut = cms.int32( 0 ),
+    candMinPtRelaxedCut = cms.double( 0.0 ),
+    candMinAbsEtaForRelaxedCut = cms.double( 0.0 ),
     candMVASel = cms.bool( False ),
     candWP = cms.double( 0.0 ),
     batchSize = cms.int32( 16 )
@@ -17024,9 +17032,7 @@ fragment.hltL2SelectorForL3IOForGlbDisplaced = cms.EDProducer( "HLTMuonL2Selecto
 fragment.hltIterL3DisplacedMuonPixelTracksTrackingRegions = cms.EDProducer( "MuonTrackingRegionEDProducer",
     EtaR_UpperLimit_Par1 = cms.double( 0.25 ),
     DeltaR = cms.double( 0.3 ),
-    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     OnDemand = cms.int32( -1 ),
-    vertexCollection = cms.InputTag( "notUsed" ),
     Rescale_phi = cms.double( 3.0 ),
     Eta_fixed = cms.bool( True ),
     Rescale_eta = cms.double( 3.0 ),
@@ -17036,7 +17042,6 @@ fragment.hltIterL3DisplacedMuonPixelTracksTrackingRegions = cms.EDProducer( "Muo
     Phi_min = cms.double( 0.0 ),
     PhiR_UpperLimit_Par1 = cms.double( 0.6 ),
     EtaR_UpperLimit_Par2 = cms.double( 0.15 ),
-    MeasurementTrackerName = cms.InputTag( "" ),
     UseVertex = cms.bool( False ),
     Rescale_Dz = cms.double( 4.0 ),
     Pt_fixed = cms.bool( True ),
@@ -17047,6 +17052,9 @@ fragment.hltIterL3DisplacedMuonPixelTracksTrackingRegions = cms.EDProducer( "Muo
     DeltaPhi = cms.double( 0.225 ),
     maxRegions = cms.int32( 5 ),
     precise = cms.bool( True ),
+    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
+    vertexCollection = cms.InputTag( "notUsed" ),
+    MeasurementTrackerName = cms.InputTag( "" ),
     input = cms.InputTag( "hltL2SelectorForL3IOForGlbDisplaced" )
 )
 fragment.hltPixelTracksInDisplacedRegionL2 = cms.EDProducer( "TrackSelectorByRegion",
@@ -17225,9 +17233,7 @@ fragment.hltDisplacedhltIter4PixelLessLayerTripletsForGlbDisplacedMuons = cms.ED
 fragment.hltDisplacedhltIter4PixelLessTrackingRegionsForGlbDisplacedMuons = cms.EDProducer( "MuonTrackingRegionEDProducer",
     EtaR_UpperLimit_Par1 = cms.double( 0.25 ),
     DeltaR = cms.double( 0.1 ),
-    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     OnDemand = cms.int32( 0 ),
-    vertexCollection = cms.InputTag( "hltTrimmedPixelVertices" ),
     Rescale_phi = cms.double( 3.0 ),
     Eta_fixed = cms.bool( True ),
     Rescale_eta = cms.double( 3.0 ),
@@ -17237,7 +17243,6 @@ fragment.hltDisplacedhltIter4PixelLessTrackingRegionsForGlbDisplacedMuons = cms.
     Phi_min = cms.double( 0.0 ),
     PhiR_UpperLimit_Par1 = cms.double( 0.6 ),
     EtaR_UpperLimit_Par2 = cms.double( 0.15 ),
-    MeasurementTrackerName = cms.InputTag( "hltDisplacedhltIter4MaskedMeasurementTrackerEventForDisplacedGblMuons" ),
     UseVertex = cms.bool( True ),
     Rescale_Dz = cms.double( 4.0 ),
     Pt_fixed = cms.bool( True ),
@@ -17248,6 +17253,9 @@ fragment.hltDisplacedhltIter4PixelLessTrackingRegionsForGlbDisplacedMuons = cms.
     DeltaPhi = cms.double( 0.3 ),
     maxRegions = cms.int32( 5 ),
     precise = cms.bool( True ),
+    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
+    vertexCollection = cms.InputTag( "hltTrimmedPixelVertices" ),
+    MeasurementTrackerName = cms.InputTag( "hltDisplacedhltIter4MaskedMeasurementTrackerEventForDisplacedGblMuons" ),
     input = cms.InputTag( "hltL2SelectorForL3IOForGlbDisplaced" )
 )
 fragment.hltDisplacedhltIter4PixelLessClusterCheckForGlbDisplacedMuons = cms.EDProducer( "ClusterCheckerEDProducer",
@@ -24541,9 +24549,7 @@ fragment.hltL2SelectorForL3IOOpenMu = cms.EDProducer( "HLTMuonL2SelectorForL3IO"
 fragment.hltIterL3MuonPixelTracksTrackingRegionsOpenMu = cms.EDProducer( "MuonTrackingRegionEDProducer",
     EtaR_UpperLimit_Par1 = cms.double( 0.25 ),
     DeltaR = cms.double( 0.025 ),
-    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
     OnDemand = cms.int32( -1 ),
-    vertexCollection = cms.InputTag( "notUsed" ),
     Rescale_phi = cms.double( 3.0 ),
     Eta_fixed = cms.bool( True ),
     Rescale_eta = cms.double( 3.0 ),
@@ -24553,7 +24559,6 @@ fragment.hltIterL3MuonPixelTracksTrackingRegionsOpenMu = cms.EDProducer( "MuonTr
     Phi_min = cms.double( 0.0 ),
     PhiR_UpperLimit_Par1 = cms.double( 0.6 ),
     EtaR_UpperLimit_Par2 = cms.double( 0.15 ),
-    MeasurementTrackerName = cms.InputTag( "" ),
     UseVertex = cms.bool( False ),
     Rescale_Dz = cms.double( 4.0 ),
     Pt_fixed = cms.bool( True ),
@@ -24564,6 +24569,9 @@ fragment.hltIterL3MuonPixelTracksTrackingRegionsOpenMu = cms.EDProducer( "MuonTr
     DeltaPhi = cms.double( 0.15 ),
     maxRegions = cms.int32( 5 ),
     precise = cms.bool( True ),
+    beamSpot = cms.InputTag( "hltOnlineBeamSpot" ),
+    vertexCollection = cms.InputTag( "notUsed" ),
+    MeasurementTrackerName = cms.InputTag( "" ),
     input = cms.InputTag( "hltL2SelectorForL3IOOpenMu" )
 )
 fragment.hltPixelTracksInRegionL2OpenMu = cms.EDProducer( "TrackSelectorByRegion",
