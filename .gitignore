@@ -21,3 +21,7 @@ __init__.py
 
 #ignore mac specific file
 .DS_Store
+
+test_run4d126/
+test_run4d126/*
+BuildFile.xml
