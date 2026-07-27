@@ -14,8 +14,8 @@ generator = cms.EDFilter(
         pythia8CP5SettingsBlock,
         processParameters=cms.vstring(
             'Charmonium:all = on',       # prompt charmonium production (J/psi, chi_c, psi(2S), ...)
-            'PhaseSpace:pTHatMin = 1.',  # low pT bin, since you want low-pT J/psi
-            'PhaseSpace:pTHatMax = 5.',
+            'PhaseSpace:pTHatMin = 100.',
+            'PhaseSpace:pTHatMax = 999999.',
             '443:onMode = off',          # only retain the requested J/psi decay mode
             '443:onIfMatch = 13 -13',
         ),
