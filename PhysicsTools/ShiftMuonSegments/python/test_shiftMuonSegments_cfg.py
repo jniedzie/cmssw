@@ -8,6 +8,13 @@ options.outputFile = "shiftMuonSegments_test.root"
 options.parseArguments()
 
 process = cms.Process("SHIFTSEGMENTS")
+process.MessageLogger = cms.Service(
+    "MessageLogger",
+    cerr=cms.untracked.PSet(
+        threshold=cms.untracked.string("INFO"),
+        ShiftMuonSegments=cms.untracked.PSet(limit=cms.untracked.int32(100000)),
+    ),
+)
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEvents))
 process.source = cms.Source("PoolSource", fileNames=cms.untracked.vstring(options.inputFile))
 process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
