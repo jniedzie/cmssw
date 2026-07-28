@@ -1,0 +1,9 @@
+<use name="DataFormats/DTRecHit"/>
+<use name="DataFormats/CSCRecHit"/>
+<use name="DataFormats/NanoAOD"/>
+<use name="FWCore/Framework"/>
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/MessageLogger"/>
+<library file="plugins/*.cc" name="PhysicsToolsShiftMuonSegmentsPlugins">
+  <flags EDM_PLUGIN="1"/>
+</library>
