@@ -1,4 +1,5 @@
 #include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "DataFormats/DTRecHit/interface/DTRecSegment4DCollection.h"
@@ -24,63 +25,61 @@ public:
     auto dh = e.getHandle(dt_);
     auto ch = e.getHandle(csc_);
     if (dh.isValid())
-      for (auto const& p : *dh) {
-        auto const& s = p.second;
-        auto id = p.first.rawId();
+      for (auto const& s : *dh) {
+        auto id = s.chamberId();
         auto pos = s.localPosition();
         auto dir = s.localDirection();
-        dr.push_back(id);
-        dw.push_back(p.first.wheel());
-        ds.push_back(p.first.station());
-        dse.push_back(p.first.sector());
+        dr.push_back(id.rawId());
+        dw.push_back(id.wheel());
+        ds.push_back(id.station());
+        dse.push_back(id.sector());
         dx.push_back(pos.x());
         dy.push_back(pos.y());
         dvx.push_back(dir.x());
         dvy.push_back(dir.y());
         dc.push_back(s.chi2());
-        dnh.push_back(s.specificRecHits().size());
+        dnh.push_back(s.recHits().size());
       }
     if (ch.isValid())
-      for (auto const& p : *ch) {
-        auto const& s = p.second;
-        auto id = p.first.rawId();
+      for (auto const& s : *ch) {
+        auto id = s.cscDetId();
         auto pos = s.localPosition();
         auto dir = s.localDirection();
-        cr.push_back(id);
-        ce.push_back(p.first.endcap());
-        cs.push_back(p.first.station());
-        crg.push_back(p.first.ring());
-        cch.push_back(p.first.chamber());
+        cr.push_back(id.rawId());
+        ce.push_back(id.endcap());
+        cs.push_back(id.station());
+        crg.push_back(id.ring());
+        cch.push_back(id.chamber());
         cx.push_back(pos.x());
         cy.push_back(pos.y());
         cvx.push_back(dir.x());
         cvy.push_back(dir.y());
         cc.push_back(s.chi2());
-        cnh.push_back(s.specificRecHits().size());
+        cnh.push_back(s.nRecHits());
       }
     auto dt = std::make_unique<nanoaod::FlatTable>(dr.size(), "ShiftDT", false, true);
     auto ct = std::make_unique<nanoaod::FlatTable>(cr.size(), "ShiftCSC", false, true);
-    dt->addColumn("rawId", dr, "detector raw id");
-    dt->addColumn("wheel", dw, "DT wheel");
-    dt->addColumn("station", ds, "DT station");
-    dt->addColumn("sector", dse, "DT sector");
-    dt->addColumn("x", dx, "local x");
-    dt->addColumn("y", dy, "local y");
-    dt->addColumn("directionX", dvx, "local direction x");
-    dt->addColumn("directionY", dvy, "local direction y");
-    dt->addColumn("chi2", dc, "segment chi2");
-    dt->addColumn("nHits", dnh, "number of hits");
-    ct->addColumn("rawId", cr, "detector raw id");
-    ct->addColumn("endcap", ce, "CSC endcap");
-    ct->addColumn("station", cs, "CSC station");
-    ct->addColumn("ring", crg, "CSC ring");
-    ct->addColumn("chamber", cch, "CSC chamber");
-    ct->addColumn("x", cx, "local x");
-    ct->addColumn("y", cy, "local y");
-    ct->addColumn("directionX", cvx, "local direction x");
-    ct->addColumn("directionY", cvy, "local direction y");
-    ct->addColumn("chi2", cc, "segment chi2");
-    ct->addColumn("nHits", cnh, "number of hits");
+    dt->addColumn<unsigned int>("rawId", dr, "detector raw id");
+    dt->addColumn<int>("wheel", dw, "DT wheel");
+    dt->addColumn<int>("station", ds, "DT station");
+    dt->addColumn<int>("sector", dse, "DT sector");
+    dt->addColumn<float>("x", dx, "local x");
+    dt->addColumn<float>("y", dy, "local y");
+    dt->addColumn<float>("directionX", dvx, "local direction x");
+    dt->addColumn<float>("directionY", dvy, "local direction y");
+    dt->addColumn<float>("chi2", dc, "segment chi2");
+    dt->addColumn<int>("nHits", dnh, "number of hits");
+    ct->addColumn<unsigned int>("rawId", cr, "detector raw id");
+    ct->addColumn<int>("endcap", ce, "CSC endcap");
+    ct->addColumn<int>("station", cs, "CSC station");
+    ct->addColumn<int>("ring", crg, "CSC ring");
+    ct->addColumn<int>("chamber", cch, "CSC chamber");
+    ct->addColumn<float>("x", cx, "local x");
+    ct->addColumn<float>("y", cy, "local y");
+    ct->addColumn<float>("directionX", cvx, "local direction x");
+    ct->addColumn<float>("directionY", cvy, "local direction y");
+    ct->addColumn<float>("chi2", cc, "segment chi2");
+    ct->addColumn<int>("nHits", cnh, "number of hits");
     e.put(std::move(dt), "ShiftDT");
     e.put(std::move(ct), "ShiftCSC");
   }

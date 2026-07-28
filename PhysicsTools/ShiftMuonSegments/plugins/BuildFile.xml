@@ -4,3 +4,6 @@
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/MessageLogger"/>
+<library file="*.cc" name="PhysicsToolsShiftMuonSegmentsPlugins">
+  <flags EDM_PLUGIN="1"/>
+</library>
