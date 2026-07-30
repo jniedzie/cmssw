@@ -147,6 +147,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
   unsigned int ng4vtx = 0;
   unsigned int ng4par = 0;
   unsigned int nHepMCMuons = 0;
+  unsigned int nG4MuonPrimaries = 0;
 
   for (const HepMC3::GenVertexPtr &vitr : evt->vertices()) {
     // loop for vertex, is it a real vertex?
@@ -387,10 +388,15 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
                                                     << " decay_length(cm)= " << decay_length / CLHEP::cm;
         }
       }
+      if (debugMuonPrimaries_ && std::abs(pdg) == 13 && !toBeAdded) {
+        std::cout << "[FixedTargetMuonDebug] HepMC3 muon rejected before G4PrimaryParticle: id=" << pitr->id()
+                  << " status=" << status << " vertex=(" << x1 / CLHEP::mm << "," << y1 / CLHEP::mm << ","
+                  << z1 / CLHEP::mm << ") mm impact=(" << ximpact / CLHEP::mm << "," << yimpact / CLHEP::mm << ","
+                  << zimpact / CLHEP::mm << ") mm rImpact=" << std::sqrt(rimpact2) / CLHEP::mm
+                  << " mm Z_hector=" << Z_hector / CLHEP::mm
+                  << " mm reason=fiducial/forward-transport selection" << std::endl;
+      }
       if (toBeAdded) {
-        if (debugMuonPrimaries_ && std::abs(pdg) == 13)
-          std::cout << "[FixedTargetMuonDebug] HepMC3 muon accepted for GEANT4 primary: id=" << pitr->id()
-                    << std::endl;
         G4PrimaryParticle *g4prim = new G4PrimaryParticle(pdg, px * CLHEP::GeV, py * CLHEP::GeV, pz * CLHEP::GeV);
 
         if (g4prim->GetG4code() != nullptr) {
@@ -418,6 +424,19 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
 
         ++ng4par;
         g4vtx->SetPrimary(g4prim);
+        if (debugMuonPrimaries_ && std::abs(pdg) == 13) {
+          ++nG4MuonPrimaries;
+          const auto *definition = g4prim->GetG4code();
+          std::cout << "[FixedTargetMuonDebug] G4PrimaryParticle from HepMC3 id=" << pitr->id()
+                    << " pdgId=" << g4prim->GetPDGcode()
+                    << " name=" << (definition != nullptr ? definition->GetParticleName() : "unknown")
+                    << " px=" << g4prim->GetPx() / CLHEP::GeV << " py=" << g4prim->GetPy() / CLHEP::GeV
+                    << " pz=" << g4prim->GetPz() / CLHEP::GeV << " mass=" << g4prim->GetMass() / CLHEP::GeV
+                    << " charge=" << g4prim->GetCharge() / CLHEP::eplus << " vertex=("
+                    << g4vtx->GetX0() / CLHEP::mm << "," << g4vtx->GetY0() / CLHEP::mm << ","
+                    << g4vtx->GetZ0() / CLHEP::mm << ") mm time=" << g4vtx->GetT0() / CLHEP::ns << " ns"
+                    << std::endl;
+        }
         edm::LogVerbatim("SimG4CoreGenerator3") << "   " << ng4par << ". new Geant4 particle pdg= " << pdg
                                                 << " Ptot(GeV/c)= " << ptot << " Pt= " << std::sqrt(px * px + py * py)
                                                 << " status= " << status << "; dir= " << g4prim->GetMomentumDirection();
@@ -442,7 +461,8 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
 
   if (debugMuonPrimaries_)
     std::cout << "[FixedTargetMuonDebug] HepMC3 event summary: muons=" << nHepMCMuons
-              << " GEANT4_primaries=" << ng4par << " GEANT4_vertices=" << ng4vtx << std::endl;
+              << " GEANT4_muon_primaries=" << nG4MuonPrimaries << " GEANT4_primaries=" << ng4par
+              << " GEANT4_vertices=" << ng4vtx << std::endl;
 
   edm::LogVerbatim("SimG4CoreGenerator3")
       << "The list of Geant4 primaries includes " << ng4par << " particles in " << ng4vtx << " vertex";
