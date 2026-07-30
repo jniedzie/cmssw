@@ -289,6 +289,7 @@ g4SimHits = cms.EDProducer("OscarMTProducer",
         ApplyLumiMonitorCuts = cms.bool(False), ## primary for lumi monitors
         IsSlepton = cms.bool(False),
         Verbosity = cms.untracked.int32(0),
+        DebugMuonPrimaries = cms.untracked.bool(False),
         PDGselection = cms.PSet(
             PDGfilterSel = cms.bool(False), ## filter out unwanted particles
             PDGfilter = cms.vint32(21,1,2,3,4,5,6) ## list of unwanted particles (gluons and quarks)
