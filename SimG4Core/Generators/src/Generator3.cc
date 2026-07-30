@@ -18,6 +18,7 @@
 
 #include "HepMC3/Print.h"
 
+#include <iostream>
 #include <sstream>
 
 using namespace edm;
@@ -44,7 +45,8 @@ Generator3::Generator3(const ParameterSet &p)
       Z_lmax(0),
       Z_hector(0),
       pdgFilterSel(false),
-      fPDGFilter(false) {
+      fPDGFilter(false),
+      debugMuonPrimaries_(p.getUntrackedParameter<bool>("DebugMuonPrimaries", false)) {
   bool lumi = p.getParameter<bool>("ApplyLumiMonitorCuts");
   if (lumi) {
     fLumiFilter = new LumiMonitorFilter();
@@ -144,6 +146,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
 
   unsigned int ng4vtx = 0;
   unsigned int ng4par = 0;
+  unsigned int nHepMCMuons = 0;
 
   for (const HepMC3::GenVertexPtr &vitr : evt->vertices()) {
     // loop for vertex, is it a real vertex?
@@ -158,6 +161,15 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
       // 3:  particles are decayed by generator and do not need to be propagated by GEANT
       int status = pitr->status();
       int pdg = pitr->pid();
+      if (debugMuonPrimaries_ && std::abs(pdg) == 13) {
+        ++nHepMCMuons;
+        const auto &p4 = pitr->momentum();
+        const auto &xyz = vitr->position();
+        std::cout << "[FixedTargetMuonDebug] HepMC3 muon: id=" << pitr->id() << " pdgId=" << pdg
+                  << " status=" << status << " px=" << p4.px() << " py=" << p4.py() << " pz=" << p4.pz()
+                  << " E=" << p4.e() << " vertex=(" << xyz.x() << "," << xyz.y() << "," << xyz.z() << ")"
+                  << std::endl;
+      }
       if (status > 3 && isExotic(pdg) && (!(isExoticNonDetectable(pdg)))) {
         // In Pythia 8, there are many status codes besides 1, 2, 3.
         // By setting the status to 2 for exotic particles, they will be
@@ -376,6 +388,9 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
         }
       }
       if (toBeAdded) {
+        if (debugMuonPrimaries_ && std::abs(pdg) == 13)
+          std::cout << "[FixedTargetMuonDebug] HepMC3 muon accepted for GEANT4 primary: id=" << pitr->id()
+                    << std::endl;
         G4PrimaryParticle *g4prim = new G4PrimaryParticle(pdg, px * CLHEP::GeV, py * CLHEP::GeV, pz * CLHEP::GeV);
 
         if (g4prim->GetG4code() != nullptr) {
@@ -424,6 +439,10 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
 
     g4evt->AddPrimaryVertex(g4vtx);
   }
+
+  if (debugMuonPrimaries_)
+    std::cout << "[FixedTargetMuonDebug] HepMC3 event summary: muons=" << nHepMCMuons
+              << " GEANT4_primaries=" << ng4par << " GEANT4_vertices=" << ng4vtx << std::endl;
 
   edm::LogVerbatim("SimG4CoreGenerator3")
       << "The list of Geant4 primaries includes " << ng4par << " particles in " << ng4vtx << " vertex";

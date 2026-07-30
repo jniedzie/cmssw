@@ -66,6 +66,7 @@ private:
   std::vector<int> pdgFilter;
   bool pdgFilterSel;
   bool fPDGFilter;
+  bool debugMuonPrimaries_;
 };
 
 #endif
