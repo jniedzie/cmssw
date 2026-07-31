@@ -5,8 +5,20 @@ shiftMuonSegmentsSequence = cms.Sequence(shiftMuonSegmentsCounter + shiftMuonSeg
 
 def addShiftMuonSegments(process):
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
-    process.shiftMuonSegments = shiftMuonSegments.clone()
-    process.shiftMuonSegmentsSequence = cms.Sequence(process.shiftMuonSegmentsCounter + process.shiftMuonSegments)
+    # NanoAOD retains FlatTables with module labels matching ``*Table``.  Keep
+    # that suffix here so the standard NanoAOD output commands write both
+    # ShiftDT and ShiftCSC tables.
+    process.shiftMuonSegmentsTable = shiftMuonSegments.clone()
+    process.shiftMuonSegmentsSequence = cms.Sequence(process.shiftMuonSegmentsCounter + process.shiftMuonSegmentsTable)
+
+    # Be explicit as well as following the standard ``*Table`` convention:
+    # this makes the tables resilient to a future restrictive NanoAOD output
+    # command list.
+    for output_name in ("NANOAODoutput", "NANOAODSIMoutput"):
+        if hasattr(process, output_name):
+            getattr(process, output_name).outputCommands.append(
+                "keep nanoaodFlatTable_shiftMuonSegmentsTable_*_*"
+            )
     # cmsDriver's NANO step is the path that is actually scheduled and
     # written by the NANOAODSIM output module.  Attach the producer to that
     # path, rather than only defining it in the process.  The nanoSequence
