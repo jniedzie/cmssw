@@ -17,7 +17,9 @@
 #include "G4UnitsTable.hh"
 
 #include <iostream>
+#include <map>
 #include <sstream>
+#include <string>
 
 using namespace edm;
 
@@ -146,6 +148,7 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
   unsigned int ng4par = 0;
   unsigned int nHepMCMuons = 0;
   unsigned int nG4MuonPrimaries = 0;
+  std::map<std::string, unsigned int> muonFirstFailure;
 
   for (HepMC::GenEvent::vertex_const_iterator vitr = evt->vertices_begin(); vitr != evt->vertices_end(); ++vitr) {
     // loop for vertex, is it a real vertex?
@@ -161,11 +164,12 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
       // 3:  particles are decayed by generator and do not need to be propagated by GEANT
       int status = (*pitr)->status();
       int pdg = (*pitr)->pdg_id();
-      if (debugMuonPrimaries_ && std::abs(pdg) == 13) {
+      if (debugMuonPrimaries_ && std::abs(pdg) == 13 && status == 1) {
         ++nHepMCMuons;
         const auto &p4 = (*pitr)->momentum();
         const auto &xyz = (*vitr)->position();
-        std::cout << "[FixedTargetMuonDebug] HepMC muon: barcode=" << (*pitr)->barcode() << " pdgId=" << pdg
+        std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                  << " stage=inventory decision=seen barcode=" << (*pitr)->barcode() << " pdgId=" << pdg
                   << " status=" << status << " px=" << p4.px() << " py=" << p4.py() << " pz=" << p4.pz()
                   << " E=" << p4.e() << " vertex=(" << xyz.x() << "," << xyz.y() << "," << xyz.z() << ")"
                   << std::endl;
@@ -223,6 +227,16 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
     // if this vertex is inside fiductial volume inside the beam pipe
     // and has no long-lived secondary the vertex is not saved
     if (!qvtx) {
+      if (debugMuonPrimaries_) {
+        for (pitr = (*vitr)->particles_begin(HepMC::children); pitr != (*vitr)->particles_end(HepMC::children); ++pitr) {
+          if (std::abs((*pitr)->pdg_id()) == 13 && (*pitr)->status() == 1)
+            ++muonFirstFailure["vertex_not_selected"];
+          if (std::abs((*pitr)->pdg_id()) == 13 && (*pitr)->status() == 1)
+            std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                      << " stage=vertex-selection decision=rejected barcode=" << (*pitr)->barcode()
+                      << " reason=no_status1_or_long_lived_status2_daughter_at_vertex" << std::endl;
+        }
+      }
       continue;
     }
 
@@ -237,11 +251,19 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
       int status = (*pitr)->status();
       int pdg = (*pitr)->pdg_id();
       bool hasDecayVertex = (nullptr != (*pitr)->end_vertex());
+      bool isMuon = debugMuonPrimaries_ && std::abs(pdg) == 13 && status == 1;
 
       // Filter on allowed particle species if required
       if (fPDGFilter) {
         bool isInTheList = IsInTheFilterList(pdg);
         if ((!pdgFilterSel && isInTheList) || (pdgFilterSel && !isInTheList)) {
+          if (isMuon)
+            ++muonFirstFailure["pdg_filter"];
+          if (isMuon)
+            std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                      << " stage=pdg-filter decision=rejected barcode=" << (*pitr)->barcode() << " pdgId=" << pdg
+                      << " status=" << status << " inList=" << isInTheList << " selectList=" << pdgFilterSel
+                      << " reason=pdg_filter" << std::endl;
           if (0 < verbose)
             edm::LogVerbatim("SimG4CoreGenerator")
                 << " Skiped GenParticle barcode= " << (*pitr)->barcode() << " PDGid= " << pdg << " status= " << status
@@ -319,7 +341,7 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
       // HECTOR transport of protons are done in corresponding PPS producer
       if (1 == status && std::abs(zimpact) >= Z_hector && rimpact2 <= theDecRCut2) {
         // very forward n, nbar, gamma are allowed
-        toBeAdded = (2112 == std::abs(pdg) || 22 == pdg);
+        toBeAdded = (2112 == std::abs(pdg) || 22 == pdg || 13 == std::abs(pdg));
         if (verbose > 1) {
           edm::LogVerbatim("SimG4CoreGenerator")
               << "GenParticle barcode = " << (*pitr)->barcode() << " very forward; to be added: " << toBeAdded;
@@ -329,12 +351,24 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
         if (1 == status && (std::abs(zimpact) < Z_hector || rimpact2 > theDecRCut2)) {
           // Ptot cut for all particles
           if (fPCuts && (ptot < theMinPCut || ptot > theMaxPCut)) {
+            if (isMuon)
+              ++muonFirstFailure["p_cut"];
+            if (isMuon)
+              std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                        << " stage=momentum-cut decision=rejected barcode=" << (*pitr)->barcode() << " p=" << ptot
+                        << " GeV allowed=[" << theMinPCut << "," << theMaxPCut << "] GeV reason=p_cut" << std::endl;
             continue;
           }
           // phi cut is applied mainly for particle gun
           if (fPhiCuts) {
             double phi = p.phi();
             if (phi < theMinPhiCut || phi > theMaxPhiCut) {
+              if (isMuon)
+                ++muonFirstFailure["phi_cut"];
+              if (isMuon)
+                std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                          << " stage=phi-cut decision=rejected barcode=" << (*pitr)->barcode() << " phi=" << phi
+                          << " allowed=[" << theMinPhiCut << "," << theMaxPhiCut << "] reason=phi_cut" << std::endl;
               continue;
             }
           }
@@ -365,10 +399,23 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
             }
             // check eta cut
             if ((zi >= Z_lmin) & (zi <= Z_lmax) & (xi * xi + yi * yi < theDecRCut2)) {
+              if (isMuon)
+                ++muonFirstFailure["eta_fiducial_cut"];
+              if (isMuon)
+                std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                          << " stage=eta-cut decision=rejected barcode=" << (*pitr)->barcode() << " projected=("
+                          << xi / CLHEP::mm << "," << yi / CLHEP::mm << "," << zi / CLHEP::mm
+                          << ") mm reason=eta_fiducial_cut" << std::endl;
               continue;
             }
           }
           if (fLumiFilter && !fLumiFilter->isGoodForLumiMonitor(*pitr)) {
+            if (isMuon)
+              ++muonFirstFailure["lumi_monitor_filter"];
+            if (isMuon)
+              std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                        << " stage=lumi-filter decision=rejected barcode=" << (*pitr)->barcode()
+                        << " reason=lumi_monitor_filter" << std::endl;
             continue;
           }
           toBeAdded = true;
@@ -386,13 +433,16 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
                                                    << " decay_length(cm)= " << decay_length / CLHEP::cm;
         }
       }
-      if (debugMuonPrimaries_ && std::abs(pdg) == 13 && !toBeAdded) {
-        std::cout << "[FixedTargetMuonDebug] HepMC muon rejected before G4PrimaryParticle: barcode="
+      if (isMuon && !toBeAdded) {
+        const char *reason = "forward_transport_not_allowed_for_muon";
+        ++muonFirstFailure[reason];
+        std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                  << " stage=primary-selection decision=rejected barcode="
                   << (*pitr)->barcode() << " status=" << status << " vertex=(" << x1 / CLHEP::mm << ","
                   << y1 / CLHEP::mm << "," << z1 / CLHEP::mm << ") mm impact=(" << ximpact / CLHEP::mm << ","
                   << yimpact / CLHEP::mm << "," << zimpact / CLHEP::mm << ") mm rImpact="
                   << std::sqrt(rimpact2) / CLHEP::mm << " mm Z_hector=" << Z_hector / CLHEP::mm
-                  << " mm reason=fiducial/forward-transport selection" << std::endl;
+                  << " mm reason=" << reason << std::endl;
       }
       if (toBeAdded) {
         G4PrimaryParticle *g4prim = new G4PrimaryParticle(pdg, px * CLHEP::GeV, py * CLHEP::GeV, pz * CLHEP::GeV);
@@ -403,6 +453,13 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
 
           // apply Pt cut
           if (fPtransCut && 1 == status && 0.0 != charge && px * px + py * py < theMinPtCut2) {
+            if (isMuon)
+              ++muonFirstFailure["pt_cut"];
+            if (isMuon)
+              std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                        << " stage=pt-cut decision=rejected barcode=" << (*pitr)->barcode()
+                        << " pt=" << std::sqrt(px * px + py * py) << " GeV minPt=" << std::sqrt(theMinPtCut2)
+                        << " GeV charge=" << charge / CLHEP::eplus << " reason=pt_cut" << std::endl;
             delete g4prim;
             continue;
           }
@@ -422,10 +479,11 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
 
         ++ng4par;
         g4vtx->SetPrimary(g4prim);
-        if (debugMuonPrimaries_ && std::abs(pdg) == 13) {
+        if (isMuon) {
           ++nG4MuonPrimaries;
           const auto *definition = g4prim->GetG4code();
-          std::cout << "[FixedTargetMuonDebug] G4PrimaryParticle from HepMC barcode=" << (*pitr)->barcode()
+          std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                    << " stage=g4-primary decision=accepted barcode=" << (*pitr)->barcode()
                     << " pdgId=" << g4prim->GetPDGcode()
                     << " name=" << (definition != nullptr ? definition->GetParticleName() : "unknown")
                     << " px=" << g4prim->GetPx() / CLHEP::GeV << " py=" << g4prim->GetPy() / CLHEP::GeV
@@ -458,9 +516,15 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
   }
 
   if (debugMuonPrimaries_)
-    std::cout << "[FixedTargetMuonDebug] HepMC event summary: muons=" << nHepMCMuons
+    std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+              << " stage=event-summary decision=complete status1_muons=" << nHepMCMuons
               << " GEANT4_muon_primaries=" << nG4MuonPrimaries << " GEANT4_primaries=" << ng4par
               << " GEANT4_vertices=" << ng4vtx << std::endl;
+  if (debugMuonPrimaries_) {
+    for (const auto &failure : muonFirstFailure)
+      std::cout << "[FixedTargetMuonDebug][HepMC] event=" << g4evt->GetEventID()
+                << " stage=first-failure-summary cut=" << failure.first << " muons=" << failure.second << std::endl;
+  }
 
   edm::LogVerbatim("SimG4CoreGenerator") << "The list of Geant4 primaries includes " << ng4par << " particles in "
                                          << ng4vtx << " vertex";
