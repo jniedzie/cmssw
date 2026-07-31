@@ -32,4 +32,16 @@ def addShiftMuonSegments(process):
             "Cannot attach ShiftMuonSegments: process has neither "
             "nanoAOD_step nor nanoSequence"
         )
+    # The standard NanoAOD event content currently keeps all FlatTables, but
+    # retain these products explicitly as well.  This makes the contract
+    # independent of future EXONanoAOD event-content changes.
+    for output_name in ("NANOAODoutput", "NANOAODSIMoutput"):
+        if hasattr(process, output_name):
+            output = getattr(process, output_name)
+            for command in (
+                "keep nanoaodFlatTable_shiftMuonSegments_ShiftDT_*",
+                "keep nanoaodFlatTable_shiftMuonSegments_ShiftCSC_*",
+            ):
+                if command not in output.outputCommands:
+                    output.outputCommands.append(command)
     return process
