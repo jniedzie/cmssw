@@ -342,8 +342,12 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
       // Particles of status 1 trasnported along the beam pipe
       // HECTOR transport of protons are done in corresponding PPS producer
       if (1 == status && std::abs(zimpact) >= Z_hector && rimpact2 <= theDecRCut2) {
-        // very forward n, nbar, gamma are allowed
-        toBeAdded = (2112 == std::abs(pdg) || 22 == pdg || 13 == std::abs(pdg));
+        // Very forward n, nbar, and gamma are allowed. The SHIFT extension is
+        // limited to stable muons produced beyond the HECTOR boundary and
+        // directed from either SHIFT side back toward CMS.
+        const bool inwardSHIFTMuon =
+            (13 == std::abs(pdg) && std::abs(z1) >= Z_hector && z1 * pz < 0.0);
+        toBeAdded = (2112 == std::abs(pdg) || 22 == pdg || inwardSHIFTMuon);
         if (verbose > 1) {
           edm::LogVerbatim("SimG4CoreGenerator3")
               << "GenParticle barcode = " << pitr->id() << " very forward; to be added: " << toBeAdded;

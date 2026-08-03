@@ -352,6 +352,8 @@ g4SimHits = cms.EDProducer("OscarMTProducer",
     SteppingAction = cms.PSet(
         common_MCtruth,
         common_maximum_time,
+        # Enables the shared corridor used by outward ZDC neutrals and inward
+        # primary muons from either SHIFT interaction point.
         CMStoZDCtransport       = cms.bool(False),
         MaxNumberOfSteps        = cms.int32(20000),
         CMSName                 = cms.string('CMSE'),
