@@ -7,7 +7,7 @@ def addShiftMuonSegments(process):
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     # NanoAOD retains FlatTables with module labels matching ``*Table``.  Keep
     # that suffix here so the standard NanoAOD output commands write both
-    # ShiftDT and ShiftCSC tables.
+    # ShiftDT/CSC/GEM segment tables and ShiftRPC reconstructed-hit table.
     process.shiftMuonSegmentsTable = shiftMuonSegments.clone()
     process.shiftMuonSegmentsSequence = cms.Sequence(process.shiftMuonSegmentsCounter + process.shiftMuonSegmentsTable)
 
@@ -41,6 +41,8 @@ def addShiftMuonSegments(process):
             for command in (
                 "keep nanoaodFlatTable_shiftMuonSegments_ShiftDT_*",
                 "keep nanoaodFlatTable_shiftMuonSegments_ShiftCSC_*",
+                "keep nanoaodFlatTable_shiftMuonSegments_ShiftRPC_*",
+                "keep nanoaodFlatTable_shiftMuonSegments_ShiftGEM_*",
             ):
                 if command not in output.outputCommands:
                     output.outputCommands.append(command)
