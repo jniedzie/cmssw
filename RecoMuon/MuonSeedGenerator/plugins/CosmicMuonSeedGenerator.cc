@@ -55,6 +55,7 @@ CosmicMuonSeedGenerator::CosmicMuonSeedGenerator(const edm::ParameterSet& pset) 
   theMaxCSCChi2 = pset.getParameter<double>("MaxCSCChi2");
 
   theForcePointDownFlag = pset.existsAs<bool>("ForcePointDown") ? pset.getParameter<bool>("ForcePointDown") : true;
+  theKeepAllSegmentsFlag = pset.getParameter<bool>("KeepAllSegments");
 
   // pre-determined parameters for seed pt calculation ( pt * dphi )
   theParameters["topmb41"] = 0.87;
@@ -169,7 +170,15 @@ void CosmicMuonSeedGenerator::produce(edm::Event& event, const edm::EventSetup& 
   //  createSeeds(seeds, mb21, eSetup);
 
   if (!allHits.empty()) {
-    MuonRecHitContainer goodhits = selectSegments(allHits);
+    MuonRecHitContainer goodhits;
+    if (theKeepAllSegmentsFlag) {
+      for (auto const& hit : allHits) {
+        if (checkQuality(hit))
+          goodhits.push_back(hit);
+      }
+    } else {
+      goodhits = selectSegments(allHits);
+    }
     LogTrace(category) << "good RecHits: " << goodhits.size();
 
     if (goodhits.empty()) {
@@ -551,6 +560,8 @@ void CosmicMuonSeedGenerator::fillDescriptions(edm::ConfigurationDescriptions& d
   desc.add<double>("MaxDTChi2", 300.0);
   desc.add<double>("MaxCSCChi2", 300.0);
   desc.add<bool>("ForcePointDown", true);
+  desc.add<bool>("KeepAllSegments", false)
+      ->setComment("Keep every qualified segment instead of cosmic-ray global-y correlation pruning");
   descriptions.addWithDefaultLabel(desc);
 }
 
