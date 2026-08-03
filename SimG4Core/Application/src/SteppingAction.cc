@@ -50,7 +50,7 @@ SteppingAction::SteppingAction(const CMSSteppingVerbose* sv, const edm::Paramete
       << " MaxTrackTime = " << maxTrackTime / CLHEP::ns << " ns;"
       << " MaxZCentralCMS = " << maxZCentralCMS / CLHEP::m << " m"
       << " MaxTrackTimeForward = " << maxTrackTimeForward / CLHEP::ns << " ns"
-      << " MaxNumberOfSteps = " << maxNumberOfSteps << " ZDC: " << m_CMStoZDCtransport << "\n"
+      << " MaxNumberOfSteps = " << maxNumberOfSteps << " ZDC/SHIFT corridor: " << m_CMStoZDCtransport << "\n"
       << "                 Names of special volumes: " << trackerName_ << "  " << caloName_;
 
   numberTimes = maxTrackTimes.size();
@@ -122,6 +122,8 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
   const G4StepPoint* preStep = aStep->GetPreStepPoint();
   const G4StepPoint* postStep = aStep->GetPostStepPoint();
   const bool debugMuon = debugMuonTracking_ && std::abs(theTrack->GetDefinition()->GetPDGEncoding()) == 13;
+  bool killedByConfiguredDeadRegion = false;
+  bool killedLeavingZDC = false;
   if (debugMuon &&
       (theTrack->GetCurrentStepNumber() == 1 || preStep->GetPhysicalVolume() != postStep->GetPhysicalVolume())) {
     const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
@@ -137,9 +139,9 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
               << " pre_volume=" << (preVolume ? preVolume->GetName() : "outside-world")
               << " pre_region=" << (preRegion ? preRegion->GetName() : "none")
               << " post_volume=" << (postVolume ? postVolume->GetName() : "outside-world")
-              << " post_region=" << (postRegion ? postRegion->GetName() : "none")
-              << " position_mm=(" << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << ","
-              << position.z() / CLHEP::mm << ") kinetic_energy_GeV=" << ekin / CLHEP::GeV
+              << " post_region=" << (postRegion ? postRegion->GetName() : "none") << " position_mm=("
+              << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << "," << position.z() / CLHEP::mm
+              << ") kinetic_energy_GeV=" << ekin / CLHEP::GeV
               << " global_time_ns=" << theTrack->GetGlobalTime() / CLHEP::ns
               << " process=" << (process ? process->GetProcessName() : "none") << std::endl;
   }
@@ -167,17 +169,39 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
     // next logical volume and next region
     const G4LogicalVolume* lv = postStep->GetPhysicalVolume()->GetLogicalVolume();
     const G4Region* theRegion = lv->GetRegion();
+    const int absPdg = std::abs(theTrack->GetParticleDefinition()->GetPDGEncoding());
+    const bool insideDeadRegion = isInsideDeadRegion(theRegion);
+    const bool forZDC = isForZDC(lv, absPdg);
+    const bool forSHIFT = isForSHIFT(lv, theTrack);
 
-    // kill in dead regions except CMStoZDC volume
-    if (isInsideDeadRegion(theRegion) && !isForZDC(lv, std::abs(theTrack->GetParticleDefinition()->GetPDGEncoding()))) {
+    // Kill in dead regions, except particles allowed through the shared
+    // CMS<->ZDC/SHIFT transport corridor.
+    if (insideDeadRegion && !forZDC && !forSHIFT) {
       tstat = sDeadRegion;
+      killedByConfiguredDeadRegion = true;
+    } else if (debugMuon && insideDeadRegion && forSHIFT &&
+               (preStep->GetPhysicalVolume() != postStep->GetPhysicalVolume() ||
+                preStep->GetPhysicalVolume()->GetLogicalVolume()->GetRegion() != theRegion)) {
+      const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+      std::cout << "[FixedTargetMuonDebug][G4Step] event=" << (event ? event->GetEventID() : -1)
+                << " stage=dead-region-bypass decision=accepted track_id=" << theTrack->GetTrackID()
+                << " parent_id=" << theTrack->GetParentID() << " step=" << theTrack->GetCurrentStepNumber()
+                << " volume=" << postStep->GetPhysicalVolume()->GetName() << " region=" << theRegion->GetName()
+                << " reason=shift-to-cms-primary-muon"
+                << " vertex_z_mm=" << theTrack->GetVertexPosition().z() / CLHEP::mm
+                << " momentum_direction_z=" << theTrack->GetMomentumDirection().z() << std::endl;
     }
 
     // kill particles leaving ZDC
     if (sAlive == sVeryForward && m_CMStoZDCtransport) {
       const G4Region* preRegion = preStep->GetPhysicalVolume()->GetLogicalVolume()->GetRegion();
-      if (preRegion == m_ZDCRegion && preRegion != theRegion)
+      const bool inwardSHIFTMuon = std::abs(theTrack->GetDefinition()->GetPDGEncoding()) == 13 &&
+                                    theTrack->GetParentID() == 0 &&
+                                    theTrack->GetVertexPosition().z() * theTrack->GetMomentumDirection().z() < 0.0;
+      if (preRegion == m_ZDCRegion && preRegion != theRegion && !inwardSHIFTMuon) {
         tstat = sDeadRegion;
+        killedLeavingZDC = true;
+      }
     }
 
     // kill out of time
@@ -214,19 +238,35 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
       const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
       const G4VPhysicalVolume* volume = postStep->GetPhysicalVolume();
       const G4Region* region = volume ? volume->GetLogicalVolume()->GetRegion() : nullptr;
+      const G4LogicalVolume* logicalVolume = volume ? volume->GetLogicalVolume() : nullptr;
+      const int absPdg = std::abs(theTrack->GetDefinition()->GetPDGEncoding());
       std::cout << "[FixedTargetMuonDebug][G4Step] event=" << (event ? event->GetEventID() : -1)
-                << " stage=cmssw-kill track_id=" << theTrack->GetTrackID()
-                << " parent_id=" << theTrack->GetParentID() << " step=" << theTrack->GetCurrentStepNumber()
-                << " reason_code=" << static_cast<int>(tstat)
-                << " reason=" << (tstat == sDeadRegion       ? "dead-region"
-                                   : tstat == sOutOfTime      ? "out-of-time"
-                                   : tstat == sLowEnergy      ? "low-energy"
-                                   : tstat == sLowEnergyInVacuum ? "low-energy-in-vacuum"
-                                   : tstat == sVeryForward    ? "very-forward"
-                                   : tstat == sNumberOfSteps  ? "maximum-steps"
-                                                              : "other")
+                << " stage=cmssw-kill track_id=" << theTrack->GetTrackID() << " parent_id=" << theTrack->GetParentID()
+                << " step=" << theTrack->GetCurrentStepNumber() << " reason_code=" << static_cast<int>(tstat)
+                << " reason="
+                << (tstat == sDeadRegion          ? "dead-region"
+                    : tstat == sOutOfTime         ? "out-of-time"
+                    : tstat == sLowEnergy         ? "low-energy"
+                    : tstat == sLowEnergyInVacuum ? "low-energy-in-vacuum"
+                    : tstat == sVeryForward       ? "very-forward"
+                    : tstat == sNumberOfSteps     ? "maximum-steps"
+                                                  : "other")
+                << " dead_region_source="
+                << (killedByConfiguredDeadRegion ? "configured-list"
+                    : killedLeavingZDC           ? "leaving-zdc"
+                                                 : "none")
                 << " volume=" << (volume ? volume->GetName() : "outside-world")
                 << " region=" << (region ? region->GetName() : "none")
+                << " configured_dead_region=" << isInsideDeadRegion(region)
+                << " cmstozdc_transport=" << m_CMStoZDCtransport
+                << " cmstozdc_volume_match=" << (logicalVolume == m_CMStoZDC)
+                << " zdc_particle_eligible=" << (absPdg == 22 || absPdg == 2112)
+                << " shifttocms_transport=" << m_CMStoZDCtransport
+                << " shift_particle_eligible="
+                << (absPdg == 13 && theTrack->GetParentID() == 0 &&
+                    theTrack->GetVertexPosition().z() * theTrack->GetMomentumDirection().z() < 0.0)
+                << " vertex_z_mm=" << theTrack->GetVertexPosition().z() / CLHEP::mm
+                << " momentum_direction_z=" << theTrack->GetMomentumDirection().z()
                 << " kinetic_energy_GeV=" << theTrack->GetKineticEnergy() / CLHEP::GeV
                 << " global_time_ns=" << theTrack->GetGlobalTime() / CLHEP::ns << std::endl;
     }
