@@ -4,6 +4,7 @@
 <use name="DataFormats/RPCRecHit"/>
 <use name="DataFormats/MuonSeed"/>
 <use name="DataFormats/TrackReco"/>
+<use name="DataFormats/TrajectorySeed"/>
 <use name="DataFormats/NanoAOD"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
