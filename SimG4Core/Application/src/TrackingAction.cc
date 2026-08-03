@@ -28,6 +28,7 @@ TrackingAction::TrackingAction(SimTrackManager* stm, CMSSteppingVerbose* sv, con
       endPrintTrackID_(p.getParameter<int>("EndPrintTrackID")),
       checkTrack_(p.getUntrackedParameter<bool>("CheckTrack", false)),
       debugMuonTracking_(p.getUntrackedParameter<bool>("DebugMuonTracking", false)),
+      debugMuonPrimaryFates_(p.getUntrackedParameter<bool>("DebugMuonPrimaryFates", false)),
       doFineCalo_(p.getParameter<bool>("DoFineCalo")),
       saveCaloBoundaryInformation_(p.getParameter<bool>("SaveCaloBoundaryInformation")),
       ekinMin_(p.getParameter<double>("PersistencyEmin") * CLHEP::GeV),
@@ -68,12 +69,16 @@ void TrackingAction::PreUserTrackingAction(const G4Track* aTrack) {
   }
   double ekin = aTrack->GetKineticEnergy();
 
-  if (debugMuonTracking_ && std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13) {
+  bool const primaryMuon = trkInfo_ && trkInfo_->isPrimary() &&
+                           std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13;
+  if ((debugMuonTracking_ && std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13) ||
+      (debugMuonPrimaryFates_ && primaryMuon)) {
     const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
     const G4VPhysicalVolume* volume = aTrack->GetVolume();
     const G4ThreeVector& position = aTrack->GetPosition();
     const G4ThreeVector& momentum = aTrack->GetMomentum();
-    std::cout << "[FixedTargetMuonDebug][G4Track] event=" << (event ? event->GetEventID() : -1)
+    std::cout << "[FixedTargetMuonDebug][" << (primaryMuon ? "PrimaryFate" : "G4Track")
+              << "] event=" << (event ? event->GetEventID() : -1)
               << " stage=track-start track_id=" << aTrack->GetTrackID() << " parent_id=" << aTrack->GetParentID()
               << " pdg_id=" << aTrack->GetDefinition()->GetPDGEncoding()
               << " primary=" << (trkInfo_ && trkInfo_->isPrimary())
@@ -103,13 +108,17 @@ void TrackingAction::PostUserTrackingAction(const G4Track* aTrack) {
   // Tracks in history may be upgraded to stored secondary tracks,
   // which cross the boundary between Tracker and Calo
   int id = aTrack->GetTrackID();
-  if (debugMuonTracking_ && std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13) {
+  bool const primaryMuon = trkInfo_ && trkInfo_->isPrimary() &&
+                           std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13;
+  if ((debugMuonTracking_ && std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13) ||
+      (debugMuonPrimaryFates_ && primaryMuon)) {
     const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
     const G4VPhysicalVolume* volume = aTrack->GetVolume();
     const G4Step* step = aTrack->GetStep();
     const G4VProcess* process = step ? step->GetPostStepPoint()->GetProcessDefinedStep() : nullptr;
     const G4ThreeVector& position = aTrack->GetPosition();
-    std::cout << "[FixedTargetMuonDebug][G4Track] event=" << (event ? event->GetEventID() : -1)
+    std::cout << "[FixedTargetMuonDebug][" << (primaryMuon ? "PrimaryFate" : "G4Track")
+              << "] event=" << (event ? event->GetEventID() : -1)
               << " stage=track-end track_id=" << id << " parent_id=" << aTrack->GetParentID()
               << " pdg_id=" << aTrack->GetDefinition()->GetPDGEncoding() << " g4_status=" << aTrack->GetTrackStatus()
               << " steps=" << aTrack->GetCurrentStepNumber()

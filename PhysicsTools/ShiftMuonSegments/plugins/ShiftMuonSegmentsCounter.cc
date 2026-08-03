@@ -195,6 +195,25 @@ public:
             << " chi2=" << track.chi2() << " ndof=" << track.ndof();
       }
     }
+    auto printTrackCollection = [&event](auto const& handle, char const* collection) {
+      if (!handle.isValid())
+        return;
+      unsigned int index = 0;
+      for (auto const& track : *handle) {
+        edm::LogPrint("ShiftMuonRecoDebug")
+            << "[ShiftMuonRecoDebug][" << collection << "] event=" << event.id().event()
+            << " index=" << index++ << " pt=" << track.pt() << " eta=" << track.eta()
+            << " phi=" << track.phi() << " vx=" << track.vx() << " vy=" << track.vy()
+            << " vz=" << track.vz() << " innerR=" << track.innerPosition().rho()
+            << " innerZ=" << track.innerPosition().z() << " outerR=" << track.outerPosition().rho()
+            << " outerZ=" << track.outerPosition().z() << " validHits=" << track.numberOfValidHits()
+            << " lostHits=" << track.numberOfLostHits() << " chi2=" << track.chi2()
+            << " ndof=" << track.ndof();
+      }
+    };
+    printTrackCollection(cosmicTracks, "CosmicTrack");
+    printTrackCollection(traversingTracks, "TraversingTrack");
+    printTrackCollection(cosmicTrackerTracks, "TrackerTrack");
   }
 
 private:
