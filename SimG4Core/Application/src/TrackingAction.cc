@@ -11,8 +11,14 @@
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
 #include "G4UImanager.hh"
+#include "G4Event.hh"
+#include "G4EventManager.hh"
+#include "G4Step.hh"
+#include "G4VProcess.hh"
 #include "G4TrackingManager.hh"
 #include <CLHEP/Units/SystemOfUnits.h>
+
+#include <iostream>
 
 //#define EDM_ML_DEBUG
 
@@ -21,6 +27,7 @@ TrackingAction::TrackingAction(SimTrackManager* stm, CMSSteppingVerbose* sv, con
       steppingVerbose_(sv),
       endPrintTrackID_(p.getParameter<int>("EndPrintTrackID")),
       checkTrack_(p.getUntrackedParameter<bool>("CheckTrack", false)),
+      debugMuonTracking_(p.getUntrackedParameter<bool>("DebugMuonTracking", false)),
       doFineCalo_(p.getParameter<bool>("DoFineCalo")),
       saveCaloBoundaryInformation_(p.getParameter<bool>("SaveCaloBoundaryInformation")),
       ekinMin_(p.getParameter<double>("PersistencyEmin") * CLHEP::GeV),
@@ -61,6 +68,22 @@ void TrackingAction::PreUserTrackingAction(const G4Track* aTrack) {
   }
   double ekin = aTrack->GetKineticEnergy();
 
+  if (debugMuonTracking_ && std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13) {
+    const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+    const G4VPhysicalVolume* volume = aTrack->GetVolume();
+    const G4ThreeVector& position = aTrack->GetPosition();
+    const G4ThreeVector& momentum = aTrack->GetMomentum();
+    std::cout << "[FixedTargetMuonDebug][G4Track] event=" << (event ? event->GetEventID() : -1)
+              << " stage=track-start track_id=" << aTrack->GetTrackID() << " parent_id=" << aTrack->GetParentID()
+              << " pdg_id=" << aTrack->GetDefinition()->GetPDGEncoding()
+              << " primary=" << (trkInfo_ && trkInfo_->isPrimary())
+              << " volume=" << (volume ? volume->GetName() : "outside-world")
+              << " position_mm=(" << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << ","
+              << position.z() / CLHEP::mm << ")"
+              << " momentum_GeV=(" << momentum.x() / CLHEP::GeV << "," << momentum.y() / CLHEP::GeV << ","
+              << momentum.z() / CLHEP::GeV << ") kinetic_energy_GeV=" << ekin / CLHEP::GeV << std::endl;
+  }
+
 #ifdef EDM_ML_DEBUG
   edm::LogVerbatim("DoFineCalo") << "PreUserTrackingAction: Start processing track " << aTrack->GetTrackID()
                                  << " pdgid=" << aTrack->GetDefinition()->GetPDGEncoding()
@@ -80,6 +103,22 @@ void TrackingAction::PostUserTrackingAction(const G4Track* aTrack) {
   // Tracks in history may be upgraded to stored secondary tracks,
   // which cross the boundary between Tracker and Calo
   int id = aTrack->GetTrackID();
+  if (debugMuonTracking_ && std::abs(aTrack->GetDefinition()->GetPDGEncoding()) == 13) {
+    const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+    const G4VPhysicalVolume* volume = aTrack->GetVolume();
+    const G4Step* step = aTrack->GetStep();
+    const G4VProcess* process = step ? step->GetPostStepPoint()->GetProcessDefinedStep() : nullptr;
+    const G4ThreeVector& position = aTrack->GetPosition();
+    std::cout << "[FixedTargetMuonDebug][G4Track] event=" << (event ? event->GetEventID() : -1)
+              << " stage=track-end track_id=" << id << " parent_id=" << aTrack->GetParentID()
+              << " pdg_id=" << aTrack->GetDefinition()->GetPDGEncoding() << " g4_status=" << aTrack->GetTrackStatus()
+              << " steps=" << aTrack->GetCurrentStepNumber()
+              << " volume=" << (volume ? volume->GetName() : "outside-world")
+              << " position_mm=(" << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << ","
+              << position.z() / CLHEP::mm << ") kinetic_energy_GeV=" << aTrack->GetKineticEnergy() / CLHEP::GeV
+              << " global_time_ns=" << aTrack->GetGlobalTime() / CLHEP::ns
+              << " last_process=" << (process ? process->GetProcessName() : "none") << std::endl;
+  }
   bool ok = currentHistory_->saved();
   if (nullptr != trkInfo_) {
     ok = (ok || trkInfo_->storeTrack());

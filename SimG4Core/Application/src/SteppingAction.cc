@@ -8,7 +8,12 @@
 #include "G4PhysicalVolumeStore.hh"
 #include "G4RegionStore.hh"
 #include "G4UnitsTable.hh"
+#include "G4Event.hh"
+#include "G4EventManager.hh"
+#include "G4VProcess.hh"
 #include <CLHEP/Units/SystemOfUnits.h>
+
+#include <iostream>
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Utilities/interface/isFinite.h"
@@ -36,6 +41,7 @@ SteppingAction::SteppingAction(const CMSSteppingVerbose* sv, const edm::Paramete
   trackerName_ = p.getParameter<std::string>("TrackerName");
   caloName_ = p.getParameter<std::string>("CaloName");
   cms2ZDCName_ = p.getParameter<std::string>("CMS2ZDCName");
+  debugMuonTracking_ = p.getUntrackedParameter<bool>("DebugMuonTracking", false);
 
   edm::LogVerbatim("SimG4CoreApplication")
       << "SteppingAction:: KillBeamPipe = " << killBeamPipe
@@ -115,6 +121,28 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
 
   const G4StepPoint* preStep = aStep->GetPreStepPoint();
   const G4StepPoint* postStep = aStep->GetPostStepPoint();
+  const bool debugMuon = debugMuonTracking_ && std::abs(theTrack->GetDefinition()->GetPDGEncoding()) == 13;
+  if (debugMuon &&
+      (theTrack->GetCurrentStepNumber() == 1 || preStep->GetPhysicalVolume() != postStep->GetPhysicalVolume())) {
+    const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+    const G4VPhysicalVolume* preVolume = preStep->GetPhysicalVolume();
+    const G4VPhysicalVolume* postVolume = postStep->GetPhysicalVolume();
+    const G4Region* preRegion = preVolume ? preVolume->GetLogicalVolume()->GetRegion() : nullptr;
+    const G4Region* postRegion = postVolume ? postVolume->GetLogicalVolume()->GetRegion() : nullptr;
+    const G4VProcess* process = postStep->GetProcessDefinedStep();
+    const G4ThreeVector& position = postStep->GetPosition();
+    std::cout << "[FixedTargetMuonDebug][G4Step] event=" << (event ? event->GetEventID() : -1)
+              << " stage=volume-transition track_id=" << theTrack->GetTrackID()
+              << " parent_id=" << theTrack->GetParentID() << " step=" << theTrack->GetCurrentStepNumber()
+              << " pre_volume=" << (preVolume ? preVolume->GetName() : "outside-world")
+              << " pre_region=" << (preRegion ? preRegion->GetName() : "none")
+              << " post_volume=" << (postVolume ? postVolume->GetName() : "outside-world")
+              << " post_region=" << (postRegion ? postRegion->GetName() : "none")
+              << " position_mm=(" << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << ","
+              << position.z() / CLHEP::mm << ") kinetic_energy_GeV=" << ekin / CLHEP::GeV
+              << " global_time_ns=" << theTrack->GetGlobalTime() / CLHEP::ns
+              << " process=" << (process ? process->GetProcessName() : "none") << std::endl;
+  }
   if (sAlive == tstat && theTrack->GetCurrentStepNumber() > maxNumberOfSteps) {
     tstat = sNumberOfSteps;
     if (nWarnings < 5) {
@@ -182,6 +210,26 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
       }
     }
   } else {
+    if (debugMuon) {
+      const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+      const G4VPhysicalVolume* volume = postStep->GetPhysicalVolume();
+      const G4Region* region = volume ? volume->GetLogicalVolume()->GetRegion() : nullptr;
+      std::cout << "[FixedTargetMuonDebug][G4Step] event=" << (event ? event->GetEventID() : -1)
+                << " stage=cmssw-kill track_id=" << theTrack->GetTrackID()
+                << " parent_id=" << theTrack->GetParentID() << " step=" << theTrack->GetCurrentStepNumber()
+                << " reason_code=" << static_cast<int>(tstat)
+                << " reason=" << (tstat == sDeadRegion       ? "dead-region"
+                                   : tstat == sOutOfTime      ? "out-of-time"
+                                   : tstat == sLowEnergy      ? "low-energy"
+                                   : tstat == sLowEnergyInVacuum ? "low-energy-in-vacuum"
+                                   : tstat == sVeryForward    ? "very-forward"
+                                   : tstat == sNumberOfSteps  ? "maximum-steps"
+                                                              : "other")
+                << " volume=" << (volume ? volume->GetName() : "outside-world")
+                << " region=" << (region ? region->GetName() : "none")
+                << " kinetic_energy_GeV=" << theTrack->GetKineticEnergy() / CLHEP::GeV
+                << " global_time_ns=" << theTrack->GetGlobalTime() / CLHEP::ns << std::endl;
+    }
     theTrack->SetTrackStatus(fStopAndKill);
     isKilled = true;
 #ifdef EDM_ML_DEBUG

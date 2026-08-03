@@ -87,6 +87,10 @@ private:
   int theTrackID;
 
   bool printHits_;
+  bool debugMuonHits_;
+  unsigned int debugMuonSteps_;
+  unsigned int debugMuonPositiveEdepSteps_;
+  unsigned int debugMuonSavedHits_;
   SimHitPrinter* thePrinter;
 
   //--- SimTracks cuts

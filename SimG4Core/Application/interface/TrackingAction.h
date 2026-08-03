@@ -44,6 +44,7 @@ private:
   TrackWithHistory* currentHistory_ = nullptr;
   int endPrintTrackID_;
   bool checkTrack_;
+  bool debugMuonTracking_;
   bool doFineCalo_;
   bool saveCaloBoundaryInformation_;
   double ekinMin_;

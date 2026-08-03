@@ -56,6 +56,10 @@ MuonSensitiveDetector::MuonSensitiveDetector(const std::string& name,
   bool dd4hep = p.getParameter<bool>("g4GeometryDD4hepSource");
   edm::ParameterSet muonSD = p.getParameter<edm::ParameterSet>("MuonSD");
   printHits_ = muonSD.getParameter<bool>("PrintHits");
+  debugMuonHits_ = muonSD.getUntrackedParameter<bool>("DebugMuonHits", false);
+  debugMuonSteps_ = 0;
+  debugMuonPositiveEdepSteps_ = 0;
+  debugMuonSavedHits_ = 0;
   ePersistentCutGeV_ = muonSD.getParameter<double>("EnergyThresholdForPersistency") / CLHEP::GeV;  //Default 1. GeV
   allMuonsPersistent_ = muonSD.getParameter<bool>("AllMuonsPersistent");
   haveDemo_ = muonSD.getParameter<bool>("HaveDemoChambers");
@@ -119,6 +123,9 @@ MuonSensitiveDetector::~MuonSensitiveDetector() {
 
 void MuonSensitiveDetector::update(const BeginOfEvent* i) {
   clearHits();
+  debugMuonSteps_ = 0;
+  debugMuonPositiveEdepSteps_ = 0;
+  debugMuonSavedHits_ = 0;
   //----- Initialize variables to check if two steps belong to same hit
   thePV = nullptr;
   theDetUnitId = 0;
@@ -137,7 +144,33 @@ bool MuonSensitiveDetector::ProcessHits(G4Step* aStep, G4TouchableHistory* ROhis
   edm::LogVerbatim("MuonSim") << " MuonSensitiveDetector::ProcessHits " << InitialStepPosition(aStep, WorldCoordinates);
 #endif
 
-  if (aStep->GetTotalEnergyDeposit() > 0.) {
+  const G4Track* track = aStep->GetTrack();
+  const bool isMuon = std::abs(track->GetDefinition()->GetPDGEncoding()) == 13;
+  const double energyDeposit = aStep->GetTotalEnergyDeposit();
+  if (debugMuonHits_ && isMuon) {
+    ++debugMuonSteps_;
+    if (energyDeposit > 0.)
+      ++debugMuonPositiveEdepSteps_;
+    const G4StepPoint* pre = aStep->GetPreStepPoint();
+    const G4StepPoint* post = aStep->GetPostStepPoint();
+    const G4VPhysicalVolume* volume = pre->GetPhysicalVolume();
+    const G4VProcess* process = post->GetProcessDefinedStep();
+    const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+    std::cout << "[FixedTargetMuonDebug][MuonSD] event=" << (event ? event->GetEventID() : -1)
+              << " stage=sensitive-step detector=" << GetName() << " track_id=" << track->GetTrackID()
+              << " parent_id=" << track->GetParentID() << " pdg_id=" << track->GetDefinition()->GetPDGEncoding()
+              << " volume=" << (volume ? volume->GetName() : "none")
+              << " kinetic_energy_GeV=" << track->GetKineticEnergy() / CLHEP::GeV
+              << " edep_GeV=" << energyDeposit / CLHEP::GeV
+              << " pre_mm=(" << pre->GetPosition().x() / CLHEP::mm << "," << pre->GetPosition().y() / CLHEP::mm
+              << "," << pre->GetPosition().z() / CLHEP::mm << ")"
+              << " post_mm=(" << post->GetPosition().x() / CLHEP::mm << "," << post->GetPosition().y() / CLHEP::mm
+              << "," << post->GetPosition().z() / CLHEP::mm << ")"
+              << " process=" << (process ? process->GetProcessName() : "none")
+              << " will_create_or_update_hit=" << (energyDeposit > 0.) << std::endl;
+  }
+
+  if (energyDeposit > 0.) {
     newDetUnitId = setDetUnitId(aStep);
 #ifdef EDM_ML_DEBUG
     G4VPhysicalVolume* vol = aStep->GetPreStepPoint()->GetTouchable()->GetVolume(0);
@@ -318,7 +351,17 @@ void MuonSensitiveDetector::updateHit(const G4Step* aStep) {
 
 void MuonSensitiveDetector::saveHit() {
   if (theHit) {
-    if (acceptHit(theHit->detUnitId())) {
+    const bool accepted = acceptHit(theHit->detUnitId());
+    if (debugMuonHits_ && std::abs(theHit->particleType()) == 13) {
+      const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+      std::cout << "[FixedTargetMuonDebug][MuonSD] event=" << (event ? event->GetEventID() : -1)
+                << " stage=save-psimhit detector=" << GetName() << " track_id=" << theHit->trackId()
+                << " pdg_id=" << theHit->particleType() << " det_unit_id=" << theHit->detUnitId()
+                << " energy_loss_GeV=" << theHit->energyLoss() << " accepted=" << accepted << std::endl;
+      if (accepted)
+        ++debugMuonSavedHits_;
+    }
+    if (accepted) {
       if (printHits_) {
         thePrinter->startNewSimHit(detector->name());
         thePrinter->printId(theHit->detUnitId());
@@ -332,7 +375,16 @@ void MuonSensitiveDetector::saveHit() {
   }
 }
 
-void MuonSensitiveDetector::EndOfEvent(G4HCofThisEvent*) { saveHit(); }
+void MuonSensitiveDetector::EndOfEvent(G4HCofThisEvent*) {
+  saveHit();
+  if (debugMuonHits_) {
+    const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+    std::cout << "[FixedTargetMuonDebug][MuonSD] event=" << (event ? event->GetEventID() : -1)
+              << " stage=event-summary detector=" << GetName() << " muon_sensitive_steps=" << debugMuonSteps_
+              << " muon_positive_edep_steps=" << debugMuonPositiveEdepSteps_
+              << " muon_saved_psimhits=" << debugMuonSavedHits_ << std::endl;
+  }
+}
 
 void MuonSensitiveDetector::fillHits(edm::PSimHitContainer& cc, const std::string& hname) {
   if (slaveMuon->name() == hname) {
