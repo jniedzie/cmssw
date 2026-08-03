@@ -7,6 +7,27 @@ def customise(process):
     return addShiftMuonSegments(process)
 
 
+def customiseKeepShiftTruth(process):
+    """Retain generator and simulation truth needed for SHIFT hit attribution."""
+    truth_commands = (
+        "keep edmHepMCProduct_generator_*_*",
+        "keep SimTracks_g4SimHits_*_*",
+        "keep SimVertexs_g4SimHits_*_*",
+        "keep PSimHits_g4SimHits_*_*",
+        "keep *_mix_MergedTrackTruth_*",
+        "keep TrackingParticles_mix_MergedTrackTruth_*",
+        "keep TrackingVertexs_mix_MergedTrackTruth_*",
+    )
+    for output in process.outputModules_().values():
+        if not hasattr(output, "outputCommands"):
+            continue
+        existing = set(output.outputCommands)
+        for command in truth_commands:
+            if command not in existing:
+                output.outputCommands.append(command)
+    return process
+
+
 def customiseRecoDebug(process):
     """Run the reconstruction-funnel diagnostic on a dedicated end path."""
     from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegmentsCounter
@@ -32,6 +53,53 @@ def customiseRecoDebug(process):
     return process
 
 
+def customiseTraversingShiftMuonReco(process):
+    """Add parallel cosmic-style through-going muon and tracker reconstruction."""
+    from RecoMuon.MuonSeedGenerator.CosmicMuonSeedProducer_cfi import CosmicMuonSeed
+    from RecoMuon.CosmicMuonProducer.cosmicMuons_cfi import cosmicMuons
+
+    process.shiftCosmicMuonSeed = CosmicMuonSeed.clone(
+        ForcePointDown=False,
+        KeepAllSegments=True,
+        MaxCSCChi2=1000.0,
+        MaxDTChi2=1000.0,
+    )
+    process.shiftCosmicMuons = cosmicMuons.clone(
+        MuonSeedCollectionLabel="shiftCosmicMuonSeed",
+        TrajectoryBuilderParameters=dict(
+            BuildTraversingMuon=False,
+            Strict1Leg=False,
+        ),
+    )
+    process.shiftTraversingMuons = cosmicMuons.clone(
+        MuonSeedCollectionLabel="shiftCosmicMuonSeed",
+        TrajectoryBuilderParameters=dict(
+            BuildTraversingMuon=True,
+            Strict1Leg=False,
+        ),
+    )
+    process.shiftTraversingMuon_step = cms.Path(
+        process.shiftCosmicMuonSeed
+        + process.shiftCosmicMuons
+        + process.shiftTraversingMuons
+    )
+    if hasattr(process, "schedule"):
+        process.schedule.append(process.shiftTraversingMuon_step)
+    else:
+        raise RuntimeError("Cannot attach traversing Shift muon reconstruction: no process schedule")
+
+    keep_commands = (
+        "keep *_shiftCosmicMuonSeed_*_*",
+        "keep *_shiftCosmicMuons_*_*",
+        "keep *_shiftTraversingMuons_*_*",
+        "keep *_generalTracks_*_*",
+    )
+    for output in process.outputModules_().values():
+        if hasattr(output, "outputCommands"):
+            output.outputCommands.extend(keep_commands)
+    return process
+
+
 def customiseRecoForShiftMuons(
     process,
     numberOfSigma=5.0,
@@ -50,6 +118,8 @@ def customiseRecoForShiftMuons(
     builder.BWFilterParameters.NumberOfSigma = numberOfSigma
     builder.FilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
     builder.BWFilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
+    builder.FilterParameters.EnableGEMMeasurement = True
+    builder.BWFilterParameters.EnableGEMMeasurement = True
     builder.SeedPosition = seedPosition
     builder.DoBackwardFilter = doBackwardFilter
     builder.NavigationType = navigationType

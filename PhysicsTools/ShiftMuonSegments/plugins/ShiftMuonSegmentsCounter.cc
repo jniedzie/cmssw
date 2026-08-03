@@ -12,10 +12,15 @@
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrajectorySeed/interface/TrajectorySeedCollection.h"
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
+#include "SimDataFormats/Vertex/interface/SimVertexContainer.h"
 
+#include <array>
 #include <cmath>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 namespace {
   template <typename T>
@@ -36,6 +41,16 @@ public:
         gemSegments_(consumes<GEMSegmentCollection>(p.getParameter<edm::InputTag>("gemSegments"))),
         seeds_(consumes<TrajectorySeedCollection>(p.getParameter<edm::InputTag>("dsaSeeds"))),
         tracks_(consumes<reco::TrackCollection>(p.getParameter<edm::InputTag>("dsaTracks"))),
+        cosmicTracks_(consumes<reco::TrackCollection>(p.getParameter<edm::InputTag>("cosmicTracks"))),
+        traversingTracks_(consumes<reco::TrackCollection>(p.getParameter<edm::InputTag>("traversingTracks"))),
+        cosmicTrackerTracks_(
+            consumes<reco::TrackCollection>(p.getParameter<edm::InputTag>("cosmicTrackerTracks"))),
+        simTracks_(consumes<edm::SimTrackContainer>(p.getParameter<edm::InputTag>("simTracks"))),
+        simVertices_(consumes<edm::SimVertexContainer>(p.getParameter<edm::InputTag>("simVertices"))),
+        dtSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("dtSimHits"))),
+        cscSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("cscSimHits"))),
+        rpcSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("rpcSimHits"))),
+        gemSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("gemSimHits"))),
         printDetails_(p.getParameter<bool>("printDetails")) {}
 
   void analyze(edm::Event const& event, edm::EventSetup const&) override {
@@ -48,6 +63,15 @@ public:
     auto gemSegments = event.getHandle(gemSegments_);
     auto seeds = event.getHandle(seeds_);
     auto tracks = event.getHandle(tracks_);
+    auto cosmicTracks = event.getHandle(cosmicTracks_);
+    auto traversingTracks = event.getHandle(traversingTracks_);
+    auto cosmicTrackerTracks = event.getHandle(cosmicTrackerTracks_);
+    auto simTracks = event.getHandle(simTracks_);
+    auto simVertices = event.getHandle(simVertices_);
+    auto dtSimHits = event.getHandle(dtSimHits_);
+    auto cscSimHits = event.getHandle(cscSimHits_);
+    auto rpcSimHits = event.getHandle(rpcSimHits_);
+    auto gemSimHits = event.getHandle(gemSimHits_);
 
     edm::LogPrint("ShiftMuonRecoDebug")
         << "[ShiftMuonRecoDebug][summary] run=" << event.id().run() << " lumi=" << event.luminosityBlock()
@@ -55,10 +79,46 @@ public:
         << " dtSegments=" << sizeOrMissing(dtSegments) << " cscRecHits=" << sizeOrMissing(cscHits)
         << " cscSegments=" << sizeOrMissing(cscSegments) << " rpcRecHits=" << sizeOrMissing(rpcHits)
         << " gemRecHits=" << sizeOrMissing(gemHits) << " gemSegments=" << sizeOrMissing(gemSegments)
-        << " dsaSeeds=" << sizeOrMissing(seeds) << " dsaTracks=" << sizeOrMissing(tracks);
+        << " dsaSeeds=" << sizeOrMissing(seeds) << " dsaTracks=" << sizeOrMissing(tracks)
+        << " cosmicTracks=" << sizeOrMissing(cosmicTracks)
+        << " traversingTracks=" << sizeOrMissing(traversingTracks)
+        << " cosmicTrackerTracks=" << sizeOrMissing(cosmicTrackerTracks)
+        << " simTracks=" << sizeOrMissing(simTracks) << " simVertices=" << sizeOrMissing(simVertices)
+        << " dtSimHits=" << sizeOrMissing(dtSimHits) << " cscSimHits=" << sizeOrMissing(cscSimHits)
+        << " rpcSimHits=" << sizeOrMissing(rpcSimHits) << " gemSimHits=" << sizeOrMissing(gemSimHits);
 
     if (!printDetails_)
       return;
+
+    std::unordered_map<unsigned int, std::array<unsigned int, 4>> muonHitCounts;
+    auto countSimHits = [&muonHitCounts](auto const& handle, unsigned int detectorIndex) {
+      if (!handle.isValid())
+        return;
+      for (auto const& hit : *handle)
+        ++muonHitCounts[hit.trackId()][detectorIndex];
+    };
+    countSimHits(dtSimHits, 0);
+    countSimHits(cscSimHits, 1);
+    countSimHits(rpcSimHits, 2);
+    countSimHits(gemSimHits, 3);
+    if (simTracks.isValid()) {
+      for (auto const& simTrack : *simTracks) {
+        if (std::abs(simTrack.type()) != 13)
+          continue;
+        double vertexZ = -999999.;
+        if (simVertices.isValid() && simTrack.vertIndex() >= 0 &&
+            static_cast<std::size_t>(simTrack.vertIndex()) < simVertices->size())
+          vertexZ = (*simVertices)[simTrack.vertIndex()].position().z();
+        auto const counts = muonHitCounts[simTrack.trackId()];
+        edm::LogPrint("ShiftMuonRecoDebug")
+            << "[ShiftMuonRecoDebug][SimMuon] event=" << event.id().event()
+            << " trackId=" << simTrack.trackId() << " type=" << simTrack.type()
+            << " vertIndex=" << simTrack.vertIndex() << " vertexZ=" << vertexZ
+            << " pt=" << simTrack.momentum().pt() << " eta=" << simTrack.momentum().eta()
+            << " phi=" << simTrack.momentum().phi() << " dtHits=" << counts[0]
+            << " cscHits=" << counts[1] << " rpcHits=" << counts[2] << " gemHits=" << counts[3];
+      }
+    }
     if (dtSegments.isValid())
       for (auto const& segment : *dtSegments) {
         auto id = segment.chamberId();
@@ -147,6 +207,15 @@ private:
   edm::EDGetTokenT<GEMSegmentCollection> gemSegments_;
   edm::EDGetTokenT<TrajectorySeedCollection> seeds_;
   edm::EDGetTokenT<reco::TrackCollection> tracks_;
+  edm::EDGetTokenT<reco::TrackCollection> cosmicTracks_;
+  edm::EDGetTokenT<reco::TrackCollection> traversingTracks_;
+  edm::EDGetTokenT<reco::TrackCollection> cosmicTrackerTracks_;
+  edm::EDGetTokenT<edm::SimTrackContainer> simTracks_;
+  edm::EDGetTokenT<edm::SimVertexContainer> simVertices_;
+  edm::EDGetTokenT<edm::PSimHitContainer> dtSimHits_;
+  edm::EDGetTokenT<edm::PSimHitContainer> cscSimHits_;
+  edm::EDGetTokenT<edm::PSimHitContainer> rpcSimHits_;
+  edm::EDGetTokenT<edm::PSimHitContainer> gemSimHits_;
   bool printDetails_;
 };
 
