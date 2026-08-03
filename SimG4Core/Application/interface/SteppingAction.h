@@ -59,6 +59,7 @@ private:
   bool m_CMStoZDCtransport;
   bool hasWatcher;
   bool dd4hep_;
+  bool debugMuonTracking_;
 
   std::vector<double> maxTrackTimes, ekinMins;
   std::vector<std::string> maxTimeNames, ekinNames, ekinParticles;
