@@ -13,6 +13,7 @@
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrajectorySeed/interface/TrajectorySeedCollection.h"
 
+#include <cmath>
 #include <sstream>
 #include <string>
 
@@ -108,10 +109,26 @@ public:
     if (tracks.isValid()) {
       unsigned index = 0;
       for (auto const& track : *tracks) {
+        auto const& innerPosition = track.innerPosition();
+        auto const& innerMomentum = track.innerMomentum();
+        double const transverseMomentum2 = innerMomentum.x() * innerMomentum.x() +
+                                           innerMomentum.y() * innerMomentum.y();
+        double linePcaZ = innerPosition.z();
+        double linePcaR = innerPosition.rho();
+        if (transverseMomentum2 > 0.) {
+          double const scale = -(innerPosition.x() * innerMomentum.x() +
+                                 innerPosition.y() * innerMomentum.y()) /
+                               transverseMomentum2;
+          double const linePcaX = innerPosition.x() + scale * innerMomentum.x();
+          double const linePcaY = innerPosition.y() + scale * innerMomentum.y();
+          linePcaZ += scale * innerMomentum.z();
+          linePcaR = std::hypot(linePcaX, linePcaY);
+        }
         edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][DSAtrack] event=" << event.id().event() << " index=" << index++
             << " pt=" << track.pt() << " eta=" << track.eta() << " phi=" << track.phi()
             << " vx=" << track.vx() << " vy=" << track.vy() << " vz=" << track.vz()
+            << " linePcaR=" << linePcaR << " linePcaZ=" << linePcaZ
             << " innerR=" << track.innerPosition().rho() << " innerZ=" << track.innerPosition().z()
             << " outerR=" << track.outerPosition().rho() << " outerZ=" << track.outerPosition().z()
             << " validHits=" << track.numberOfValidHits() << " lostHits=" << track.numberOfLostHits()
