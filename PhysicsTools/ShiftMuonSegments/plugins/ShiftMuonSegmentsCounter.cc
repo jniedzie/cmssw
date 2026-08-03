@@ -8,10 +8,10 @@
 #include "DataFormats/DTRecHit/interface/DTRecSegment4DCollection.h"
 #include "DataFormats/GEMRecHit/interface/GEMRecHitCollection.h"
 #include "DataFormats/GEMRecHit/interface/GEMSegmentCollection.h"
-#include "DataFormats/MuonSeed/interface/L2MuonTrajectorySeedCollection.h"
 #include "DataFormats/RPCRecHit/interface/RPCRecHitCollection.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/TrajectorySeed/interface/TrajectorySeedCollection.h"
 
 #include <sstream>
 #include <string>
@@ -33,7 +33,7 @@ public:
         rpcHits_(consumes<RPCRecHitCollection>(p.getParameter<edm::InputTag>("rpcRecHits"))),
         gemHits_(consumes<GEMRecHitCollection>(p.getParameter<edm::InputTag>("gemRecHits"))),
         gemSegments_(consumes<GEMSegmentCollection>(p.getParameter<edm::InputTag>("gemSegments"))),
-        seeds_(consumes<L2MuonTrajectorySeedCollection>(p.getParameter<edm::InputTag>("dsaSeeds"))),
+        seeds_(consumes<TrajectorySeedCollection>(p.getParameter<edm::InputTag>("dsaSeeds"))),
         tracks_(consumes<reco::TrackCollection>(p.getParameter<edm::InputTag>("dsaTracks"))),
         printDetails_(p.getParameter<bool>("printDetails")) {}
 
@@ -127,7 +127,7 @@ private:
   edm::EDGetTokenT<RPCRecHitCollection> rpcHits_;
   edm::EDGetTokenT<GEMRecHitCollection> gemHits_;
   edm::EDGetTokenT<GEMSegmentCollection> gemSegments_;
-  edm::EDGetTokenT<L2MuonTrajectorySeedCollection> seeds_;
+  edm::EDGetTokenT<TrajectorySeedCollection> seeds_;
   edm::EDGetTokenT<reco::TrackCollection> tracks_;
   bool printDetails_;
 };
