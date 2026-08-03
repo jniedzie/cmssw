@@ -111,6 +111,7 @@ public:
         edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][DSAtrack] event=" << event.id().event() << " index=" << index++
             << " pt=" << track.pt() << " eta=" << track.eta() << " phi=" << track.phi()
+            << " vx=" << track.vx() << " vy=" << track.vy() << " vz=" << track.vz()
             << " innerR=" << track.innerPosition().rho() << " innerZ=" << track.innerPosition().z()
             << " outerR=" << track.outerPosition().rho() << " outerZ=" << track.outerPosition().z()
             << " validHits=" << track.numberOfValidHits() << " lostHits=" << track.numberOfLostHits()
