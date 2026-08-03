@@ -48,7 +48,7 @@ public:
     auto seeds = event.getHandle(seeds_);
     auto tracks = event.getHandle(tracks_);
 
-    edm::LogVerbatim("ShiftMuonRecoDebug")
+    edm::LogPrint("ShiftMuonRecoDebug")
         << "[ShiftMuonRecoDebug][summary] run=" << event.id().run() << " lumi=" << event.luminosityBlock()
         << " event=" << event.id().event() << " dtRecHits=" << sizeOrMissing(dtHits)
         << " dtSegments=" << sizeOrMissing(dtSegments) << " cscRecHits=" << sizeOrMissing(cscHits)
@@ -62,7 +62,7 @@ public:
       for (auto const& segment : *dtSegments) {
         auto id = segment.chamberId();
         auto direction = segment.localDirection();
-        edm::LogVerbatim("ShiftMuonRecoDebug")
+        edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][DTsegment] event=" << event.id().event() << " rawId=" << id.rawId()
             << " wheel=" << id.wheel() << " station=" << id.station() << " sector=" << id.sector()
             << " nHits=" << segment.recHits().size() << " chi2=" << segment.chi2()
@@ -72,7 +72,7 @@ public:
       for (auto const& segment : *cscSegments) {
         auto id = segment.cscDetId();
         auto direction = segment.localDirection();
-        edm::LogVerbatim("ShiftMuonRecoDebug")
+        edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][CSCsegment] event=" << event.id().event() << " rawId=" << id.rawId()
             << " endcap=" << id.endcap() << " station=" << id.station() << " ring=" << id.ring()
             << " chamber=" << id.chamber() << " nHits=" << segment.nRecHits() << " chi2=" << segment.chi2()
@@ -81,7 +81,7 @@ public:
     if (rpcHits.isValid())
       for (auto const& hit : *rpcHits) {
         auto id = hit.rpcId();
-        edm::LogVerbatim("ShiftMuonRecoDebug")
+        edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][RPChit] event=" << event.id().event() << " rawId=" << id.rawId()
             << " region=" << id.region() << " station=" << id.station() << " sector=" << id.sector()
             << " layer=" << id.layer() << " bx=" << hit.BunchX() << " time=" << hit.time();
@@ -90,16 +90,25 @@ public:
       for (auto const& segment : *gemSegments) {
         auto id = segment.gemDetId();
         auto direction = segment.localDirection();
-        edm::LogVerbatim("ShiftMuonRecoDebug")
+        edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][GEMsegment] event=" << event.id().event() << " rawId=" << id.rawId()
             << " region=" << id.region() << " station=" << id.station() << " ring=" << id.ring()
             << " chamber=" << id.chamber() << " nHits=" << segment.nRecHits() << " chi2=" << segment.chi2()
             << " direction=(" << direction.x() << ',' << direction.y() << ',' << direction.z() << ')';
       }
+    if (seeds.isValid()) {
+      unsigned index = 0;
+      for (auto const& seed : *seeds) {
+        edm::LogPrint("ShiftMuonRecoDebug")
+            << "[ShiftMuonRecoDebug][DSAseed] event=" << event.id().event() << " index=" << index++
+            << " nHits=" << seed.nHits() << " detId=" << seed.startingState().detId()
+            << " direction=" << static_cast<int>(seed.direction());
+      }
+    }
     if (tracks.isValid()) {
       unsigned index = 0;
       for (auto const& track : *tracks) {
-        edm::LogVerbatim("ShiftMuonRecoDebug")
+        edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][DSAtrack] event=" << event.id().event() << " index=" << index++
             << " pt=" << track.pt() << " eta=" << track.eta() << " phi=" << track.phi()
             << " innerR=" << track.innerPosition().rho() << " innerZ=" << track.innerPosition().z()
