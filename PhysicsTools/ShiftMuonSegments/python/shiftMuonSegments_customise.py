@@ -32,11 +32,13 @@ def customiseRecoDebug(process):
     return process
 
 
-def customiseRecoForShiftMuons(process, numberOfSigma=5.0):
-    """First isolated DSA trial: relax only measurement compatibility."""
+def customiseRecoForShiftMuons(process, numberOfSigma=5.0, maxHitChi2=100.0):
+    """Tune explicitly selected DSA cuts, keeping each trial reproducible."""
     if not hasattr(process, "displacedStandAloneMuons"):
         raise RuntimeError("Cannot tune Shift DSA reconstruction: displacedStandAloneMuons is absent")
     builder = process.displacedStandAloneMuons.STATrajBuilderParameters
     builder.FilterParameters.NumberOfSigma = numberOfSigma
     builder.BWFilterParameters.NumberOfSigma = numberOfSigma
+    builder.FilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
+    builder.BWFilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
     return process
