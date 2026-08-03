@@ -39,7 +39,8 @@ def customiseRecoForShiftMuons(
     seedPosition="in",
     doBackwardFilter=True,
     keepAllSeedSegments=True,
-    navigationType="Direct",
+    navigationType="Standard",
+    pcaPropagator="SteppingHelixPropagatorAny",
 ):
     """Tune explicitly selected DSA cuts, keeping each trial reproducible."""
     if not hasattr(process, "displacedStandAloneMuons"):
@@ -59,4 +60,5 @@ def customiseRecoForShiftMuons(
     # when propagation to the PCA fails outside the tracker; retain it using
     # its geometrically innermost state, as done for cosmic-muon tracks.
     process.displacedStandAloneMuons.TrackLoaderParameters.AllowNoVertex = cms.untracked.bool(True)
+    process.displacedStandAloneMuons.TrackLoaderParameters.MuonUpdatorAtVertexParameters.Propagator = pcaPropagator
     return process
