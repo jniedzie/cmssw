@@ -45,6 +45,7 @@ private:
   int endPrintTrackID_;
   bool checkTrack_;
   bool debugMuonTracking_;
+  bool debugMuonPrimaryFates_;
   bool doFineCalo_;
   bool saveCaloBoundaryInformation_;
   double ekinMin_;
