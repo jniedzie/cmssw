@@ -129,6 +129,7 @@ private:
   double theMaxDTChi2;
   double theMaxCSCChi2;
   bool theForcePointDownFlag;
+  bool theKeepAllSegmentsFlag;
   edm::ESHandle<MuonDetLayerGeometry> theMuonLayers;
   edm::ESHandle<MagneticField> theField;
   edm::ESGetToken<MuonDetLayerGeometry, MuonRecoGeometryRecord> muonLayersToken;

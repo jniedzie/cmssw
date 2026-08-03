@@ -12,6 +12,7 @@
 #include "RecoMuon/StandAloneTrackFinder/interface/StandAloneTrajectoryBuilder.h"
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/Framework/interface/Event.h"
 #include "DataFormats/TrajectorySeed/interface/TrajectorySeed.h"
 #include "DataFormats/TrajectoryState/interface/PTrajectoryStateOnDet.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
@@ -105,6 +106,7 @@ StandAloneMuonTrajectoryBuilder::StandAloneMuonTrajectoryBuilder(const Parameter
 }
 
 void StandAloneMuonTrajectoryBuilder::setEvent(const edm::Event& event) {
+  debugEventNumber_ = event.id().event();
   theFilter->setEvent(event);
   if (doBackwardFilter)
     theBWFilter->setEvent(event);
@@ -175,6 +177,18 @@ MuonTrajectoryBuilder::TrajectoryContainer StandAloneMuonTrajectoryBuilder::traj
 
   // the trajectory is filled in the refitter::refit
   filter()->refit(inputFromSeed.second, inputFromSeed.first, trajectoryFW);
+
+  edm::LogPrint("ShiftDSABuilder")
+      << "[ShiftDSABuilder][forward] event=" << debugEventNumber_ << " seedDetId=" << lastDetId.rawId()
+      << " seedPosition=" << (theSeedPosition == recoMuon::in ? "in" : "out")
+      << " empty=" << trajectoryFW.empty() << " foundHits=" << trajectoryFW.foundHits()
+      << " usedTotal=" << filter()->getTotalChamberUsed() << " usedDT=" << filter()->getDTChamberUsed()
+      << " usedCSC=" << filter()->getCSCChamberUsed() << " usedRPC=" << filter()->getRPCChamberUsed()
+      << " compatibleTotal=" << filter()->getTotalCompatibleChambers()
+      << " compatibleDT=" << filter()->getDTCompatibleChambers()
+      << " compatibleCSC=" << filter()->getCSCCompatibleChambers()
+      << " compatibleRPC=" << filter()->getRPCCompatibleChambers() << " goodState=" << filter()->goodState()
+      << " compatibilitySatisfied=" << filter()->isCompatibilitySatisfied();
 
   // "0th order" check...
   if (trajectoryFW.empty()) {
@@ -286,6 +300,17 @@ MuonTrajectoryBuilder::TrajectoryContainer StandAloneMuonTrajectoryBuilder::traj
 
   // FIXME! under check!
   bwfilter()->refit(tsosAfterRefit, filter()->lastDetLayer(), trajectoryBW);
+
+  edm::LogPrint("ShiftDSABuilder")
+      << "[ShiftDSABuilder][backward] event=" << debugEventNumber_ << " seedDetId=" << lastDetId.rawId()
+      << " empty=" << trajectoryBW.empty() << " foundHits=" << trajectoryBW.foundHits()
+      << " usedTotal=" << bwfilter()->getTotalChamberUsed() << " usedDT=" << bwfilter()->getDTChamberUsed()
+      << " usedCSC=" << bwfilter()->getCSCChamberUsed() << " usedRPC=" << bwfilter()->getRPCChamberUsed()
+      << " compatibleTotal=" << bwfilter()->getTotalCompatibleChambers()
+      << " compatibleDT=" << bwfilter()->getDTCompatibleChambers()
+      << " compatibleCSC=" << bwfilter()->getCSCCompatibleChambers()
+      << " compatibleRPC=" << bwfilter()->getRPCCompatibleChambers() << " goodState=" << bwfilter()->goodState()
+      << " compatibilitySatisfied=" << bwfilter()->isCompatibilitySatisfied();
 
   // Get the last TSOS
   TrajectoryStateOnSurface tsosAfterBWRefit = bwfilter()->lastUpdatedTSOS();
