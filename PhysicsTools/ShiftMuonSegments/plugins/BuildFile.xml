@@ -5,6 +5,9 @@
 <use name="DataFormats/MuonSeed"/>
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/TrajectorySeed"/>
+<use name="SimDataFormats/Track"/>
+<use name="SimDataFormats/TrackingHit"/>
+<use name="SimDataFormats/Vertex"/>
 <use name="DataFormats/NanoAOD"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
