@@ -59,8 +59,6 @@ private:
   DetLayerWithState propagateTheSeedTSOS(TrajectoryStateOnSurface& aTSOS, DetId& aDetId);
 
 private:
-  unsigned long long debugEventNumber_ = 0;
-
   /// Navigation type
   /// "Direct","Standard"
   std::string theNavigationType;

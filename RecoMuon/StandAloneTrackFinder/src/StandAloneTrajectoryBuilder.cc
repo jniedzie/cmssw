@@ -39,6 +39,10 @@
 using namespace edm;
 using namespace std;
 
+namespace {
+  thread_local unsigned long long shiftDebugEventNumber = 0;
+}
+
 StandAloneMuonTrajectoryBuilder::StandAloneMuonTrajectoryBuilder(const ParameterSet& par,
                                                                  const MuonServiceProxy* service,
                                                                  edm::ConsumesCollector& iC)
@@ -106,7 +110,7 @@ StandAloneMuonTrajectoryBuilder::StandAloneMuonTrajectoryBuilder(const Parameter
 }
 
 void StandAloneMuonTrajectoryBuilder::setEvent(const edm::Event& event) {
-  debugEventNumber_ = event.id().event();
+  shiftDebugEventNumber = event.id().event();
   theFilter->setEvent(event);
   if (doBackwardFilter)
     theBWFilter->setEvent(event);
@@ -179,7 +183,7 @@ MuonTrajectoryBuilder::TrajectoryContainer StandAloneMuonTrajectoryBuilder::traj
   filter()->refit(inputFromSeed.second, inputFromSeed.first, trajectoryFW);
 
   edm::LogPrint("ShiftDSABuilder")
-      << "[ShiftDSABuilder][forward] event=" << debugEventNumber_ << " seedDetId=" << lastDetId.rawId()
+      << "[ShiftDSABuilder][forward] event=" << shiftDebugEventNumber << " seedDetId=" << lastDetId.rawId()
       << " seedPosition=" << (theSeedPosition == recoMuon::in ? "in" : "out")
       << " empty=" << trajectoryFW.empty() << " foundHits=" << trajectoryFW.foundHits()
       << " usedTotal=" << filter()->getTotalChamberUsed() << " usedDT=" << filter()->getDTChamberUsed()
@@ -302,7 +306,7 @@ MuonTrajectoryBuilder::TrajectoryContainer StandAloneMuonTrajectoryBuilder::traj
   bwfilter()->refit(tsosAfterRefit, filter()->lastDetLayer(), trajectoryBW);
 
   edm::LogPrint("ShiftDSABuilder")
-      << "[ShiftDSABuilder][backward] event=" << debugEventNumber_ << " seedDetId=" << lastDetId.rawId()
+      << "[ShiftDSABuilder][backward] event=" << shiftDebugEventNumber << " seedDetId=" << lastDetId.rawId()
       << " empty=" << trajectoryBW.empty() << " foundHits=" << trajectoryBW.foundHits()
       << " usedTotal=" << bwfilter()->getTotalChamberUsed() << " usedDT=" << bwfilter()->getDTChamberUsed()
       << " usedCSC=" << bwfilter()->getCSCChamberUsed() << " usedRPC=" << bwfilter()->getRPCChamberUsed()

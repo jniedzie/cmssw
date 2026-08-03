@@ -39,6 +39,7 @@ def customiseRecoForShiftMuons(
     seedPosition="in",
     doBackwardFilter=True,
     keepAllSeedSegments=True,
+    navigationType="Direct",
 ):
     """Tune explicitly selected DSA cuts, keeping each trial reproducible."""
     if not hasattr(process, "displacedStandAloneMuons"):
@@ -50,5 +51,12 @@ def customiseRecoForShiftMuons(
     builder.BWFilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
     builder.SeedPosition = seedPosition
     builder.DoBackwardFilter = doBackwardFilter
+    builder.NavigationType = navigationType
     process.displacedMuonSeeds.KeepAllSegments = keepAllSeedSegments
+
+    # SHIFT muons originate far outside CMS and need not extrapolate to the
+    # beam line.  The default standalone loader rejects a valid trajectory
+    # when propagation to the PCA fails outside the tracker; retain it using
+    # its geometrically innermost state, as done for cosmic-muon tracks.
+    process.displacedStandAloneMuons.TrackLoaderParameters.AllowNoVertex = cms.untracked.bool(True)
     return process
