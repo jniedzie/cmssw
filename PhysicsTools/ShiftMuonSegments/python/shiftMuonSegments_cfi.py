@@ -17,6 +17,10 @@ shiftMuonTable = cms.EDProducer(
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),
     maxDuplicateLineDistance=cms.double(30.0),
+    minAbsOriginZ=cms.double(2000.0),
+    originTransverseResolution=cms.double(100.0),
+    originZResolution=cms.double(2000.0),
+    requireOppositeSign=cms.bool(True),
     maxGenDeltaR=cms.double(0.5),
 )
 shiftMuonSegmentsCounter = cms.EDAnalyzer(

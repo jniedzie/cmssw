@@ -130,6 +130,9 @@ private:
   double theMaxCSCChi2;
   double theSingleSegmentPt;
   double theMinPairPt;
+  double thePairSegmentPt;
+  bool theUsePairPtEstimate;
+  bool theTryBothPairCharges;
   bool theForcePointDownFlag;
   bool theKeepAllSegmentsFlag;
   edm::ESHandle<MuonDetLayerGeometry> theMuonLayers;
