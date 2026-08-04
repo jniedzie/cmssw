@@ -2,11 +2,17 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexFitter.h"
+#include "RecoVertex/VertexPrimitives/interface/TransientVertex.h"
+#include "TrackingTools/Records/interface/TransientTrackRecord.h"
+#include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
 
 #include <algorithm>
 #include <array>
@@ -76,6 +82,14 @@ namespace {
     return {std::hypot(position.x() + scale * momentum.x(), position.y() + scale * momentum.y()),
             position.z() + scale * momentum.z()};
   }
+
+  double shiftDirectionSign(reco::Track const& track) {
+    // Orient the track from its reconstructed beam-axis crossing toward CMS.
+    // A source at +z must have pz<0, while a source at -z must have pz>0.
+    // The line PCA is reconstructed information and is available on data.
+    double const sourceZ = transverseLinePca(track).second;
+    return sourceZ * track.pz() > 0. ? -1. : 1.;
+  }
 }  // namespace
 
 class ShiftMuonTableProducer : public edm::stream::EDProducer<> {
@@ -86,15 +100,17 @@ public:
         traversingToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("traversingTracks"))),
         genParticlesToken_(
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
+        transientTrackBuilderToken_(esConsumes(edm::ESInputTag("", "TransientTrackBuilder"))),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
         maxDuplicateLineDistance_(parameters.getParameter<double>("maxDuplicateLineDistance")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
     produces<nanoaod::FlatTable>();
+    produces<nanoaod::FlatTable>("ShiftDimuonVertex");
   }
 
-  void produce(edm::Event& event, edm::EventSetup const&) override {
+  void produce(edm::Event& event, edm::EventSetup const& setup) override {
     auto const dsa = event.getHandle(dsaToken_);
     auto const cosmic = event.getHandle(cosmicToken_);
     auto const traversing = event.getHandle(traversingToken_);
@@ -152,6 +168,7 @@ public:
     // block cannot affect reconstruction or the duplicate decision, and an
     // absent collection (as in collision data) leaves every index at -1.
     std::vector<int> genPartIdx(selected.size(), -1);
+    std::vector<float> genPartDeltaR(selected.size(), -1.f);
     if (genParticles.isValid()) {
       struct Match {
         double deltaR;
@@ -168,35 +185,47 @@ public:
           if (deltaR < maxGenDeltaR_)
             matches.push_back({deltaR, selectedIndex, genIndex});
         }
-      std::sort(matches.begin(), matches.end(), [](Match const& first, Match const& second) {
-        return first.deltaR < second.deltaR;
-      });
-      std::vector<bool> usedGen(genParticles->size(), false);
+      // This is a diagnostic association, not part of reconstruction.  Allow
+      // several reconstructed candidates to reference the same primary muon;
+      // one-to-one assignment hid overlaps by leaving all but one at -1.
       for (auto const& match : matches)
-        if (genPartIdx[match.selectedIndex] < 0 && !usedGen[match.genIndex]) {
+        if (genPartIdx[match.selectedIndex] < 0 || match.deltaR < genPartDeltaR[match.selectedIndex]) {
           genPartIdx[match.selectedIndex] = match.genIndex;
-          usedGen[match.genIndex] = true;
+          genPartDeltaR[match.selectedIndex] = match.deltaR;
         }
     }
 
     std::vector<float> pt, eta, phi, mass, p, px, py, pz, ptError, etaError, phiError, vx, vy, vz, dxy,
         dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ;
-    std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits;
+    std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits,
+        directionFlipped, inferredSourceSide;
     for (auto const* candidate : selected) {
       auto const& track = *candidate->track;
       auto const [pcaR, pcaZ] = transverseLinePca(track);
+      // Cosmic-style fits do not determine which way along the fitted helix
+      // the particle travelled.  Orient it from the inferred source side
+      // toward CMS, supporting both +z and -z SHIFT locations without truth.
+      double const sign = shiftDirectionSign(track);
+      bool const flip = sign < 0.;
+      double const storedPx = sign * track.px();
+      double const storedPy = sign * track.py();
+      double const storedPz = sign * track.pz();
       pt.push_back(track.pt());
-      eta.push_back(track.eta());
-      phi.push_back(track.phi());
+      eta.push_back(sign * track.eta());
+      phi.push_back(std::atan2(storedPy, storedPx));
       mass.push_back(0.105658f);
       p.push_back(track.p());
-      px.push_back(track.px());
-      py.push_back(track.py());
-      pz.push_back(track.pz());
+      px.push_back(storedPx);
+      py.push_back(storedPy);
+      pz.push_back(storedPz);
       ptError.push_back(track.ptError());
       etaError.push_back(track.etaError());
       phiError.push_back(track.phiError());
-      charge.push_back(track.charge());
+      // Momentum and charge are the simultaneous two-fold ambiguity of a
+      // no-timing cosmic-style helix fit.  Reverse both to preserve curvature.
+      charge.push_back(sign * track.charge());
+      directionFlipped.push_back(flip);
+      inferredSourceSide.push_back((pcaZ > 0.) - (pcaZ < 0.));
       vx.push_back(track.vx());
       vy.push_back(track.vy());
       vz.push_back(track.vz());
@@ -232,6 +261,10 @@ public:
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
     table->addColumn<int>("charge", charge, "electric charge");
+    table->addColumn<int>("directionFlipped", directionFlipped,
+                          "1 when momentum and charge were reversed to point from inferred source toward CMS");
+    table->addColumn<int>("inferredSourceSide", inferredSourceSide,
+                          "sign of reconstructed linePcaZ: -1=-z source, +1=+z source");
     table->addColumn<float>("vx", vx, "track reference-point x");
     table->addColumn<float>("vy", vy, "track reference-point y");
     table->addColumn<float>("vz", vz, "track reference-point z");
@@ -253,7 +286,88 @@ public:
     table->addColumn<int>("source", source, "0=DSA, 1=traversing, 2=cosmic");
     table->addColumn<int>("sourceIndex", sourceIndex, "index in the source track collection");
     table->addColumn<int>("genPartIdx", genPartIdx, "index in GenPart, or -1 when unmatched or on data");
+    table->addColumn<float>("genPartDeltaR", genPartDeltaR,
+                            "direction-ambiguous deltaR to matched GenPart, or -1 when unmatched/on data");
     event.put(std::move(table));
+
+    // Fit every cleaned pair directly from its retained source tracks.  The
+    // resulting indices always refer to ShiftMuon rows and therefore do not
+    // depend on keeping any of the input collections in NanoAOD.
+    std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
+    std::vector<float> vertexX, vertexY, vertexZ, vertexXError, vertexYError, vertexZError,
+        vertexChi2, vertexNdof, vertexNormalizedChi2, vertexMass, vertexPt, vertexEta, vertexPhi;
+    auto const& builder = setup.getData(transientTrackBuilderToken_);
+    KalmanVertexFitter vertexFitter(true, true);
+    constexpr double muonMass = 0.105658;
+    for (unsigned int first = 0; first < selected.size(); ++first) {
+      for (unsigned int second = first + 1; second < selected.size(); ++second) {
+        std::vector<reco::TransientTrack> transientTracks{
+            builder.build(selected[first]->track), builder.build(selected[second]->track)};
+        TransientVertex const vertex = vertexFitter.vertex(transientTracks);
+        if (!vertex.isValid())
+          continue;
+        reco::Vertex const persistentVertex(vertex);
+
+        auto canonicalMomentum = [](reco::Track const& track) {
+          double const sign = shiftDirectionSign(track);
+          return std::array<double, 3>{sign * track.px(), sign * track.py(), sign * track.pz()};
+        };
+        auto const firstP = canonicalMomentum(*selected[first]->track);
+        auto const secondP = canonicalMomentum(*selected[second]->track);
+        double const pairPx = firstP[0] + secondP[0];
+        double const pairPy = firstP[1] + secondP[1];
+        double const pairPz = firstP[2] + secondP[2];
+        double const firstEnergy = std::sqrt(selected[first]->track->p() * selected[first]->track->p() +
+                                             muonMass * muonMass);
+        double const secondEnergy = std::sqrt(selected[second]->track->p() * selected[second]->track->p() +
+                                              muonMass * muonMass);
+        double const mass2 = std::pow(firstEnergy + secondEnergy, 2) -
+                             pairPx * pairPx - pairPy * pairPy - pairPz * pairPz;
+        double const pairPt = std::hypot(pairPx, pairPy);
+
+        vertexMuonIdx1.push_back(first);
+        vertexMuonIdx2.push_back(second);
+        int const firstCharge = shiftDirectionSign(*selected[first]->track) * selected[first]->track->charge();
+        int const secondCharge = shiftDirectionSign(*selected[second]->track) * selected[second]->track->charge();
+        vertexIsOS.push_back(firstCharge != secondCharge);
+        vertexX.push_back(vertex.position().x());
+        vertexY.push_back(vertex.position().y());
+        vertexZ.push_back(vertex.position().z());
+        vertexXError.push_back(persistentVertex.xError());
+        vertexYError.push_back(persistentVertex.yError());
+        vertexZError.push_back(persistentVertex.zError());
+        vertexChi2.push_back(vertex.totalChiSquared());
+        vertexNdof.push_back(vertex.degreesOfFreedom());
+        vertexNormalizedChi2.push_back(vertex.degreesOfFreedom() > 0.
+                                           ? vertex.totalChiSquared() / vertex.degreesOfFreedom()
+                                           : std::numeric_limits<float>::infinity());
+        vertexMass.push_back(std::sqrt(std::max(0., mass2)));
+        vertexPt.push_back(pairPt);
+        vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
+                                       : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
+        vertexPhi.push_back(std::atan2(pairPy, pairPx));
+      }
+    }
+
+    auto vertexTable =
+        std::make_unique<nanoaod::FlatTable>(vertexMuonIdx1.size(), "ShiftDimuonVertex", false, false);
+    vertexTable->addColumn<int>("muonIdx1", vertexMuonIdx1, "index of first muon in ShiftMuon");
+    vertexTable->addColumn<int>("muonIdx2", vertexMuonIdx2, "index of second muon in ShiftMuon");
+    vertexTable->addColumn<int>("isOS", vertexIsOS, "1 for an opposite-sign pair");
+    vertexTable->addColumn<float>("x", vertexX, "Kalman vertex x");
+    vertexTable->addColumn<float>("y", vertexY, "Kalman vertex y");
+    vertexTable->addColumn<float>("z", vertexZ, "Kalman vertex z");
+    vertexTable->addColumn<float>("xErr", vertexXError, "Kalman vertex x uncertainty");
+    vertexTable->addColumn<float>("yErr", vertexYError, "Kalman vertex y uncertainty");
+    vertexTable->addColumn<float>("zErr", vertexZError, "Kalman vertex z uncertainty");
+    vertexTable->addColumn<float>("chi2", vertexChi2, "Kalman vertex chi2");
+    vertexTable->addColumn<float>("ndof", vertexNdof, "Kalman vertex degrees of freedom");
+    vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "Kalman vertex chi2 divided by ndof");
+    vertexTable->addColumn<float>("mass", vertexMass, "dimuon invariant mass using canonical SHIFT directions");
+    vertexTable->addColumn<float>("pt", vertexPt, "dimuon transverse momentum");
+    vertexTable->addColumn<float>("eta", vertexEta, "dimuon pseudorapidity");
+    vertexTable->addColumn<float>("phi", vertexPhi, "dimuon azimuthal angle");
+    event.put(std::move(vertexTable), "ShiftDimuonVertex");
   }
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
@@ -275,6 +389,7 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> cosmicToken_;
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
+  edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> transientTrackBuilderToken_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
