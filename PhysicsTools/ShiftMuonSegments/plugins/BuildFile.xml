@@ -9,6 +9,8 @@
 <use name="SimDataFormats/TrackingHit"/>
 <use name="SimDataFormats/Vertex"/>
 <use name="DataFormats/NanoAOD"/>
+<use name="DataFormats/HepMCCandidate"/>
+<use name="DataFormats/GeometryVector"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/MessageLogger"/>
