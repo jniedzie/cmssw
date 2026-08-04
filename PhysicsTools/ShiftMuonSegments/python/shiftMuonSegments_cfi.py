@@ -7,6 +7,18 @@ shiftMuonSegments = cms.EDProducer(
     rpcRecHits=cms.InputTag("rpcRecHits"),
     gemSegments=cms.InputTag("gemSegments"),
 )
+shiftMuonTable = cms.EDProducer(
+    "ShiftMuonTableProducer",
+    dsaTracks=cms.InputTag("displacedStandAloneMuons"),
+    cosmicTracks=cms.InputTag("shiftCosmicMuons"),
+    traversingTracks=cms.InputTag("shiftTraversingMuons"),
+    genParticles=cms.InputTag("finalGenParticles"),
+    minSharedHitFraction=cms.double(0.5),
+    minSharedDetIds=cms.uint32(2),
+    maxDuplicateAngle=cms.double(0.03),
+    maxDuplicateLineDistance=cms.double(30.0),
+    maxGenDeltaR=cms.double(0.5),
+)
 shiftMuonSegmentsCounter = cms.EDAnalyzer(
     "ShiftMuonSegmentsCounter",
     dtRecHits=cms.InputTag("dt1DRecHits"),

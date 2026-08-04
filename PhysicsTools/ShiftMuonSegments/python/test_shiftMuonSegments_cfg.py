@@ -1,6 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
-from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegments, shiftMuonSegmentsCounter
+from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegments, shiftMuonSegmentsCounter, shiftMuonTable
 
 options = VarParsing("analysis")
 options.register("inputFile", "file:events_AOD.root", VarParsing.multiplicity.singleton, VarParsing.varType.string, "AOD input file")
@@ -18,7 +18,8 @@ process.MessageLogger = cms.Service(
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEvents))
 process.source = cms.Source("PoolSource", fileNames=cms.untracked.vstring(options.inputFile))
 process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
+process.shiftMuonTable = shiftMuonTable.clone()
 process.shiftMuonSegmentsTable = shiftMuonSegments.clone()
-process.p = cms.Path(process.shiftMuonSegmentsCounter + process.shiftMuonSegmentsTable)
+process.p = cms.Path(process.shiftMuonSegmentsCounter + process.shiftMuonTable + process.shiftMuonSegmentsTable)
 process.out = cms.OutputModule("PoolOutputModule", fileName=cms.untracked.string(options.outputFile), SelectEvents=cms.untracked.PSet(SelectEvents=cms.vstring("p")))
 process.end = cms.EndPath(process.out)
