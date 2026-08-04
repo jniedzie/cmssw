@@ -128,6 +128,8 @@ private:
   /// the maximum chi2 required for dt and csc rechits
   double theMaxDTChi2;
   double theMaxCSCChi2;
+  double theSingleSegmentPt;
+  double theMinPairPt;
   bool theForcePointDownFlag;
   bool theKeepAllSegmentsFlag;
   edm::ESHandle<MuonDetLayerGeometry> theMuonLayers;
