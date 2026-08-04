@@ -1,3 +1,4 @@
+#include "CommonTools/Statistics/interface/ChiSquaredProbability.h"
 #include "DataFormats/NanoAOD/interface/FlatTable.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/TrackReco/interface/Track.h"
@@ -9,9 +10,20 @@
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
-#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexFitter.h"
+#include "MagneticField/Engine/interface/MagneticField.h"
+#include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanSmoothedVertexChi2Estimator.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanTrackToTrackCovCalculator.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexTrackUpdator.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexUpdator.h"
+#include "RecoVertex/LinearizationPointFinders/interface/FsmwLinearizationPointFinder.h"
 #include "RecoVertex/VertexPrimitives/interface/TransientVertex.h"
+#include "RecoVertex/VertexTools/interface/LinearizedTrackStateFactory.h"
+#include "RecoVertex/VertexTools/interface/SequentialVertexFitter.h"
+#include "RecoVertex/VertexTools/interface/SequentialVertexSmoother.h"
+#include "TrackingTools/PatternTools/interface/TwoTrackMinimumDistance.h"
 #include "TrackingTools/Records/interface/TransientTrackRecord.h"
+#include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
 #include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
 
 #include <algorithm>
@@ -101,6 +113,7 @@ public:
         genParticlesToken_(
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
         transientTrackBuilderToken_(esConsumes(edm::ESInputTag("", "TransientTrackBuilder"))),
+        magneticFieldToken_(esConsumes<MagneticField, IdealMagneticFieldRecord>()),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
@@ -294,16 +307,59 @@ public:
     // resulting indices always refer to ShiftMuon rows and therefore do not
     // depend on keeping any of the input collections in NanoAOD.
     std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
+    std::vector<int> vertexDcaStatus;
     std::vector<float> vertexX, vertexY, vertexZ, vertexXError, vertexYError, vertexZError,
-        vertexChi2, vertexNdof, vertexNormalizedChi2, vertexMass, vertexPt, vertexEta, vertexPhi;
+        vertexChi2, vertexNdof, vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi,
+        vertexDca, vertexDcaX, vertexDcaY, vertexDcaZ;
     auto const& builder = setup.getData(transientTrackBuilderToken_);
-    KalmanVertexFitter vertexFitter(true, true);
+    auto const& magneticField = setup.getData(magneticFieldToken_);
+    edm::ParameterSet vertexParameters;
+    vertexParameters.addParameter<double>("maxDistance", 0.01);
+    vertexParameters.addParameter<int>("maxNbrOfIterations", 100);
+    KalmanVertexTrackUpdator<5> vertexTrackUpdator;
+    KalmanSmoothedVertexChi2Estimator<5> vertexChi2Estimator;
+    KalmanTrackToTrackCovCalculator<5> covarianceCalculator;
+    SequentialVertexSmoother<5> vertexSmoother(vertexTrackUpdator, vertexChi2Estimator, covarianceCalculator);
+    SequentialVertexFitter<5> vertexFitter(vertexParameters,
+                                           FsmwLinearizationPointFinder(20, -2., 0.4, 10.),
+                                           KalmanVertexUpdator<5>(),
+                                           vertexSmoother,
+                                           LinearizedTrackStateFactory());
+    // The standard fitter rejects vertices outside either the tracker or,
+    // with its DSA option, |z|<960 cm muon-system bounds.  SHIFT production
+    // is around |z|=14800 cm, so retain the Kalman algorithm but remove this
+    // detector-size acceptance restriction.
+    vertexFitter.setTrackerBounds(1.e6, 1.e6);
     constexpr double muonMass = 0.105658;
     for (unsigned int first = 0; first < selected.size(); ++first) {
       for (unsigned int second = first + 1; second < selected.size(); ++second) {
         std::vector<reco::TransientTrack> transientTracks{
             builder.build(selected[first]->track), builder.build(selected[second]->track)};
-        TransientVertex const vertex = vertexFitter.vertex(transientTracks);
+        TwoTrackMinimumDistance minimumDistance;
+        FreeTrajectoryState firstState(GlobalPoint(selected[first]->track->vx(),
+                                                   selected[first]->track->vy(),
+                                                   selected[first]->track->vz()),
+                                       GlobalVector(selected[first]->track->px(),
+                                                    selected[first]->track->py(),
+                                                    selected[first]->track->pz()),
+                                       selected[first]->track->charge(),
+                                       &magneticField);
+        FreeTrajectoryState secondState(GlobalPoint(selected[second]->track->vx(),
+                                                    selected[second]->track->vy(),
+                                                    selected[second]->track->vz()),
+                                        GlobalVector(selected[second]->track->px(),
+                                                     selected[second]->track->py(),
+                                                     selected[second]->track->pz()),
+                                        selected[second]->track->charge(),
+                                        &magneticField);
+        bool const dcaIsValid = minimumDistance.calculate(firstState, secondState);
+        auto const dcaCrossingPoint = dcaIsValid ? minimumDistance.crossingPoint() : GlobalPoint();
+        double const fallbackZ = 0.5 * (transverseLinePca(*selected[first]->track).second +
+                                        transverseLinePca(*selected[second]->track).second);
+        GlobalPoint const linearizationPoint = dcaIsValid ? dcaCrossingPoint : GlobalPoint(0., 0., fallbackZ);
+        // This overload uses the supplied point only for linearization; it is
+        // not a positional prior or beam-spot constraint.
+        TransientVertex const vertex = vertexFitter.vertex(transientTracks, linearizationPoint);
         if (!vertex.isValid())
           continue;
         reco::Vertex const persistentVertex(vertex);
@@ -341,6 +397,14 @@ public:
         vertexNormalizedChi2.push_back(vertex.degreesOfFreedom() > 0.
                                            ? vertex.totalChiSquared() / vertex.degreesOfFreedom()
                                            : std::numeric_limits<float>::infinity());
+        vertexProbability.push_back(vertex.degreesOfFreedom() > 0.
+                                        ? ChiSquaredProbability(vertex.totalChiSquared(), vertex.degreesOfFreedom())
+                                        : 0.f);
+        vertexDcaStatus.push_back(dcaIsValid);
+        vertexDca.push_back(dcaIsValid ? minimumDistance.distance() : -1.f);
+        vertexDcaX.push_back(dcaIsValid ? dcaCrossingPoint.x() : 0.f);
+        vertexDcaY.push_back(dcaIsValid ? dcaCrossingPoint.y() : 0.f);
+        vertexDcaZ.push_back(dcaIsValid ? dcaCrossingPoint.z() : 0.f);
         vertexMass.push_back(std::sqrt(std::max(0., mass2)));
         vertexPt.push_back(pairPt);
         vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
@@ -363,6 +427,12 @@ public:
     vertexTable->addColumn<float>("chi2", vertexChi2, "Kalman vertex chi2");
     vertexTable->addColumn<float>("ndof", vertexNdof, "Kalman vertex degrees of freedom");
     vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "Kalman vertex chi2 divided by ndof");
+    vertexTable->addColumn<float>("probability", vertexProbability, "Kalman vertex chi2 probability");
+    vertexTable->addColumn<int>("dcaValid", vertexDcaStatus, "1 when the two-track DCA calculation succeeded");
+    vertexTable->addColumn<float>("dca", vertexDca, "three-dimensional distance of closest approach");
+    vertexTable->addColumn<float>("dcaX", vertexDcaX, "x of the two-track closest-approach crossing point");
+    vertexTable->addColumn<float>("dcaY", vertexDcaY, "y of the two-track closest-approach crossing point");
+    vertexTable->addColumn<float>("dcaZ", vertexDcaZ, "z of the two-track closest-approach crossing point");
     vertexTable->addColumn<float>("mass", vertexMass, "dimuon invariant mass using canonical SHIFT directions");
     vertexTable->addColumn<float>("pt", vertexPt, "dimuon transverse momentum");
     vertexTable->addColumn<float>("eta", vertexEta, "dimuon pseudorapidity");
@@ -390,6 +460,7 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
   edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> transientTrackBuilderToken_;
+  edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
