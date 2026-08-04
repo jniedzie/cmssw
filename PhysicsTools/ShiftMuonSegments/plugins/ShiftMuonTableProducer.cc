@@ -16,17 +16,45 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 namespace {
+  struct HitFingerprint {
+    uint32_t detId;
+    float localX;
+    float localY;
+  };
+
   struct Candidate {
     reco::Track const* track;
     int source;
     unsigned int sourceIndex;
     std::unordered_set<uint32_t> hitDetIds;
+    std::vector<HitFingerprint> hitFingerprints;
   };
+
+  void appendHitFingerprints(TrackingRecHit const& hit, std::vector<HitFingerprint>& result) {
+    auto const components = hit.recHits();
+    if (!components.empty()) {
+      for (auto const* component : components)
+        if (component && component->isValid())
+          appendHitFingerprints(*component, result);
+      return;
+    }
+    auto const position = hit.localPosition();
+    result.push_back({hit.rawId(), position.x(), position.y()});
+  }
+
+  std::vector<HitFingerprint> hitFingerprints(reco::Track const& track) {
+    std::vector<HitFingerprint> result;
+    for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit)
+      if ((*hit)->isValid())
+        appendHitFingerprints(**hit, result);
+    return result;
+  }
 
   std::unordered_set<uint32_t> validHitDetIds(reco::Track const& track) {
     std::unordered_set<uint32_t> result;
@@ -49,8 +77,7 @@ namespace {
       return std::abs(value);
     };
     double const direct = std::hypot(track.eta() - particle.eta(), deltaPhi(track.phi(), particle.phi()));
-    double const reverse =
-        std::hypot(track.eta() + particle.eta(), deltaPhi(track.phi() + M_PI, particle.phi()));
+    double const reverse = std::hypot(track.eta() + particle.eta(), deltaPhi(track.phi() + M_PI, particle.phi()));
     return std::min(direct, reverse);
   }
 
@@ -99,6 +126,74 @@ namespace {
     double distance;
   };
 
+  struct CommonLineVertex {
+    bool valid = false;
+    GlobalPoint position;
+    std::array<double, 3> error{{0., 0., 0.}};
+    double chi2 = 0.;
+    double ndof = 3.;
+  };
+
+  bool invertSymmetric3x3(std::array<std::array<double, 3>, 3> const& matrix,
+                          std::array<std::array<double, 3>, 3>& inverse) {
+    double const a = matrix[0][0], b = matrix[0][1], c = matrix[0][2];
+    double const d = matrix[1][1], e = matrix[1][2], f = matrix[2][2];
+    double const determinant = a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d);
+    if (!std::isfinite(determinant) || std::abs(determinant) < 1.e-18)
+      return false;
+    inverse = {{{(d * f - e * e) / determinant, (c * e - b * f) / determinant, (b * e - c * d) / determinant},
+                {(c * e - b * f) / determinant, (a * f - c * c) / determinant, (b * c - a * e) / determinant},
+                {(b * e - c * d) / determinant, (b * c - a * e) / determinant, (a * d - b * b) / determinant}}};
+    return true;
+  }
+
+  CommonLineVertex commonLineVertex(reco::Track const& first,
+                                    reco::Track const& second,
+                                    double lineResolution,
+                                    double beamLineResolution) {
+    // Minimise the distances to the two unbounded track lines together with
+    // a loose x=y=0 target-line prior.  Unlike TransientTrack propagation,
+    // this analytic fit has no detector-volume boundary at |z|~10 m.
+    std::array<std::array<double, 3>, 3> normal{};
+    std::array<double, 3> rhs{};
+    double const lineWeight = 1. / (lineResolution * lineResolution);
+    for (auto const* track : {&first, &second}) {
+      auto const point = track->innerPosition();
+      auto const direction = track->innerMomentum().unit();
+      std::array<double, 3> const p{{point.x(), point.y(), point.z()}};
+      std::array<double, 3> const u{{direction.x(), direction.y(), direction.z()}};
+      for (unsigned int row = 0; row < 3; ++row)
+        for (unsigned int column = 0; column < 3; ++column) {
+          double const projector = (row == column ? 1. : 0.) - u[row] * u[column];
+          normal[row][column] += lineWeight * projector;
+          rhs[row] += lineWeight * projector * p[column];
+        }
+    }
+    double const beamWeight = 1. / (beamLineResolution * beamLineResolution);
+    normal[0][0] += beamWeight;
+    normal[1][1] += beamWeight;
+    std::array<std::array<double, 3>, 3> covariance{};
+    if (!invertSymmetric3x3(normal, covariance))
+      return {};
+    std::array<double, 3> fitted{};
+    for (unsigned int row = 0; row < 3; ++row)
+      for (unsigned int column = 0; column < 3; ++column)
+        fitted[row] += covariance[row][column] * rhs[column];
+    if (!std::isfinite(fitted[0]) || !std::isfinite(fitted[1]) || !std::isfinite(fitted[2]))
+      return {};
+    GlobalPoint const position(fitted[0], fitted[1], fitted[2]);
+    double chi2 = (fitted[0] * fitted[0] + fitted[1] * fitted[1]) * beamWeight;
+    for (auto const* track : {&first, &second})
+      chi2 += std::pow(pointLineDistance(reco::Track::Point(fitted[0], fitted[1], fitted[2]), *track), 2) * lineWeight;
+    return {true,
+            position,
+            {{std::sqrt(std::max(0., covariance[0][0])),
+              std::sqrt(std::max(0., covariance[1][1])),
+              std::sqrt(std::max(0., covariance[2][2]))}},
+            chi2,
+            3.};
+  }
+
   StraightLineApproach straightLineApproach(reco::Track const& first, reco::Track const& second) {
     auto const firstPoint = first.innerPosition();
     auto const secondPoint = second.innerPosition();
@@ -115,10 +210,8 @@ namespace {
                                  0.5 * (firstPca.z() + secondPca.z()));
       return {true, midpoint, (firstPca - secondPca).R()};
     }
-    double const firstScale = (dot * secondDirection.Dot(separation) - firstDirection.Dot(separation)) /
-                              denominator;
-    double const secondScale = (secondDirection.Dot(separation) - dot * firstDirection.Dot(separation)) /
-                               denominator;
+    double const firstScale = (dot * secondDirection.Dot(separation) - firstDirection.Dot(separation)) / denominator;
+    double const secondScale = (secondDirection.Dot(separation) - dot * firstDirection.Dot(separation)) / denominator;
     auto const firstClosest = firstPoint + firstScale * firstDirection;
     auto const secondClosest = secondPoint + secondScale * secondDirection;
     GlobalPoint const midpoint(0.5 * (firstClosest.x() + secondClosest.x()),
@@ -142,8 +235,14 @@ public:
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
         maxDuplicateLineDistance_(parameters.getParameter<double>("maxDuplicateLineDistance")),
         minAbsOriginZ_(parameters.getParameter<double>("minAbsOriginZ")),
+        maxOriginR_(parameters.getParameter<double>("maxOriginR")),
         originTransverseResolution_(parameters.getParameter<double>("originTransverseResolution")),
         originZResolution_(parameters.getParameter<double>("originZResolution")),
+        commonVertexLineResolution_(parameters.getParameter<double>("commonVertexLineResolution")),
+        commonVertexBeamLineResolution_(parameters.getParameter<double>("commonVertexBeamLineResolution")),
+        maxPairOriginNormalizedChi2_(parameters.getParameter<double>("maxPairOriginNormalizedChi2")),
+        maxPairDca_(parameters.getParameter<double>("maxPairDca")),
+        maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
     produces<nanoaod::FlatTable>();
@@ -162,7 +261,7 @@ public:
         return;
       unsigned int index = 0;
       for (auto const& track : *handle) {
-        candidates.push_back({&track, source, index++, validHitDetIds(track)});
+        candidates.push_back({&track, source, index++, validHitDetIds(track), hitFingerprints(track)});
       }
     };
     // Lower source values have precedence.  MC studies show that DSA gives
@@ -178,7 +277,8 @@ public:
     candidates.erase(std::remove_if(candidates.begin(),
                                     candidates.end(),
                                     [this](Candidate const& candidate) {
-                                      return std::abs(transverseLinePca(*candidate.track).second) < minAbsOriginZ_;
+                                      auto const [originR, originZ] = transverseLinePca(*candidate.track);
+                                      return std::abs(originZ) < minAbsOriginZ_ || originR > maxOriginR_;
                                     }),
                      candidates.end());
 
@@ -197,21 +297,71 @@ public:
       auto const smallerHitSet = std::min(first.hitDetIds.size(), second.hitDetIds.size());
       bool const sharedHits = smallerHitSet > 0 && shared >= minSharedDetIds_ &&
                               static_cast<double>(shared) / smallerHitSet >= minSharedHitFraction_;
+      unsigned int sharedInputs = 0;
+      for (auto const& firstHit : first.hitFingerprints) {
+        bool sharesThisHit = false;
+        for (auto const& secondHit : second.hitFingerprints)
+          if (firstHit.detId == secondHit.detId &&
+              std::hypot(firstHit.localX - secondHit.localX, firstHit.localY - secondHit.localY) < 0.1) {
+            sharesThisHit = true;
+            break;
+          }
+        sharedInputs += sharesThisHit;
+      }
+      auto const smallerRecHitSet = std::min(first.hitFingerprints.size(), second.hitFingerprints.size());
+      bool const exactSharedInputs = smallerRecHitSet > 0 && sharedInputs >= minSharedDetIds_ &&
+                                     static_cast<double>(sharedInputs) / smallerRecHitSet >= minSharedHitFraction_;
       bool const sameLine = directionAngle(*first.track, *second.track) < maxDuplicateAngle_ &&
                             symmetricLineDistance(*first.track, *second.track) < maxDuplicateLineDistance_;
-      return sharedHits || sameLine;
+      return exactSharedInputs || sharedHits || sameLine;
     };
 
-    std::vector<Candidate const*> selected;
-    for (auto const& candidate : candidates) {
-      bool overlaps = false;
-      for (auto const* retained : selected)
-        if (duplicates(candidate, *retained)) {
-          overlaps = true;
-          break;
+    // Collapse complete connected components rather than applying an
+    // order-dependent greedy veto.  This handles A<->B<->C duplicate chains
+    // even when the two endpoint fits narrowly fail the direct comparison.
+    std::vector<unsigned int> parent(candidates.size());
+    std::iota(parent.begin(), parent.end(), 0);
+    auto findRoot = [&parent](unsigned int index) {
+      while (parent[index] != index) {
+        parent[index] = parent[parent[index]];
+        index = parent[index];
+      }
+      return index;
+    };
+    for (unsigned int first = 0; first < candidates.size(); ++first)
+      for (unsigned int second = first + 1; second < candidates.size(); ++second)
+        if (duplicates(candidates[first], candidates[second])) {
+          unsigned int const firstRoot = findRoot(first);
+          unsigned int const secondRoot = findRoot(second);
+          if (firstRoot != secondRoot)
+            parent[secondRoot] = firstRoot;
         }
-      if (!overlaps)
-        selected.push_back(&candidate);
+
+    std::vector<std::vector<unsigned int>> groups(candidates.size());
+    for (unsigned int index = 0; index < candidates.size(); ++index)
+      groups[findRoot(index)].push_back(index);
+    auto betterRepresentative = [&candidates](unsigned int first, unsigned int second) {
+      auto const& a = candidates[first];
+      auto const& b = candidates[second];
+      if (a.source != b.source)
+        return a.source < b.source;
+      if (a.track->hitPattern().muonStationsWithValidHits() != b.track->hitPattern().muonStationsWithValidHits())
+        return a.track->hitPattern().muonStationsWithValidHits() > b.track->hitPattern().muonStationsWithValidHits();
+      if (a.track->numberOfValidHits() != b.track->numberOfValidHits())
+        return a.track->numberOfValidHits() > b.track->numberOfValidHits();
+      return a.track->normalizedChi2() < b.track->normalizedChi2();
+    };
+    std::vector<Candidate const*> selected;
+    std::vector<unsigned int> duplicateGroupSize;
+    for (auto const& group : groups) {
+      if (group.empty())
+        continue;
+      unsigned int representative = group.front();
+      for (auto const member : group)
+        if (betterRepresentative(member, representative))
+          representative = member;
+      selected.push_back(&candidates[representative]);
+      duplicateGroupSize.push_back(group.size());
     }
 
     // All primary muons in an event share the target side.  Use the most
@@ -263,11 +413,10 @@ public:
         }
     }
 
-    std::vector<float> pt, eta, phi, mass, p, px, py, pz, ptError, etaError, phiError, vx, vy, vz,
-        trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2,
-        linePcaR, linePcaZ;
-    std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits,
-        directionFlipped, inferredSourceSide, chargeMatchesGen;
+    std::vector<float> pt, eta, phi, mass, p, px, py, pz, ptError, etaError, phiError, vx, vy, vz, trackVx, trackVy,
+        trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ;
+    std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
+        inferredSourceSide, chargeMatchesGen;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -342,12 +491,14 @@ public:
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
     table->addColumn<int>("charge", charge, "electric charge");
-    table->addColumn<int>("chargeMatchesGen", chargeMatchesGen,
+    table->addColumn<int>("chargeMatchesGen",
+                          chargeMatchesGen,
                           "MC diagnostic: 1/0 if charge agrees/disagrees with matched GenPart, -1 on data/unmatched");
-    table->addColumn<int>("directionFlipped", directionFlipped,
+    table->addColumn<int>("directionFlipped",
+                          directionFlipped,
                           "1 when momentum and charge were reversed to point from inferred source toward CMS");
-    table->addColumn<int>("inferredSourceSide", inferredSourceSide,
-                          "sign of reconstructed linePcaZ: -1=-z source, +1=+z source");
+    table->addColumn<int>(
+        "inferredSourceSide", inferredSourceSide, "sign of reconstructed linePcaZ: -1=-z source, +1=+z source");
     table->addColumn<float>("vx", vx, "estimated origin x at straight-line transverse PCA");
     table->addColumn<float>("vy", vy, "estimated origin y at straight-line transverse PCA");
     table->addColumn<float>("vz", vz, "estimated origin z at straight-line transverse PCA");
@@ -371,9 +522,12 @@ public:
     table->addColumn<int>("nLostHits", lostHits, "number of lost track hits");
     table->addColumn<int>("source", source, "0=DSA, 1=traversing, 2=cosmic");
     table->addColumn<int>("sourceIndex", sourceIndex, "index in the source track collection");
+    table->addColumn<unsigned int>("duplicateGroupSize",
+                                   duplicateGroupSize,
+                                   "number of transitive input-track duplicates represented by this row");
     table->addColumn<int>("genPartIdx", genPartIdx, "index in GenPart, or -1 when unmatched or on data");
-    table->addColumn<float>("genPartDeltaR", genPartDeltaR,
-                            "direction-ambiguous deltaR to matched GenPart, or -1 when unmatched/on data");
+    table->addColumn<float>(
+        "genPartDeltaR", genPartDeltaR, "direction-ambiguous deltaR to matched GenPart, or -1 when unmatched/on data");
     event.put(std::move(table));
 
     // Fit every cleaned pair directly from its retained source tracks.  The
@@ -382,117 +536,171 @@ public:
     std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
     std::vector<int> vertexDcaStatus, vertexKalmanAttempted, vertexKalmanValid, vertexUsesLineFallback,
         vertexSameGenMuon, vertexGenIsOS;
-    std::vector<float> vertexX, vertexY, vertexZ, vertexXError, vertexYError, vertexZError,
-        vertexChi2, vertexNdof, vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi,
-        vertexDca, vertexDcaX, vertexDcaY, vertexDcaZ;
+    std::vector<float> vertexX, vertexY, vertexZ, vertexXError, vertexYError, vertexZError, vertexChi2, vertexNdof,
+        vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi, vertexDca, vertexDcaX,
+        vertexDcaY, vertexDcaZ, vertexOriginCompatibilityChi2, vertexOriginCompatibilityNormalizedChi2;
     constexpr double muonMass = 0.105658;
+
+    struct PairChoice {
+      unsigned int first;
+      unsigned int second;
+      StraightLineApproach approach;
+      CommonLineVertex fit;
+      double originChi2;
+      double score;
+    };
+    std::vector<PairChoice> pairChoices;
     for (unsigned int first = 0; first < selected.size(); ++first) {
       for (unsigned int second = first + 1; second < selected.size(); ++second) {
         auto const lineApproach = straightLineApproach(*selected[first]->track, *selected[second]->track);
-        if (!lineApproach.valid)
+        if (!lineApproach.valid || lineApproach.distance > maxPairDca_)
           continue;
 
-        int const firstCharge = shiftDirectionSign(*selected[first]->track, eventSourceSide) *
-                                selected[first]->track->charge();
-        int const secondCharge = shiftDirectionSign(*selected[second]->track, eventSourceSide) *
-                                 selected[second]->track->charge();
+        int const firstCharge =
+            shiftDirectionSign(*selected[first]->track, eventSourceSide) * selected[first]->track->charge();
+        int const secondCharge =
+            shiftDirectionSign(*selected[second]->track, eventSourceSide) * selected[second]->track->charge();
         if (requireOppositeSign_ && firstCharge == secondCharge)
           continue;
 
-        auto canonicalMomentum = [eventSourceSide](reco::Track const& track) {
-          double const sign = shiftDirectionSign(track, eventSourceSide);
-          return std::array<double, 3>{sign * track.px(), sign * track.py(), sign * track.pz()};
-        };
-        auto const firstP = canonicalMomentum(*selected[first]->track);
-        auto const secondP = canonicalMomentum(*selected[second]->track);
-        double const pairPx = firstP[0] + secondP[0];
-        double const pairPy = firstP[1] + secondP[1];
-        double const pairPz = firstP[2] + secondP[2];
-        double const firstEnergy = std::sqrt(selected[first]->track->p() * selected[first]->track->p() +
-                                             muonMass * muonMass);
-        double const secondEnergy = std::sqrt(selected[second]->track->p() * selected[second]->track->p() +
-                                              muonMass * muonMass);
-        double const mass2 = std::pow(firstEnergy + secondEnergy, 2) -
-                             pairPx * pairPx - pairPy * pairPy - pairPz * pairPz;
-        double const pairPt = std::hypot(pairPx, pairPy);
-
-        vertexMuonIdx1.push_back(first);
-        vertexMuonIdx2.push_back(second);
-        vertexIsOS.push_back(firstCharge != secondCharge);
-        int sameGenMuon = -1;
-        int genIsOS = -1;
-        if (genParticles.isValid() && genPartIdx[first] >= 0 && genPartIdx[second] >= 0) {
-          sameGenMuon = genPartIdx[first] == genPartIdx[second];
-          int const firstGenPdgId = (*genParticles)[genPartIdx[first]].pdgId();
-          int const secondGenPdgId = (*genParticles)[genPartIdx[second]].pdgId();
-          genIsOS = firstGenPdgId * secondGenPdgId < 0;
-        }
-        vertexSameGenMuon.push_back(sameGenMuon);
-        vertexGenIsOS.push_back(genIsOS);
         auto const firstOrigin = transverseLinePcaPoint(*selected[first]->track);
         auto const secondOrigin = transverseLinePcaPoint(*selected[second]->track);
-        GlobalPoint const storedPosition(0.5 * (firstOrigin.x() + secondOrigin.x()),
-                                         0.5 * (firstOrigin.y() + secondOrigin.y()),
-                                         0.5 * (firstOrigin.z() + secondOrigin.z()));
+        // A physical SHIFT pair must point back to the same side.  This is a
+        // reconstruction-only condition and prevents +z/-z averages near 0.
+        if (firstOrigin.z() * secondOrigin.z() <= 0.)
+          continue;
         double const deltaX = firstOrigin.x() - secondOrigin.x();
         double const deltaY = firstOrigin.y() - secondOrigin.y();
         double const deltaZ = firstOrigin.z() - secondOrigin.z();
-        double const geometricChi2 =
-            (deltaX * deltaX + deltaY * deltaY) /
-                (2. * originTransverseResolution_ * originTransverseResolution_) +
+        double const originChi2 =
+            (deltaX * deltaX + deltaY * deltaY) / (2. * originTransverseResolution_ * originTransverseResolution_) +
             deltaZ * deltaZ / (2. * originZResolution_ * originZResolution_);
-        constexpr double geometricNdof = 3.;
-        vertexKalmanAttempted.push_back(0);
-        vertexKalmanValid.push_back(0);
-        vertexUsesLineFallback.push_back(1);
-        vertexX.push_back(storedPosition.x());
-        vertexY.push_back(storedPosition.y());
-        vertexZ.push_back(storedPosition.z());
-        vertexXError.push_back(originTransverseResolution_ / std::sqrt(2.));
-        vertexYError.push_back(originTransverseResolution_ / std::sqrt(2.));
-        vertexZError.push_back(originZResolution_ / std::sqrt(2.));
-        vertexChi2.push_back(geometricChi2);
-        vertexNdof.push_back(geometricNdof);
-        vertexNormalizedChi2.push_back(geometricChi2 / geometricNdof);
-        vertexProbability.push_back(ChiSquaredProbability(geometricChi2, geometricNdof));
-        vertexDcaStatus.push_back(lineApproach.valid);
-        vertexDca.push_back(lineApproach.valid ? lineApproach.distance : -1.f);
-        vertexDcaX.push_back(lineApproach.valid ? lineApproach.midpoint.x() : 0.f);
-        vertexDcaY.push_back(lineApproach.valid ? lineApproach.midpoint.y() : 0.f);
-        vertexDcaZ.push_back(lineApproach.valid ? lineApproach.midpoint.z() : 0.f);
-        vertexMass.push_back(std::sqrt(std::max(0., mass2)));
-        vertexPt.push_back(pairPt);
-        vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
-                                       : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
-        vertexPhi.push_back(std::atan2(pairPy, pairPx));
+        constexpr double originNdof = 3.;
+        if (originChi2 / originNdof > maxPairOriginNormalizedChi2_)
+          continue;
+        auto const fit = commonLineVertex(*selected[first]->track,
+                                          *selected[second]->track,
+                                          commonVertexLineResolution_,
+                                          commonVertexBeamLineResolution_);
+        if (!fit.valid || std::abs(fit.position.z()) < minAbsOriginZ_ || fit.position.perp() > maxOriginR_)
+          continue;
+        double const score = originChi2 / originNdof +
+                             std::pow(lineApproach.distance / commonVertexLineResolution_, 2) + fit.chi2 / fit.ndof;
+        pairChoices.push_back({first, second, lineApproach, fit, originChi2, score});
       }
     }
+    std::stable_sort(pairChoices.begin(), pairChoices.end(), [](PairChoice const& first, PairChoice const& second) {
+      return first.score < second.score;
+    });
 
-    auto vertexTable =
-        std::make_unique<nanoaod::FlatTable>(vertexMuonIdx1.size(), "ShiftDimuonVertex", false, false);
+    std::vector<bool> muonAlreadyUsed(selected.size(), false);
+    unsigned int retainedVertices = 0;
+    for (auto const& choice : pairChoices) {
+      unsigned int const first = choice.first;
+      unsigned int const second = choice.second;
+      if (muonAlreadyUsed[first] || muonAlreadyUsed[second])
+        continue;
+      if (maxDimuonVertices_ > 0 && retainedVertices >= maxDimuonVertices_)
+        break;
+      muonAlreadyUsed[first] = true;
+      muonAlreadyUsed[second] = true;
+      ++retainedVertices;
+
+      int const firstCharge =
+          shiftDirectionSign(*selected[first]->track, eventSourceSide) * selected[first]->track->charge();
+      int const secondCharge =
+          shiftDirectionSign(*selected[second]->track, eventSourceSide) * selected[second]->track->charge();
+
+      auto canonicalMomentum = [eventSourceSide](reco::Track const& track) {
+        double const sign = shiftDirectionSign(track, eventSourceSide);
+        return std::array<double, 3>{sign * track.px(), sign * track.py(), sign * track.pz()};
+      };
+      auto const firstP = canonicalMomentum(*selected[first]->track);
+      auto const secondP = canonicalMomentum(*selected[second]->track);
+      double const pairPx = firstP[0] + secondP[0];
+      double const pairPy = firstP[1] + secondP[1];
+      double const pairPz = firstP[2] + secondP[2];
+      double const firstEnergy =
+          std::sqrt(selected[first]->track->p() * selected[first]->track->p() + muonMass * muonMass);
+      double const secondEnergy =
+          std::sqrt(selected[second]->track->p() * selected[second]->track->p() + muonMass * muonMass);
+      double const mass2 =
+          std::pow(firstEnergy + secondEnergy, 2) - pairPx * pairPx - pairPy * pairPy - pairPz * pairPz;
+      double const pairPt = std::hypot(pairPx, pairPy);
+
+      vertexMuonIdx1.push_back(first);
+      vertexMuonIdx2.push_back(second);
+      vertexIsOS.push_back(firstCharge != secondCharge);
+      int sameGenMuon = -1;
+      int genIsOS = -1;
+      if (genParticles.isValid() && genPartIdx[first] >= 0 && genPartIdx[second] >= 0) {
+        sameGenMuon = genPartIdx[first] == genPartIdx[second];
+        int const firstGenPdgId = (*genParticles)[genPartIdx[first]].pdgId();
+        int const secondGenPdgId = (*genParticles)[genPartIdx[second]].pdgId();
+        genIsOS = firstGenPdgId * secondGenPdgId < 0;
+      }
+      vertexSameGenMuon.push_back(sameGenMuon);
+      vertexGenIsOS.push_back(genIsOS);
+      vertexKalmanAttempted.push_back(0);
+      vertexKalmanValid.push_back(0);
+      vertexUsesLineFallback.push_back(1);
+      vertexX.push_back(choice.fit.position.x());
+      vertexY.push_back(choice.fit.position.y());
+      vertexZ.push_back(choice.fit.position.z());
+      vertexXError.push_back(choice.fit.error[0]);
+      vertexYError.push_back(choice.fit.error[1]);
+      vertexZError.push_back(choice.fit.error[2]);
+      vertexChi2.push_back(choice.fit.chi2);
+      vertexNdof.push_back(choice.fit.ndof);
+      vertexNormalizedChi2.push_back(choice.fit.chi2 / choice.fit.ndof);
+      vertexProbability.push_back(ChiSquaredProbability(choice.fit.chi2, choice.fit.ndof));
+      vertexOriginCompatibilityChi2.push_back(choice.originChi2);
+      vertexOriginCompatibilityNormalizedChi2.push_back(choice.originChi2 / 3.);
+      vertexDcaStatus.push_back(choice.approach.valid);
+      vertexDca.push_back(choice.approach.distance);
+      vertexDcaX.push_back(choice.approach.midpoint.x());
+      vertexDcaY.push_back(choice.approach.midpoint.y());
+      vertexDcaZ.push_back(choice.approach.midpoint.z());
+      vertexMass.push_back(std::sqrt(std::max(0., mass2)));
+      vertexPt.push_back(pairPt);
+      vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
+                                      : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
+      vertexPhi.push_back(std::atan2(pairPy, pairPx));
+    }
+
+    auto vertexTable = std::make_unique<nanoaod::FlatTable>(vertexMuonIdx1.size(), "ShiftDimuonVertex", false, false);
     vertexTable->addColumn<int>("muonIdx1", vertexMuonIdx1, "index of first muon in ShiftMuon");
     vertexTable->addColumn<int>("muonIdx2", vertexMuonIdx2, "index of second muon in ShiftMuon");
     vertexTable->addColumn<int>("isOS", vertexIsOS, "1 for an opposite-sign pair");
-    vertexTable->addColumn<int>("kalmanAttempted", vertexKalmanAttempted,
-                                "1 when the pair lies inside safe transient-track propagation range");
-    vertexTable->addColumn<int>("sameGenMuon", vertexSameGenMuon,
+    vertexTable->addColumn<int>(
+        "kalmanAttempted", vertexKalmanAttempted, "1 when the pair lies inside safe transient-track propagation range");
+    vertexTable->addColumn<int>("sameGenMuon",
+                                vertexSameGenMuon,
                                 "MC diagnostic: 1 when both legs match the same GenPart, -1 on data/unmatched");
-    vertexTable->addColumn<int>("genIsOS", vertexGenIsOS,
-                                "MC diagnostic: generator pair is opposite-sign, -1 on data/unmatched");
-    vertexTable->addColumn<int>("kalmanValid", vertexKalmanValid,
+    vertexTable->addColumn<int>(
+        "genIsOS", vertexGenIsOS, "MC diagnostic: generator pair is opposite-sign, -1 on data/unmatched");
+    vertexTable->addColumn<int>("kalmanValid",
+                                vertexKalmanValid,
                                 "1 when the unconstrained far-vertex Kalman fit converged near its line seed");
-    vertexTable->addColumn<int>("usesLineFallback", vertexUsesLineFallback,
+    vertexTable->addColumn<int>("usesLineFallback",
+                                vertexUsesLineFallback,
                                 "1 when position comes from straight-line closest approach after Kalman failure");
-    vertexTable->addColumn<float>("x", vertexX, "average of the two ShiftMuon transverse-PCA origins in x");
-    vertexTable->addColumn<float>("y", vertexY, "average of the two ShiftMuon transverse-PCA origins in y");
-    vertexTable->addColumn<float>("z", vertexZ, "average of the two ShiftMuon transverse-PCA origins in z");
-    vertexTable->addColumn<float>("xErr", vertexXError, "configured geometric origin x uncertainty");
-    vertexTable->addColumn<float>("yErr", vertexYError, "configured geometric origin y uncertainty");
-    vertexTable->addColumn<float>("zErr", vertexZError, "configured geometric origin z uncertainty");
-    vertexTable->addColumn<float>("chi2", vertexChi2, "compatibility chi2 of the two independent origin estimates");
-    vertexTable->addColumn<float>("ndof", vertexNdof, "degrees of freedom of geometric origin compatibility");
-    vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "geometric compatibility chi2 divided by ndof");
-    vertexTable->addColumn<float>("probability", vertexProbability, "geometric origin compatibility probability");
+    vertexTable->addColumn<float>("x", vertexX, "unbounded common-line fit x");
+    vertexTable->addColumn<float>("y", vertexY, "unbounded common-line fit y");
+    vertexTable->addColumn<float>("z", vertexZ, "unbounded common-line fit z");
+    vertexTable->addColumn<float>("xErr", vertexXError, "common-line fit x uncertainty");
+    vertexTable->addColumn<float>("yErr", vertexYError, "common-line fit y uncertainty");
+    vertexTable->addColumn<float>("zErr", vertexZError, "common-line fit z uncertainty");
+    vertexTable->addColumn<float>("chi2", vertexChi2, "common-line vertex fit chi2");
+    vertexTable->addColumn<float>("ndof", vertexNdof, "common-line vertex fit degrees of freedom");
+    vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "common-line vertex chi2 divided by ndof");
+    vertexTable->addColumn<float>("probability", vertexProbability, "common-line vertex fit probability");
+    vertexTable->addColumn<float>("originCompatibilityChi2",
+                                  vertexOriginCompatibilityChi2,
+                                  "compatibility chi2 of the two independent ShiftMuon origins");
+    vertexTable->addColumn<float>("originCompatibilityNormalizedChi2",
+                                  vertexOriginCompatibilityNormalizedChi2,
+                                  "independent-origin compatibility chi2 divided by three");
     vertexTable->addColumn<int>("dcaValid", vertexDcaStatus, "1 when the two-track DCA calculation succeeded");
     vertexTable->addColumn<float>("dca", vertexDca, "three-dimensional distance of closest approach");
     vertexTable->addColumn<float>("dcaX", vertexDcaX, "x of the two-track closest-approach crossing point");
@@ -516,8 +724,14 @@ public:
     description.add<double>("maxDuplicateAngle", 0.03);
     description.add<double>("maxDuplicateLineDistance", 30.0);
     description.add<double>("minAbsOriginZ", 2000.0);
+    description.add<double>("maxOriginR", 300.0);
     description.add<double>("originTransverseResolution", 100.0);
     description.add<double>("originZResolution", 2000.0);
+    description.add<double>("commonVertexLineResolution", 100.0);
+    description.add<double>("commonVertexBeamLineResolution", 100.0);
+    description.add<double>("maxPairOriginNormalizedChi2", 9.0);
+    description.add<double>("maxPairDca", 500.0);
+    description.add<unsigned int>("maxDimuonVertices", 1);
     description.add<bool>("requireOppositeSign", true);
     description.add<double>("maxGenDeltaR", 0.5);
     descriptions.add("shiftMuonTable", description);
@@ -533,8 +747,14 @@ private:
   double maxDuplicateAngle_;
   double maxDuplicateLineDistance_;
   double minAbsOriginZ_;
+  double maxOriginR_;
   double originTransverseResolution_;
   double originZResolution_;
+  double commonVertexLineResolution_;
+  double commonVertexBeamLineResolution_;
+  double maxPairOriginNormalizedChi2_;
+  double maxPairDca_;
+  unsigned int maxDimuonVertices_;
   bool requireOppositeSign_;
   double maxGenDeltaR_;
 };
