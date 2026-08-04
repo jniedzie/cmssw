@@ -53,6 +53,8 @@ CosmicMuonSeedGenerator::CosmicMuonSeedGenerator(const edm::ParameterSet& pset) 
 
   theMaxDTChi2 = pset.getParameter<double>("MaxDTChi2");
   theMaxCSCChi2 = pset.getParameter<double>("MaxCSCChi2");
+  theSingleSegmentPt = pset.getParameter<double>("SingleSegmentPt");
+  theMinPairPt = pset.getParameter<double>("MinPairPt");
 
   theForcePointDownFlag = pset.existsAs<bool>("ForcePointDown") ? pset.getParameter<bool>("ForcePointDown") : true;
   theKeepAllSegmentsFlag = pset.getParameter<bool>("KeepAllSegments");
@@ -319,8 +321,10 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const MuonRecHit
 
   MuonPatternRecoDumper dumper;
 
-  // set the pt by hand
-  double pt = 10.0;
+  // A segment alone has no useful curvature measurement.  Keep the historical
+  // 10 GeV default, but allow specialized reconstruction to choose a suitably
+  // low seed hypothesis instead of creating an artificial momentum peak.
+  double pt = theSingleSegmentPt;
 
   // AlgebraicVector4 t;
   AlgebraicSymMatrix mat(5, 0);
@@ -479,9 +483,9 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const CosmicMuon
     pt = paraC / fabs(dphi);
   }
 
-  if (pt < 10.0) {
+  if (pt < theMinPairPt) {
     return result;
-  }  //still use the old strategy for low pt
+  }
 
   AlgebraicVector t(4);
   AlgebraicSymMatrix mat(5, 0);
@@ -559,6 +563,10 @@ void CosmicMuonSeedGenerator::fillDescriptions(edm::ConfigurationDescriptions& d
   desc.add<int>("MaxSeeds", 1000);
   desc.add<double>("MaxDTChi2", 300.0);
   desc.add<double>("MaxCSCChi2", 300.0);
+  desc.add<double>("SingleSegmentPt", 10.0)
+      ->setComment("transverse-momentum hypothesis for a seed made from one segment");
+  desc.add<double>("MinPairPt", 10.0)
+      ->setComment("minimum curvature-based transverse momentum for a two-segment seed");
   desc.add<bool>("ForcePointDown", true);
   desc.add<bool>("KeepAllSegments", false)
       ->setComment("Keep every qualified segment instead of cosmic-ray global-y correlation pruning");
