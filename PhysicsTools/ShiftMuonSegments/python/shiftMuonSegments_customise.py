@@ -68,6 +68,9 @@ def customiseTraversingShiftMuonReco(process):
         SingleSegmentPt=0.01,
         # Forward SHIFT muons can have tiny pT while retaining large |pz|.
         MinPairPt=0.0,
+        PairSegmentPt=0.01,
+        UsePairPtEstimate=False,
+        TryBothPairCharges=True,
     )
     process.shiftCosmicMuons = cosmicMuons.clone(
         MuonSeedCollectionLabel="shiftCosmicMuonSeed",
@@ -134,6 +137,9 @@ def customiseRecoForShiftMuons(
     # appropriate for the very low-pT SHIFT signal.
     process.displacedMuonSeeds.SingleSegmentPt = 0.01
     process.displacedMuonSeeds.MinPairPt = 0.0
+    process.displacedMuonSeeds.PairSegmentPt = 0.01
+    process.displacedMuonSeeds.UsePairPtEstimate = False
+    process.displacedMuonSeeds.TryBothPairCharges = True
     if hasattr(process, "displacedMuonReducedTrackExtras"):
         process.displacedMuonReducedTrackExtras.cut = cms.string("pt > 0")
 
