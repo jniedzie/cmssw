@@ -3,28 +3,12 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
-#include "DataFormats/VertexReco/interface/Vertex.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
-#include "MagneticField/Engine/interface/MagneticField.h"
-#include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
-#include "RecoVertex/KalmanVertexFit/interface/KalmanSmoothedVertexChi2Estimator.h"
-#include "RecoVertex/KalmanVertexFit/interface/KalmanTrackToTrackCovCalculator.h"
-#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexTrackUpdator.h"
-#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexUpdator.h"
-#include "RecoVertex/LinearizationPointFinders/interface/FsmwLinearizationPointFinder.h"
-#include "RecoVertex/VertexPrimitives/interface/TransientVertex.h"
-#include "RecoVertex/VertexTools/interface/LinearizedTrackStateFactory.h"
-#include "RecoVertex/VertexTools/interface/SequentialVertexFitter.h"
-#include "RecoVertex/VertexTools/interface/SequentialVertexSmoother.h"
-#include "TrackingTools/PatternTools/interface/TwoTrackMinimumDistance.h"
-#include "TrackingTools/Records/interface/TransientTrackRecord.h"
-#include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
-#include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
 
 #include <algorithm>
 #include <array>
@@ -95,12 +79,53 @@ namespace {
             position.z() + scale * momentum.z()};
   }
 
-  double shiftDirectionSign(reco::Track const& track) {
-    // Orient the track from its reconstructed beam-axis crossing toward CMS.
-    // A source at +z must have pz<0, while a source at -z must have pz>0.
-    // The line PCA is reconstructed information and is available on data.
-    double const sourceZ = transverseLinePca(track).second;
-    return sourceZ * track.pz() > 0. ? -1. : 1.;
+  reco::Track::Point transverseLinePcaPoint(reco::Track const& track) {
+    auto const& position = track.innerPosition();
+    auto const& momentum = track.innerMomentum();
+    double const pt2 = momentum.x() * momentum.x() + momentum.y() * momentum.y();
+    if (pt2 == 0.)
+      return position;
+    double const scale = -(position.x() * momentum.x() + position.y() * momentum.y()) / pt2;
+    return position + scale * momentum;
+  }
+
+  double shiftDirectionSign(reco::Track const& track, int sourceSide) {
+    return sourceSide * track.pz() > 0. ? -1. : 1.;
+  }
+
+  struct StraightLineApproach {
+    bool valid;
+    GlobalPoint midpoint;
+    double distance;
+  };
+
+  StraightLineApproach straightLineApproach(reco::Track const& first, reco::Track const& second) {
+    auto const firstPoint = first.innerPosition();
+    auto const secondPoint = second.innerPosition();
+    auto const firstDirection = first.innerMomentum().unit();
+    auto const secondDirection = second.innerMomentum().unit();
+    auto const separation = firstPoint - secondPoint;
+    double const dot = firstDirection.Dot(secondDirection);
+    double const denominator = 1. - dot * dot;
+    if (denominator < 1.e-10) {
+      auto const firstPca = transverseLinePcaPoint(first);
+      auto const secondPca = transverseLinePcaPoint(second);
+      GlobalPoint const midpoint(0.5 * (firstPca.x() + secondPca.x()),
+                                 0.5 * (firstPca.y() + secondPca.y()),
+                                 0.5 * (firstPca.z() + secondPca.z()));
+      return {true, midpoint, (firstPca - secondPca).R()};
+    }
+    double const firstScale = (dot * secondDirection.Dot(separation) - firstDirection.Dot(separation)) /
+                              denominator;
+    double const secondScale = (secondDirection.Dot(separation) - dot * firstDirection.Dot(separation)) /
+                               denominator;
+    auto const firstClosest = firstPoint + firstScale * firstDirection;
+    auto const secondClosest = secondPoint + secondScale * secondDirection;
+    GlobalPoint const midpoint(0.5 * (firstClosest.x() + secondClosest.x()),
+                               0.5 * (firstClosest.y() + secondClosest.y()),
+                               0.5 * (firstClosest.z() + secondClosest.z()));
+    double const distance = (firstClosest - secondClosest).R();
+    return {std::isfinite(distance) && std::isfinite(midpoint.z()), midpoint, distance};
   }
 }  // namespace
 
@@ -112,18 +137,20 @@ public:
         traversingToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("traversingTracks"))),
         genParticlesToken_(
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
-        transientTrackBuilderToken_(esConsumes(edm::ESInputTag("", "TransientTrackBuilder"))),
-        magneticFieldToken_(esConsumes<MagneticField, IdealMagneticFieldRecord>()),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
         maxDuplicateLineDistance_(parameters.getParameter<double>("maxDuplicateLineDistance")),
+        minAbsOriginZ_(parameters.getParameter<double>("minAbsOriginZ")),
+        originTransverseResolution_(parameters.getParameter<double>("originTransverseResolution")),
+        originZResolution_(parameters.getParameter<double>("originZResolution")),
+        requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
     produces<nanoaod::FlatTable>();
     produces<nanoaod::FlatTable>("ShiftDimuonVertex");
   }
 
-  void produce(edm::Event& event, edm::EventSetup const& setup) override {
+  void produce(edm::Event& event, edm::EventSetup const&) override {
     auto const dsa = event.getHandle(dsaToken_);
     auto const cosmic = event.getHandle(cosmicToken_);
     auto const traversing = event.getHandle(traversingToken_);
@@ -144,6 +171,16 @@ public:
     append(dsa, 0);
     append(traversing, 1);
     append(cosmic, 2);
+
+    // This is a SHIFT-specific topology requirement, not an MC requirement:
+    // reject detector-edge PCA solutions before overlap removal so they do
+    // not suppress a far-origin reconstruction of the same hits.
+    candidates.erase(std::remove_if(candidates.begin(),
+                                    candidates.end(),
+                                    [this](Candidate const& candidate) {
+                                      return std::abs(transverseLinePca(*candidate.track).second) < minAbsOriginZ_;
+                                    }),
+                     candidates.end());
 
     std::stable_sort(candidates.begin(), candidates.end(), [](Candidate const& first, Candidate const& second) {
       if (first.source != second.source)
@@ -177,6 +214,24 @@ public:
         selected.push_back(&candidate);
     }
 
+    // All primary muons in an event share the target side.  Use the most
+    // displaced reconstructed origin to define that side once per event,
+    // preventing a bad low-z leg from independently reversing eta and charge.
+    int eventSourceSide = 1;
+    double largestAbsOriginZ = 0.;
+    unsigned int positiveOrigins = 0, negativeOrigins = 0;
+    for (auto const* candidate : selected) {
+      double const originZ = transverseLinePca(*candidate->track).second;
+      positiveOrigins += originZ > 0.;
+      negativeOrigins += originZ < 0.;
+      if (std::abs(originZ) > largestAbsOriginZ) {
+        largestAbsOriginZ = std::abs(originZ);
+        eventSourceSide = originZ < 0. ? -1 : 1;
+      }
+    }
+    if (positiveOrigins != negativeOrigins)
+      eventSourceSide = positiveOrigins > negativeOrigins ? 1 : -1;
+
     // Build an optional one-to-one MC association only after cleaning.  This
     // block cannot affect reconstruction or the duplicate decision, and an
     // absent collection (as in collision data) leaves every index at -1.
@@ -208,17 +263,20 @@ public:
         }
     }
 
-    std::vector<float> pt, eta, phi, mass, p, px, py, pz, ptError, etaError, phiError, vx, vy, vz, dxy,
-        dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ;
+    std::vector<float> pt, eta, phi, mass, p, px, py, pz, ptError, etaError, phiError, vx, vy, vz,
+        trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2,
+        linePcaR, linePcaZ;
     std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits,
-        directionFlipped, inferredSourceSide;
-    for (auto const* candidate : selected) {
+        directionFlipped, inferredSourceSide, chargeMatchesGen;
+    for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
+      auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
       auto const [pcaR, pcaZ] = transverseLinePca(track);
+      auto const pcaPoint = transverseLinePcaPoint(track);
       // Cosmic-style fits do not determine which way along the fitted helix
       // the particle travelled.  Orient it from the inferred source side
       // toward CMS, supporting both +z and -z SHIFT locations without truth.
-      double const sign = shiftDirectionSign(track);
+      double const sign = shiftDirectionSign(track, eventSourceSide);
       bool const flip = sign < 0.;
       double const storedPx = sign * track.px();
       double const storedPy = sign * track.py();
@@ -236,12 +294,22 @@ public:
       phiError.push_back(track.phiError());
       // Momentum and charge are the simultaneous two-fold ambiguity of a
       // no-timing cosmic-style helix fit.  Reverse both to preserve curvature.
-      charge.push_back(sign * track.charge());
+      int const storedCharge = sign * track.charge();
+      charge.push_back(storedCharge);
+      int chargeMatch = -1;
+      if (genParticles.isValid() && genPartIdx[selectedIndex] >= 0) {
+        int const genCharge = (*genParticles)[genPartIdx[selectedIndex]].pdgId() == 13 ? -1 : 1;
+        chargeMatch = storedCharge == genCharge;
+      }
+      chargeMatchesGen.push_back(chargeMatch);
       directionFlipped.push_back(flip);
-      inferredSourceSide.push_back((pcaZ > 0.) - (pcaZ < 0.));
-      vx.push_back(track.vx());
-      vy.push_back(track.vy());
-      vz.push_back(track.vz());
+      inferredSourceSide.push_back(eventSourceSide);
+      vx.push_back(pcaPoint.x());
+      vy.push_back(pcaPoint.y());
+      vz.push_back(pcaPoint.z());
+      trackVx.push_back(track.vx());
+      trackVy.push_back(track.vy());
+      trackVz.push_back(track.vz());
       dxy.push_back(track.dxy());
       dz.push_back(track.dz());
       innerR.push_back(track.innerPosition().rho());
@@ -274,13 +342,18 @@ public:
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
     table->addColumn<int>("charge", charge, "electric charge");
+    table->addColumn<int>("chargeMatchesGen", chargeMatchesGen,
+                          "MC diagnostic: 1/0 if charge agrees/disagrees with matched GenPart, -1 on data/unmatched");
     table->addColumn<int>("directionFlipped", directionFlipped,
                           "1 when momentum and charge were reversed to point from inferred source toward CMS");
     table->addColumn<int>("inferredSourceSide", inferredSourceSide,
                           "sign of reconstructed linePcaZ: -1=-z source, +1=+z source");
-    table->addColumn<float>("vx", vx, "track reference-point x");
-    table->addColumn<float>("vy", vy, "track reference-point y");
-    table->addColumn<float>("vz", vz, "track reference-point z");
+    table->addColumn<float>("vx", vx, "estimated origin x at straight-line transverse PCA");
+    table->addColumn<float>("vy", vy, "estimated origin y at straight-line transverse PCA");
+    table->addColumn<float>("vz", vz, "estimated origin z at straight-line transverse PCA");
+    table->addColumn<float>("trackVx", trackVx, "original CMSSW track reference-point x");
+    table->addColumn<float>("trackVy", trackVy, "original CMSSW track reference-point y");
+    table->addColumn<float>("trackVz", trackVz, "original CMSSW track reference-point z");
     table->addColumn<float>("dxy", dxy, "transverse impact parameter relative to the origin");
     table->addColumn<float>("dz", dz, "longitudinal impact parameter relative to the origin");
     table->addColumn<float>("innerR", innerR, "inner-state cylindrical radius");
@@ -307,65 +380,27 @@ public:
     // resulting indices always refer to ShiftMuon rows and therefore do not
     // depend on keeping any of the input collections in NanoAOD.
     std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
-    std::vector<int> vertexDcaStatus;
+    std::vector<int> vertexDcaStatus, vertexKalmanAttempted, vertexKalmanValid, vertexUsesLineFallback,
+        vertexSameGenMuon, vertexGenIsOS;
     std::vector<float> vertexX, vertexY, vertexZ, vertexXError, vertexYError, vertexZError,
         vertexChi2, vertexNdof, vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi,
         vertexDca, vertexDcaX, vertexDcaY, vertexDcaZ;
-    auto const& builder = setup.getData(transientTrackBuilderToken_);
-    auto const& magneticField = setup.getData(magneticFieldToken_);
-    edm::ParameterSet vertexParameters;
-    vertexParameters.addParameter<double>("maxDistance", 0.01);
-    vertexParameters.addParameter<int>("maxNbrOfIterations", 100);
-    KalmanVertexTrackUpdator<5> vertexTrackUpdator;
-    KalmanSmoothedVertexChi2Estimator<5> vertexChi2Estimator;
-    KalmanTrackToTrackCovCalculator<5> covarianceCalculator;
-    SequentialVertexSmoother<5> vertexSmoother(vertexTrackUpdator, vertexChi2Estimator, covarianceCalculator);
-    SequentialVertexFitter<5> vertexFitter(vertexParameters,
-                                           FsmwLinearizationPointFinder(20, -2., 0.4, 10.),
-                                           KalmanVertexUpdator<5>(),
-                                           vertexSmoother,
-                                           LinearizedTrackStateFactory());
-    // The standard fitter rejects vertices outside either the tracker or,
-    // with its DSA option, |z|<960 cm muon-system bounds.  SHIFT production
-    // is around |z|=14800 cm, so retain the Kalman algorithm but remove this
-    // detector-size acceptance restriction.
-    vertexFitter.setTrackerBounds(1.e6, 1.e6);
     constexpr double muonMass = 0.105658;
     for (unsigned int first = 0; first < selected.size(); ++first) {
       for (unsigned int second = first + 1; second < selected.size(); ++second) {
-        std::vector<reco::TransientTrack> transientTracks{
-            builder.build(selected[first]->track), builder.build(selected[second]->track)};
-        TwoTrackMinimumDistance minimumDistance;
-        FreeTrajectoryState firstState(GlobalPoint(selected[first]->track->vx(),
-                                                   selected[first]->track->vy(),
-                                                   selected[first]->track->vz()),
-                                       GlobalVector(selected[first]->track->px(),
-                                                    selected[first]->track->py(),
-                                                    selected[first]->track->pz()),
-                                       selected[first]->track->charge(),
-                                       &magneticField);
-        FreeTrajectoryState secondState(GlobalPoint(selected[second]->track->vx(),
-                                                    selected[second]->track->vy(),
-                                                    selected[second]->track->vz()),
-                                        GlobalVector(selected[second]->track->px(),
-                                                     selected[second]->track->py(),
-                                                     selected[second]->track->pz()),
-                                        selected[second]->track->charge(),
-                                        &magneticField);
-        bool const dcaIsValid = minimumDistance.calculate(firstState, secondState);
-        auto const dcaCrossingPoint = dcaIsValid ? minimumDistance.crossingPoint() : GlobalPoint();
-        double const fallbackZ = 0.5 * (transverseLinePca(*selected[first]->track).second +
-                                        transverseLinePca(*selected[second]->track).second);
-        GlobalPoint const linearizationPoint = dcaIsValid ? dcaCrossingPoint : GlobalPoint(0., 0., fallbackZ);
-        // This overload uses the supplied point only for linearization; it is
-        // not a positional prior or beam-spot constraint.
-        TransientVertex const vertex = vertexFitter.vertex(transientTracks, linearizationPoint);
-        if (!vertex.isValid())
+        auto const lineApproach = straightLineApproach(*selected[first]->track, *selected[second]->track);
+        if (!lineApproach.valid)
           continue;
-        reco::Vertex const persistentVertex(vertex);
 
-        auto canonicalMomentum = [](reco::Track const& track) {
-          double const sign = shiftDirectionSign(track);
+        int const firstCharge = shiftDirectionSign(*selected[first]->track, eventSourceSide) *
+                                selected[first]->track->charge();
+        int const secondCharge = shiftDirectionSign(*selected[second]->track, eventSourceSide) *
+                                 selected[second]->track->charge();
+        if (requireOppositeSign_ && firstCharge == secondCharge)
+          continue;
+
+        auto canonicalMomentum = [eventSourceSide](reco::Track const& track) {
+          double const sign = shiftDirectionSign(track, eventSourceSide);
           return std::array<double, 3>{sign * track.px(), sign * track.py(), sign * track.pz()};
         };
         auto const firstP = canonicalMomentum(*selected[first]->track);
@@ -383,28 +418,48 @@ public:
 
         vertexMuonIdx1.push_back(first);
         vertexMuonIdx2.push_back(second);
-        int const firstCharge = shiftDirectionSign(*selected[first]->track) * selected[first]->track->charge();
-        int const secondCharge = shiftDirectionSign(*selected[second]->track) * selected[second]->track->charge();
         vertexIsOS.push_back(firstCharge != secondCharge);
-        vertexX.push_back(vertex.position().x());
-        vertexY.push_back(vertex.position().y());
-        vertexZ.push_back(vertex.position().z());
-        vertexXError.push_back(persistentVertex.xError());
-        vertexYError.push_back(persistentVertex.yError());
-        vertexZError.push_back(persistentVertex.zError());
-        vertexChi2.push_back(vertex.totalChiSquared());
-        vertexNdof.push_back(vertex.degreesOfFreedom());
-        vertexNormalizedChi2.push_back(vertex.degreesOfFreedom() > 0.
-                                           ? vertex.totalChiSquared() / vertex.degreesOfFreedom()
-                                           : std::numeric_limits<float>::infinity());
-        vertexProbability.push_back(vertex.degreesOfFreedom() > 0.
-                                        ? ChiSquaredProbability(vertex.totalChiSquared(), vertex.degreesOfFreedom())
-                                        : 0.f);
-        vertexDcaStatus.push_back(dcaIsValid);
-        vertexDca.push_back(dcaIsValid ? minimumDistance.distance() : -1.f);
-        vertexDcaX.push_back(dcaIsValid ? dcaCrossingPoint.x() : 0.f);
-        vertexDcaY.push_back(dcaIsValid ? dcaCrossingPoint.y() : 0.f);
-        vertexDcaZ.push_back(dcaIsValid ? dcaCrossingPoint.z() : 0.f);
+        int sameGenMuon = -1;
+        int genIsOS = -1;
+        if (genParticles.isValid() && genPartIdx[first] >= 0 && genPartIdx[second] >= 0) {
+          sameGenMuon = genPartIdx[first] == genPartIdx[second];
+          int const firstGenPdgId = (*genParticles)[genPartIdx[first]].pdgId();
+          int const secondGenPdgId = (*genParticles)[genPartIdx[second]].pdgId();
+          genIsOS = firstGenPdgId * secondGenPdgId < 0;
+        }
+        vertexSameGenMuon.push_back(sameGenMuon);
+        vertexGenIsOS.push_back(genIsOS);
+        auto const firstOrigin = transverseLinePcaPoint(*selected[first]->track);
+        auto const secondOrigin = transverseLinePcaPoint(*selected[second]->track);
+        GlobalPoint const storedPosition(0.5 * (firstOrigin.x() + secondOrigin.x()),
+                                         0.5 * (firstOrigin.y() + secondOrigin.y()),
+                                         0.5 * (firstOrigin.z() + secondOrigin.z()));
+        double const deltaX = firstOrigin.x() - secondOrigin.x();
+        double const deltaY = firstOrigin.y() - secondOrigin.y();
+        double const deltaZ = firstOrigin.z() - secondOrigin.z();
+        double const geometricChi2 =
+            (deltaX * deltaX + deltaY * deltaY) /
+                (2. * originTransverseResolution_ * originTransverseResolution_) +
+            deltaZ * deltaZ / (2. * originZResolution_ * originZResolution_);
+        constexpr double geometricNdof = 3.;
+        vertexKalmanAttempted.push_back(0);
+        vertexKalmanValid.push_back(0);
+        vertexUsesLineFallback.push_back(1);
+        vertexX.push_back(storedPosition.x());
+        vertexY.push_back(storedPosition.y());
+        vertexZ.push_back(storedPosition.z());
+        vertexXError.push_back(originTransverseResolution_ / std::sqrt(2.));
+        vertexYError.push_back(originTransverseResolution_ / std::sqrt(2.));
+        vertexZError.push_back(originZResolution_ / std::sqrt(2.));
+        vertexChi2.push_back(geometricChi2);
+        vertexNdof.push_back(geometricNdof);
+        vertexNormalizedChi2.push_back(geometricChi2 / geometricNdof);
+        vertexProbability.push_back(ChiSquaredProbability(geometricChi2, geometricNdof));
+        vertexDcaStatus.push_back(lineApproach.valid);
+        vertexDca.push_back(lineApproach.valid ? lineApproach.distance : -1.f);
+        vertexDcaX.push_back(lineApproach.valid ? lineApproach.midpoint.x() : 0.f);
+        vertexDcaY.push_back(lineApproach.valid ? lineApproach.midpoint.y() : 0.f);
+        vertexDcaZ.push_back(lineApproach.valid ? lineApproach.midpoint.z() : 0.f);
         vertexMass.push_back(std::sqrt(std::max(0., mass2)));
         vertexPt.push_back(pairPt);
         vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
@@ -418,16 +473,26 @@ public:
     vertexTable->addColumn<int>("muonIdx1", vertexMuonIdx1, "index of first muon in ShiftMuon");
     vertexTable->addColumn<int>("muonIdx2", vertexMuonIdx2, "index of second muon in ShiftMuon");
     vertexTable->addColumn<int>("isOS", vertexIsOS, "1 for an opposite-sign pair");
-    vertexTable->addColumn<float>("x", vertexX, "Kalman vertex x");
-    vertexTable->addColumn<float>("y", vertexY, "Kalman vertex y");
-    vertexTable->addColumn<float>("z", vertexZ, "Kalman vertex z");
-    vertexTable->addColumn<float>("xErr", vertexXError, "Kalman vertex x uncertainty");
-    vertexTable->addColumn<float>("yErr", vertexYError, "Kalman vertex y uncertainty");
-    vertexTable->addColumn<float>("zErr", vertexZError, "Kalman vertex z uncertainty");
-    vertexTable->addColumn<float>("chi2", vertexChi2, "Kalman vertex chi2");
-    vertexTable->addColumn<float>("ndof", vertexNdof, "Kalman vertex degrees of freedom");
-    vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "Kalman vertex chi2 divided by ndof");
-    vertexTable->addColumn<float>("probability", vertexProbability, "Kalman vertex chi2 probability");
+    vertexTable->addColumn<int>("kalmanAttempted", vertexKalmanAttempted,
+                                "1 when the pair lies inside safe transient-track propagation range");
+    vertexTable->addColumn<int>("sameGenMuon", vertexSameGenMuon,
+                                "MC diagnostic: 1 when both legs match the same GenPart, -1 on data/unmatched");
+    vertexTable->addColumn<int>("genIsOS", vertexGenIsOS,
+                                "MC diagnostic: generator pair is opposite-sign, -1 on data/unmatched");
+    vertexTable->addColumn<int>("kalmanValid", vertexKalmanValid,
+                                "1 when the unconstrained far-vertex Kalman fit converged near its line seed");
+    vertexTable->addColumn<int>("usesLineFallback", vertexUsesLineFallback,
+                                "1 when position comes from straight-line closest approach after Kalman failure");
+    vertexTable->addColumn<float>("x", vertexX, "average of the two ShiftMuon transverse-PCA origins in x");
+    vertexTable->addColumn<float>("y", vertexY, "average of the two ShiftMuon transverse-PCA origins in y");
+    vertexTable->addColumn<float>("z", vertexZ, "average of the two ShiftMuon transverse-PCA origins in z");
+    vertexTable->addColumn<float>("xErr", vertexXError, "configured geometric origin x uncertainty");
+    vertexTable->addColumn<float>("yErr", vertexYError, "configured geometric origin y uncertainty");
+    vertexTable->addColumn<float>("zErr", vertexZError, "configured geometric origin z uncertainty");
+    vertexTable->addColumn<float>("chi2", vertexChi2, "compatibility chi2 of the two independent origin estimates");
+    vertexTable->addColumn<float>("ndof", vertexNdof, "degrees of freedom of geometric origin compatibility");
+    vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "geometric compatibility chi2 divided by ndof");
+    vertexTable->addColumn<float>("probability", vertexProbability, "geometric origin compatibility probability");
     vertexTable->addColumn<int>("dcaValid", vertexDcaStatus, "1 when the two-track DCA calculation succeeded");
     vertexTable->addColumn<float>("dca", vertexDca, "three-dimensional distance of closest approach");
     vertexTable->addColumn<float>("dcaX", vertexDcaX, "x of the two-track closest-approach crossing point");
@@ -450,6 +515,10 @@ public:
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
     description.add<double>("maxDuplicateLineDistance", 30.0);
+    description.add<double>("minAbsOriginZ", 2000.0);
+    description.add<double>("originTransverseResolution", 100.0);
+    description.add<double>("originZResolution", 2000.0);
+    description.add<bool>("requireOppositeSign", true);
     description.add<double>("maxGenDeltaR", 0.5);
     descriptions.add("shiftMuonTable", description);
   }
@@ -459,12 +528,14 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> cosmicToken_;
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
-  edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> transientTrackBuilderToken_;
-  edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
   double maxDuplicateLineDistance_;
+  double minAbsOriginZ_;
+  double originTransverseResolution_;
+  double originZResolution_;
+  bool requireOppositeSign_;
   double maxGenDeltaR_;
 };
 
