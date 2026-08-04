@@ -134,6 +134,8 @@ def customiseRecoForShiftMuons(
     # appropriate for the very low-pT SHIFT signal.
     process.displacedMuonSeeds.SingleSegmentPt = 0.01
     process.displacedMuonSeeds.MinPairPt = 0.0
+    if hasattr(process, "displacedMuonReducedTrackExtras"):
+        process.displacedMuonReducedTrackExtras.cut = cms.string("pt > 0")
 
     # SHIFT muons originate far outside CMS and need not extrapolate to the
     # beam line.  The default standalone loader rejects a valid trajectory

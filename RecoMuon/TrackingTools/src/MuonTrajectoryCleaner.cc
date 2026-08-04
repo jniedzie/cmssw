@@ -100,60 +100,26 @@ void MuonTrajectoryCleaner::clean(TrajectoryContainer& trajC,
       if (match > 0) {
         // If the difference in # of rechits is null then compare the chi2/ndf of the two trajectories
         if (abs(hit_diff) == 0) {
-          double minPt = 3.5;
-          double dPt =
-              7.;  // i.e. considering 10% (conservative!) resolution at minPt it is ~ 10 sigma away from the central value
-
-          double maxFraction = 0.95;
-
-          double fraction = (2. * match) / ((*iter)->measurements().size() + (*jter)->measurements().size());
-          int belowLimit = 0;
-          int above = 0;
-
-          if ((*jter)->lastMeasurement().updatedState().globalMomentum().perp() <= minPt)
-            ++belowLimit;
-          if ((*iter)->lastMeasurement().updatedState().globalMomentum().perp() <= minPt)
-            ++belowLimit;
-
-          if ((*jter)->lastMeasurement().updatedState().globalMomentum().perp() >= dPt)
-            ++above;
-          if ((*iter)->lastMeasurement().updatedState().globalMomentum().perp() >= dPt)
-            ++above;
-
-          if (fraction >= maxFraction && belowLimit == 1 && above == 1) {
-            if ((*iter)->lastMeasurement().updatedState().globalMomentum().perp() < minPt) {
-              mask[i] = false;
-              skipnext = true;
-              seedmap[j].insert(seedmap[j].end(), seedmap[i].begin(), seedmap[i].end());
-              seedmap.erase(i);
-              LogTrace(metname) << "Trajectory # " << i
-                                << " (pT=" << (*iter)->lastMeasurement().updatedState().globalMomentum().perp()
-                                << " GeV) rejected because it has too low pt";
-            } else {
-              mask[j] = false;
-              seedmap[i].insert(seedmap[i].end(), seedmap[j].begin(), seedmap[j].end());
-              seedmap.erase(j);
-              LogTrace(metname) << "Trajectory # " << j
-                                << " (pT=" << (*jter)->lastMeasurement().updatedState().globalMomentum().perp()
-                                << " GeV) rejected because it has too low pt";
-            }
+          // Do not use the historical 3.5/7 GeV heuristic here.  It was
+          // designed to choose between overlapping collision/cosmic tracks
+          // and systematically discarded the low-pT member, even when its
+          // longitudinal momentum and fit quality were good.  Resolve equal-
+          // hit overlaps using fit quality only.
+          if (chi2_dof_i > chi2_dof_j) {
+            mask[i] = false;
+            skipnext = true;
+            seedmap[j].insert(seedmap[j].end(), seedmap[i].begin(), seedmap[i].end());
+            seedmap.erase(i);
+            LogTrace(metname) << "Trajectory # " << i
+                              << " (pT=" << (*iter)->lastMeasurement().updatedState().globalMomentum().perp()
+                              << " GeV) rejected";
           } else {
-            if (chi2_dof_i > chi2_dof_j) {
-              mask[i] = false;
-              skipnext = true;
-              seedmap[j].insert(seedmap[j].end(), seedmap[i].begin(), seedmap[i].end());
-              seedmap.erase(i);
-              LogTrace(metname) << "Trajectory # " << i
-                                << " (pT=" << (*iter)->lastMeasurement().updatedState().globalMomentum().perp()
-                                << " GeV) rejected";
-            } else {
-              mask[j] = false;
-              seedmap[i].insert(seedmap[i].end(), seedmap[j].begin(), seedmap[j].end());
-              seedmap.erase(j);
-              LogTrace(metname) << "Trajectory # " << j
-                                << " (pT=" << (*jter)->lastMeasurement().updatedState().globalMomentum().perp()
-                                << " GeV) rejected";
-            }
+            mask[j] = false;
+            seedmap[i].insert(seedmap[i].end(), seedmap[j].begin(), seedmap[j].end());
+            seedmap.erase(j);
+            LogTrace(metname) << "Trajectory # " << j
+                              << " (pT=" << (*jter)->lastMeasurement().updatedState().globalMomentum().perp()
+                              << " GeV) rejected";
           }
         } else {  // different number of hits
           if (hit_diff < 0) {

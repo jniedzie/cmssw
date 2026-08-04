@@ -1,4 +1,5 @@
 <use name="DataFormats/DTRecHit"/>
+<use name="CommonTools/Statistics"/>
 <use name="DataFormats/CSCRecHit"/>
 <use name="DataFormats/GEMRecHit"/>
 <use name="DataFormats/RPCRecHit"/>
@@ -13,7 +14,13 @@
 <use name="DataFormats/HepMCCandidate"/>
 <use name="DataFormats/GeometryVector"/>
 <use name="RecoVertex/KalmanVertexFit"/>
+<use name="RecoVertex/LinearizationPointFinders"/>
 <use name="RecoVertex/VertexPrimitives"/>
+<use name="RecoVertex/VertexTools"/>
+<use name="MagneticField/Engine"/>
+<use name="MagneticField/Records"/>
+<use name="TrackingTools/PatternTools"/>
+<use name="TrackingTools/TrajectoryState"/>
 <use name="TrackingTools/Records"/>
 <use name="TrackingTools/TransientTrack"/>
 <use name="FWCore/Framework"/>
