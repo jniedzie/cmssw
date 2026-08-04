@@ -4,6 +4,7 @@
 <use name="DataFormats/RPCRecHit"/>
 <use name="DataFormats/MuonSeed"/>
 <use name="DataFormats/TrackReco"/>
+<use name="DataFormats/VertexReco"/>
 <use name="DataFormats/TrajectorySeed"/>
 <use name="SimDataFormats/Track"/>
 <use name="SimDataFormats/TrackingHit"/>
@@ -11,6 +12,10 @@
 <use name="DataFormats/NanoAOD"/>
 <use name="DataFormats/HepMCCandidate"/>
 <use name="DataFormats/GeometryVector"/>
+<use name="RecoVertex/KalmanVertexFit"/>
+<use name="RecoVertex/VertexPrimitives"/>
+<use name="TrackingTools/Records"/>
+<use name="TrackingTools/TransientTrack"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/MessageLogger"/>
