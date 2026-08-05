@@ -12,6 +12,9 @@
 <use name="DataFormats/NanoAOD"/>
 <use name="DataFormats/HepMCCandidate"/>
 <use name="DataFormats/GeometryVector"/>
+<use name="TrackingTools/GeomPropagators"/>
+<use name="TrackingTools/Records"/>
+<use name="TrackingTools/TrajectoryState"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/MessageLogger"/>

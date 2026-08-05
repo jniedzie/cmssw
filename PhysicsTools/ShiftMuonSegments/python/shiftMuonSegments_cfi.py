@@ -13,12 +13,17 @@ shiftMuonTable = cms.EDProducer(
     cosmicTracks=cms.InputTag("shiftCosmicMuons"),
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
+    targetLinePropagator=cms.string("SteppingHelixPropagatorAny"),
     minSharedHitFraction=cms.double(0.5),
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),
     maxDuplicateLineDistance=cms.double(30.0),
-    minAbsOriginZ=cms.double(2000.0),
-    maxOriginR=cms.double(300.0),
+    # Physical transverse pointing compatibility with the unbounded beam/
+    # target line.  This deliberately imposes no requirement on origin z.
+    maxTargetLineDca=cms.double(200.0),
+    # SHIFT particles enter along the beam/target line.  Keep the requirement
+    # symmetric in eta so the same reconstruction supports either target side.
+    minAbsEta=cms.double(3.0),
     originTransverseResolution=cms.double(100.0),
     originZResolution=cms.double(2000.0),
     commonVertexLineResolution=cms.double(100.0),

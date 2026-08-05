@@ -4,6 +4,9 @@ from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegmen
 shiftMuonSegmentsSequence = cms.Sequence(shiftMuonSegmentsCounter + shiftMuonTable + shiftMuonSegments)
 
 def addShiftMuonSegments(process):
+    # This propagator transports the detector fit through the complete CMS
+    # field/material map to the PCA of the unbounded target line.
+    process.load("TrackPropagation.SteppingHelixPropagator.SteppingHelixPropagatorAny_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
     # NanoAOD retains FlatTables with module labels matching ``*Table``.  Keep
