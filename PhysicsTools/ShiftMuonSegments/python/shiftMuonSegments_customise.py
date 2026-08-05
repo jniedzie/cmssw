@@ -83,7 +83,10 @@ def customiseTraversingShiftMuonReco(process):
         MuonSeedCollectionLabel="shiftCosmicMuonSeed",
         TrajectoryBuilderParameters=dict(
             BuildTraversingMuon=True,
-            Strict1Leg=False,
+            # Require hits in separated detector hemispheres.  With False the
+            # cosmic builder accepts one-leg and mixed-muon combinations into
+            # the collection that is supposed to represent traversing tracks.
+            Strict1Leg=True,
         ),
     )
     process.shiftTraversingMuon_step = cms.Path(
