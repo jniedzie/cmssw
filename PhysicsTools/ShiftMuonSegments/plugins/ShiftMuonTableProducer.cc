@@ -780,9 +780,10 @@ public:
     std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
     std::vector<int> vertexDcaStatus, vertexKalmanAttempted, vertexKalmanValid, vertexUsesLineFallback,
         vertexSameGenMuon, vertexGenIsOS;
-    std::vector<float> vertexX, vertexY, vertexZ, vertexXError, vertexYError, vertexZError, vertexChi2, vertexNdof,
-        vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi, vertexDca, vertexDcaX,
-        vertexDcaY, vertexDcaZ, vertexOriginCompatibilityChi2, vertexOriginCompatibilityNormalizedChi2;
+    std::vector<float> vertexVx, vertexVy, vertexVz, vertexVxError, vertexVyError, vertexVzError, vertexChi2,
+        vertexNdof, vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi, vertexPz,
+        vertexDca, vertexDcaX, vertexDcaY, vertexDcaZ, vertexOriginCompatibilityChi2,
+        vertexOriginCompatibilityNormalizedChi2;
     constexpr double muonMass = 0.105658;
 
     struct PairChoice {
@@ -886,12 +887,12 @@ public:
       vertexKalmanAttempted.push_back(0);
       vertexKalmanValid.push_back(0);
       vertexUsesLineFallback.push_back(1);
-      vertexX.push_back(choice.fit.position.x());
-      vertexY.push_back(choice.fit.position.y());
-      vertexZ.push_back(choice.fit.position.z());
-      vertexXError.push_back(choice.fit.error[0]);
-      vertexYError.push_back(choice.fit.error[1]);
-      vertexZError.push_back(choice.fit.error[2]);
+      vertexVx.push_back(choice.fit.position.x());
+      vertexVy.push_back(choice.fit.position.y());
+      vertexVz.push_back(choice.fit.position.z());
+      vertexVxError.push_back(choice.fit.error[0]);
+      vertexVyError.push_back(choice.fit.error[1]);
+      vertexVzError.push_back(choice.fit.error[2]);
       vertexChi2.push_back(choice.fit.chi2);
       vertexNdof.push_back(choice.fit.ndof);
       vertexNormalizedChi2.push_back(choice.fit.chi2 / choice.fit.ndof);
@@ -905,6 +906,7 @@ public:
       vertexDcaZ.push_back(choice.approach.midpoint.z());
       vertexMass.push_back(std::sqrt(std::max(0., mass2)));
       vertexPt.push_back(pairPt);
+      vertexPz.push_back(pairPz);
       vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
                                       : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
       vertexPhi.push_back(std::atan2(pairPy, pairPx));
@@ -927,12 +929,12 @@ public:
     vertexTable->addColumn<int>("usesLineFallback",
                                 vertexUsesLineFallback,
                                 "1 when position comes from straight-line closest approach after Kalman failure");
-    vertexTable->addColumn<float>("x", vertexX, "unbounded common-line fit x");
-    vertexTable->addColumn<float>("y", vertexY, "unbounded common-line fit y");
-    vertexTable->addColumn<float>("z", vertexZ, "unbounded common-line fit z");
-    vertexTable->addColumn<float>("xErr", vertexXError, "common-line fit x uncertainty");
-    vertexTable->addColumn<float>("yErr", vertexYError, "common-line fit y uncertainty");
-    vertexTable->addColumn<float>("zErr", vertexZError, "common-line fit z uncertainty");
+    vertexTable->addColumn<float>("vx", vertexVx, "unbounded common-line fit vertex x");
+    vertexTable->addColumn<float>("vy", vertexVy, "unbounded common-line fit vertex y");
+    vertexTable->addColumn<float>("vz", vertexVz, "unbounded common-line fit vertex z");
+    vertexTable->addColumn<float>("vxErr", vertexVxError, "common-line fit vertex x uncertainty");
+    vertexTable->addColumn<float>("vyErr", vertexVyError, "common-line fit vertex y uncertainty");
+    vertexTable->addColumn<float>("vzErr", vertexVzError, "common-line fit vertex z uncertainty");
     vertexTable->addColumn<float>("chi2", vertexChi2, "common-line vertex fit chi2");
     vertexTable->addColumn<float>("ndof", vertexNdof, "common-line vertex fit degrees of freedom");
     vertexTable->addColumn<float>("normalizedChi2", vertexNormalizedChi2, "common-line vertex chi2 divided by ndof");
@@ -950,6 +952,7 @@ public:
     vertexTable->addColumn<float>("dcaZ", vertexDcaZ, "z of the two-track closest-approach crossing point");
     vertexTable->addColumn<float>("mass", vertexMass, "dimuon invariant mass using canonical SHIFT directions");
     vertexTable->addColumn<float>("pt", vertexPt, "dimuon transverse momentum");
+    vertexTable->addColumn<float>("pz", vertexPz, "dimuon longitudinal momentum");
     vertexTable->addColumn<float>("eta", vertexEta, "dimuon pseudorapidity");
     vertexTable->addColumn<float>("phi", vertexPhi, "dimuon azimuthal angle");
     event.put(std::move(vertexTable), "ShiftDimuonVertex");

@@ -4,7 +4,16 @@ from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cff import addShiftMuonSeg
 
 
 def customise(process):
-    return addShiftMuonSegments(process)
+    process = addShiftMuonSegments(process)
+    # EXONanoAOD stores GenPart vertex coordinates with only eight mantissa
+    # bits.  At the O(150 m) SHIFT displacement this quantises z in steps of
+    # tens of centimetres.  Keep the standard GenPart names and float type,
+    # but retain the full IEEE-754 float mantissa for vertex coordinates.
+    if hasattr(process, "genParticleTable"):
+        for coordinate in ("vx", "vy", "vz"):
+            if hasattr(process.genParticleTable.variables, coordinate):
+                getattr(process.genParticleTable.variables, coordinate).precision = cms.int32(23)
+    return process
 
 
 def customiseKeepShiftTruth(process):
