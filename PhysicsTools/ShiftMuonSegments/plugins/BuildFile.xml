@@ -17,6 +17,9 @@
 <use name="TrackingTools/GeomPropagators"/>
 <use name="TrackingTools/Records"/>
 <use name="TrackingTools/TrajectoryState"/>
+<use name="TrackPropagation/SteppingHelixPropagator"/>
+<use name="MagneticField/Engine"/>
+<use name="MagneticField/Records"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/MessageLogger"/>
