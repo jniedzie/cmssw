@@ -3,6 +3,8 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/CSCRecHit/interface/CSCSegment.h"
+#include "DataFormats/DTRecHit/interface/DTRecSegment4D.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
@@ -13,6 +15,8 @@
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
 #include "TrackingTools/Records/interface/TrackingComponentsRecord.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
+#include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
+#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
 
 #include <algorithm>
 #include <array>
@@ -44,14 +48,19 @@ namespace {
     unsigned int sourceIndex;
     std::vector<HitFingerprint> hitFingerprints;
     PropagatedState targetLineState;
+    int timingDirectionSign = 0;
+    unsigned int timingMeasurements = 0;
+    double timingChi2 = 0.;
+    double timingDeltaChi2 = 0.;
   };
 
-  PropagatedState propagateToTargetLine(reco::Track const& track, Propagator const& propagator, int sourceSide = 0) {
+  PropagatedState propagateToTargetLine(reco::Track const& track, Propagator const& propagator, int travelSign = 0) {
     // Once the event side is known, start from the fitted endpoint closest in
     // z to the external source.  This avoids beginning the backward transport
     // from a state that has already crossed additional detector material.
-    bool const useOuter = sourceSide != 0 &&
-                          sourceSide * track.outerPosition().z() > sourceSide * track.innerPosition().z();
+    auto const endpointDelta = track.outerPosition() - track.innerPosition();
+    bool const useOuter = travelSign != 0 &&
+                          travelSign * track.innerMomentum().Dot(endpointDelta) < 0.;
     auto const& endpoint = useOuter ? track.outerPosition() : track.innerPosition();
     auto const& endpointMomentum = useOuter ? track.outerMomentum() : track.innerMomentum();
     GlobalPoint const position(endpoint.x(), endpoint.y(), endpoint.z());
@@ -65,6 +74,75 @@ namespace {
                        std::isfinite(resultPosition.y()) && std::isfinite(resultPosition.z()) &&
                        std::isfinite(propagated.second);
     return {valid, resultPosition, resultMomentum, propagated.second};
+  }
+
+  struct TimingResult {
+    int directionSign = 0;
+    unsigned int measurements = 0;
+    double chi2 = 0.;
+    double deltaChi2 = 0.;
+  };
+
+  TimingResult timingDirection(reco::Track const& track,
+                               GlobalTrackingGeometry const& geometry,
+                               unsigned int minMeasurements,
+                               double minDeltaChi2) {
+    struct TimedPoint { GlobalPoint position; double time; double sigma; };
+    std::vector<TimedPoint> points;
+    for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
+      if (!(*hit)->isValid())
+        continue;
+      double time = 0., sigma = 0.;
+      if (auto const* segment = dynamic_cast<CSCSegment const*>(&**hit)) {
+        time = segment->time();
+        sigma = 7.;
+      } else if (auto const* segment = dynamic_cast<DTRecSegment4D const*>(&**hit)) {
+        if (!segment->hasPhi() || !segment->phiSegment()->ist0Valid())
+          continue;
+        time = segment->phiSegment()->t0();
+        sigma = 3.;
+      } else {
+        continue;
+      }
+      auto const* detector = geometry.idToDet((*hit)->geographicalId());
+      if (!detector || !std::isfinite(time) || std::abs(time) > 1.e4)
+        continue;
+      points.push_back({detector->surface().toGlobal((*hit)->localPosition()), time, sigma});
+    }
+    if (points.size() < minMeasurements)
+      return {0, static_cast<unsigned int>(points.size()), 0., 0.};
+
+    constexpr double inverseSpeedOfLight = 1. / 29.9792458;  // ns/cm
+    auto const axis = track.momentum().unit();
+    auto score = [&](double sign) {
+      auto coordinate = [&axis](GlobalPoint const& position) {
+        return axis.x() * position.x() + axis.y() * position.y() + axis.z() * position.z();
+      };
+      std::vector<double> offsets;
+      offsets.reserve(points.size());
+      for (auto const& point : points)
+        offsets.push_back(point.time - sign * coordinate(point.position) * inverseSpeedOfLight);
+      std::sort(offsets.begin(), offsets.end());
+      double const offset = offsets.size() % 2 != 0
+                                ? offsets[offsets.size() / 2]
+                                : 0.5 * (offsets[offsets.size() / 2 - 1] + offsets[offsets.size() / 2]);
+      double robustChi2 = 0.;
+      for (auto const& point : points) {
+        double const residual = point.time - offset - sign * coordinate(point.position) * inverseSpeedOfLight;
+        double const pull = std::abs(residual / point.sigma);
+        // Huber loss keeps one mistimed chamber from deciding the direction.
+        robustChi2 += pull <= 3. ? pull * pull : 6. * pull - 9.;
+      }
+      return robustChi2;
+    };
+    double const alongChi2 = score(1.);
+    double const oppositeChi2 = score(-1.);
+    double const delta = std::abs(alongChi2 - oppositeChi2);
+    int const sign = delta >= minDeltaChi2 ? (alongChi2 < oppositeChi2 ? 1 : -1) : 0;
+    return {sign,
+            static_cast<unsigned int>(points.size()),
+            std::min(alongChi2, oppositeChi2),
+            delta};
   }
 
   void appendHitFingerprints(TrackingRecHit const& hit, std::vector<HitFingerprint>& result) {
@@ -265,10 +343,13 @@ public:
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
         targetLinePropagatorToken_(esConsumes(
             edm::ESInputTag("", parameters.getParameter<std::string>("targetLinePropagator")))),
+        trackingGeometryToken_(esConsumes()),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
         maxDuplicateLineDistance_(parameters.getParameter<double>("maxDuplicateLineDistance")),
+        minTimingMeasurements_(parameters.getParameter<unsigned int>("minTimingMeasurements")),
+        minTimingDeltaChi2_(parameters.getParameter<double>("minTimingDeltaChi2")),
         maxTargetLineDca_(parameters.getParameter<double>("maxTargetLineDca")),
         minAbsEta_(parameters.getParameter<double>("minAbsEta")),
         originTransverseResolution_(parameters.getParameter<double>("originTransverseResolution")),
@@ -290,6 +371,7 @@ public:
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const& targetLinePropagator = setup.getData(targetLinePropagatorToken_);
+    auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
 
     std::vector<Candidate> candidates;
     auto append = [&candidates, &targetLinePropagator](auto const& handle, int source) {
@@ -309,6 +391,17 @@ public:
     append(dsa, 0);
     append(traversing, 1);
     append(cosmic, 2);
+
+    for (auto& candidate : candidates) {
+      auto const timing = timingDirection(*candidate.track,
+                                          trackingGeometry,
+                                          minTimingMeasurements_,
+                                          minTimingDeltaChi2_);
+      candidate.timingDirectionSign = timing.directionSign;
+      candidate.timingMeasurements = timing.measurements;
+      candidate.timingChi2 = timing.chi2;
+      candidate.timingDeltaChi2 = timing.deltaChi2;
+    }
 
     // Determine the common source side from all reconstructed hypotheses.
     // Its magnitude is never used as a selection, while the event-level sign
@@ -333,9 +426,12 @@ public:
     // Repeat the field-aware transport from the upstream fitted endpoint.
     // The preliminary inner-state result above is used only to infer the
     // common +/-z side and is never stored.
-    for (auto& candidate : candidates)
-      candidate.targetLineState =
-          propagateToTargetLine(*candidate.track, targetLinePropagator, eventSourceSide);
+    for (auto& candidate : candidates) {
+      int const directionSign = candidate.timingDirectionSign != 0
+                                    ? candidate.timingDirectionSign
+                                    : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
+      candidate.targetLineState = propagateToTargetLine(*candidate.track, targetLinePropagator, directionSign);
+    }
 
     // Do not select on reconstructed z.  Reject only invalid/empty fits and
     // trajectories which do not point back to the unbounded target line in
@@ -415,6 +511,18 @@ public:
     auto betterRepresentative = [&candidates, eventSourceSide](unsigned int first, unsigned int second) {
       auto const& a = candidates[first];
       auto const& b = candidates[second];
+      bool const aHasTiming = a.timingDirectionSign != 0;
+      bool const bHasTiming = b.timingDirectionSign != 0;
+      if (aHasTiming != bHasTiming)
+        return aHasTiming;
+      // Both seed orientations were fitted.  Prefer the fit whose native
+      // propagation direction agrees with time of flight; merely flipping a
+      // completed wrong-way fit would retain its biased material corrections
+      // and is the source of the near-zero-pT solution.
+      if (aHasTiming && (a.timingDirectionSign > 0) != (b.timingDirectionSign > 0))
+        return a.timingDirectionSign > 0;
+      if (aHasTiming && bHasTiming && a.timingChi2 != b.timingChi2)
+        return a.timingChi2 < b.timingChi2;
       auto geometryPriority = [](int source) {
         // Traversing and cosmic fits use both detector legs and give much
         // better direction/origin resolution.  DSA remains available when no
@@ -453,6 +561,11 @@ public:
       selected.push_back(&candidates[representative]);
       duplicateGroupSize.push_back(group.size());
     }
+    auto candidateDirectionSign = [eventSourceSide](Candidate const& candidate) {
+      return candidate.timingDirectionSign != 0
+                 ? candidate.timingDirectionSign
+                 : static_cast<int>(shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide));
+    };
 
     // Build an optional one-to-one MC association only after cleaning.  This
     // block cannot affect reconstruction or the duplicate decision, and an
@@ -485,11 +598,12 @@ public:
         }
     }
 
-    std::vector<float> pt, eta, phi, mass, p, px, py, pz, ptError, etaError, phiError, vx, vy, vz, trackVx, trackVy,
-        trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
-        chordLinePcaR, chordLinePcaZ, targetLinePath;
+    std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, ptError, etaError,
+        phiError, vx, vy, vz, trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof,
+        normalizedChi2, linePcaR, linePcaZ,
+        chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
     std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
-        inferredSourceSide, chargeMatchesGen;
+        inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -499,7 +613,9 @@ public:
       // Cosmic-style fits do not determine which way along the fitted helix
       // the particle travelled.  Orient it from the inferred source side
       // toward CMS, supporting both +z and -z SHIFT locations without truth.
-      double const sign = shiftDirectionSign(propagated.momentum, eventSourceSide);
+      double const sign = candidate->timingDirectionSign != 0
+                              ? candidate->timingDirectionSign
+                              : shiftDirectionSign(propagated.momentum, eventSourceSide);
       bool const flip = sign < 0.;
       double const storedPx = sign * propagated.momentum.x();
       double const storedPy = sign * propagated.momentum.y();
@@ -515,6 +631,12 @@ public:
       px.push_back(storedPx);
       py.push_back(storedPy);
       pz.push_back(storedPz);
+      trackPt.push_back(track.pt());
+      innerPt.push_back(track.innerMomentum().rho());
+      outerPt.push_back(track.outerMomentum().rho());
+      auto const endpointDelta = track.outerPosition() - track.innerPosition();
+      bool const upstreamIsOuter = sign * track.innerMomentum().Dot(endpointDelta) < 0.;
+      upstreamPt.push_back(upstreamIsOuter ? track.outerMomentum().rho() : track.innerMomentum().rho());
       ptError.push_back(track.ptError());
       etaError.push_back(track.etaError());
       phiError.push_back(track.phiError());
@@ -530,6 +652,10 @@ public:
       chargeMatchesGen.push_back(chargeMatch);
       directionFlipped.push_back(flip);
       inferredSourceSide.push_back(eventSourceSide);
+      timingDirectionSign.push_back(candidate->timingDirectionSign);
+      nTimingMeasurements.push_back(candidate->timingMeasurements);
+      timingChi2.push_back(candidate->timingChi2);
+      timingDeltaChi2.push_back(candidate->timingDeltaChi2);
       vx.push_back(propagated.position.x());
       vy.push_back(propagated.position.y());
       vz.push_back(propagated.position.z());
@@ -567,6 +693,10 @@ public:
     table->addColumn<float>("px", px, "momentum x component");
     table->addColumn<float>("py", py, "momentum y component");
     table->addColumn<float>("pz", pz, "momentum z component");
+    table->addColumn<float>("trackPt", trackPt, "pT at the original CMSSW track reference state");
+    table->addColumn<float>("innerPt", innerPt, "pT at the geometrically inner detector state");
+    table->addColumn<float>("outerPt", outerPt, "pT at the geometrically outer detector state");
+    table->addColumn<float>("upstreamPt", upstreamPt, "pT at the fitted endpoint nearest the inferred source side");
     table->addColumn<float>("ptErr", ptError, "transverse-momentum uncertainty");
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
@@ -579,6 +709,13 @@ public:
                           "1 when momentum and charge were reversed to point from inferred source toward CMS");
     table->addColumn<int>(
         "inferredSourceSide", inferredSourceSide, "sign of reconstructed linePcaZ: -1=-z source, +1=+z source");
+    table->addColumn<int>("timingDirectionSign",
+                          timingDirectionSign,
+                          "chosen sign relative to fitted momentum; 0 when timing is inconclusive");
+    table->addColumn<int>("nTimingMeasurements", nTimingMeasurements, "number of timed DT/CSC segments");
+    table->addColumn<float>("timingChi2", timingChi2, "chi2 of the preferred time-of-flight direction");
+    table->addColumn<float>(
+        "timingDeltaChi2", timingDeltaChi2, "chi2 separation between the two time-of-flight directions");
     table->addColumn<float>("vx", vx, "x at field-aware stepping-helix PCA to the target line");
     table->addColumn<float>("vy", vy, "y at field-aware stepping-helix PCA to the target line");
     table->addColumn<float>("vz", vz, "z at field-aware stepping-helix PCA to the target line");
@@ -642,9 +779,8 @@ public:
         if (!lineApproach.valid || lineApproach.distance > maxPairDca_)
           continue;
 
-        int const firstCharge = shiftDirectionSign(firstState.momentum, eventSourceSide) * selected[first]->track->charge();
-        int const secondCharge =
-            shiftDirectionSign(secondState.momentum, eventSourceSide) * selected[second]->track->charge();
+        int const firstCharge = candidateDirectionSign(*selected[first]) * selected[first]->track->charge();
+        int const secondCharge = candidateDirectionSign(*selected[second]) * selected[second]->track->charge();
         if (requireOppositeSign_ && firstCharge == secondCharge)
           continue;
 
@@ -693,18 +829,17 @@ public:
 
       auto const& firstState = selected[first]->targetLineState;
       auto const& secondState = selected[second]->targetLineState;
-      int const firstCharge =
-          shiftDirectionSign(firstState.momentum, eventSourceSide) * selected[first]->track->charge();
-      int const secondCharge =
-          shiftDirectionSign(secondState.momentum, eventSourceSide) * selected[second]->track->charge();
+      int const firstCharge = candidateDirectionSign(*selected[first]) * selected[first]->track->charge();
+      int const secondCharge = candidateDirectionSign(*selected[second]) * selected[second]->track->charge();
 
-      auto canonicalMomentum = [eventSourceSide](PropagatedState const& state) {
-        double const sign = shiftDirectionSign(state.momentum, eventSourceSide);
+      auto canonicalMomentum = [&candidateDirectionSign](Candidate const& candidate) {
+        auto const& state = candidate.targetLineState;
+        double const sign = candidateDirectionSign(candidate);
         return std::array<double, 3>{
             sign * state.momentum.x(), sign * state.momentum.y(), sign * state.momentum.z()};
       };
-      auto const firstP = canonicalMomentum(firstState);
-      auto const secondP = canonicalMomentum(secondState);
+      auto const firstP = canonicalMomentum(*selected[first]);
+      auto const secondP = canonicalMomentum(*selected[second]);
       double const pairPx = firstP[0] + secondP[0];
       double const pairPy = firstP[1] + secondP[1];
       double const pairPz = firstP[2] + secondP[2];
@@ -810,6 +945,8 @@ public:
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
     description.add<double>("maxDuplicateLineDistance", 30.0);
+    description.add<unsigned int>("minTimingMeasurements", 2);
+    description.add<double>("minTimingDeltaChi2", 4.0);
     description.add<double>("maxTargetLineDca", 200.0);
     description.add<double>("minAbsEta", 3.0);
     description.add<double>("originTransverseResolution", 100.0);
@@ -830,10 +967,13 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
   edm::ESGetToken<Propagator, TrackingComponentsRecord> targetLinePropagatorToken_;
+  edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
   double maxDuplicateLineDistance_;
+  unsigned int minTimingMeasurements_;
+  double minTimingDeltaChi2_;
   double maxTargetLineDca_;
   double minAbsEta_;
   double originTransverseResolution_;
