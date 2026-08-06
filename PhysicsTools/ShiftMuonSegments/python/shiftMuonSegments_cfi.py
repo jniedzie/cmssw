@@ -13,7 +13,6 @@ shiftMuonTable = cms.EDProducer(
     cosmicTracks=cms.InputTag("shiftCosmicMuons"),
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
-    targetLinePropagator=cms.string("SteppingHelixPropagatorAny"),
     minSharedHitFraction=cms.double(0.5),
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),

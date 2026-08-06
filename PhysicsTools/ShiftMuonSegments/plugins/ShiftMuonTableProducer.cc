@@ -11,10 +11,11 @@
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
-#include "FWCore/Utilities/interface/ESInputTag.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
-#include "TrackingTools/Records/interface/TrackingComponentsRecord.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
+#include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixPropagator.h"
+#include "MagneticField/Engine/interface/MagneticField.h"
+#include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
 #include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
 
@@ -52,6 +53,7 @@ namespace {
     unsigned int timingMeasurements = 0;
     double timingChi2 = 0.;
     double timingDeltaChi2 = 0.;
+    int physicalDirectionSign = 0;
   };
 
   PropagatedState propagateToTargetLine(reco::Track const& track, Propagator const& propagator, int travelSign = 0) {
@@ -64,10 +66,22 @@ namespace {
     auto const& endpoint = useOuter ? track.outerPosition() : track.innerPosition();
     auto const& endpointMomentum = useOuter ? track.outerMomentum() : track.innerMomentum();
     GlobalPoint const position(endpoint.x(), endpoint.y(), endpoint.z());
-    GlobalVector const momentum(endpointMomentum.x(), endpointMomentum.y(), endpointMomentum.z());
-    FreeTrajectoryState const start(position, momentum, track.charge(), propagator.magneticField());
+    // Momentum and charge must be reversed together to describe the same
+    // fitted helix with the physical time orientation.  Since the external
+    // target lies behind the incoming particle, the any-direction propagator
+    // then selects the opposite-to-momentum geometrical solution.
+    double const sign = travelSign == 0 ? 1. : travelSign;
+    GlobalVector const momentum(sign * endpointMomentum.x(),
+                                sign * endpointMomentum.y(),
+                                sign * endpointMomentum.z());
+    FreeTrajectoryState const start(position, momentum, sign * track.charge(), propagator.magneticField());
     auto const propagated =
         propagator.propagateWithPath(start, GlobalPoint(0., 0., -1.), GlobalPoint(0., 0., 1.));
+    // A failed FreeTrajectoryState propagation is returned default-constructed
+    // (zero charge and a null field pointer), unlike a TSOS it has no
+    // isValid() accessor.  Check its sentinel before accessing position.
+    if (propagated.first.charge() == 0)
+      return {};
     auto const resultPosition = propagated.first.position();
     auto const resultMomentum = propagated.first.momentum();
     bool const valid = resultMomentum.mag2() > 0. && std::isfinite(resultPosition.x()) &&
@@ -341,8 +355,7 @@ public:
         traversingToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("traversingTracks"))),
         genParticlesToken_(
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
-        targetLinePropagatorToken_(esConsumes(
-            edm::ESInputTag("", parameters.getParameter<std::string>("targetLinePropagator")))),
+        magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
@@ -370,11 +383,21 @@ public:
     auto const cosmic = event.getHandle(cosmicToken_);
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
-    auto const& targetLinePropagator = setup.getData(targetLinePropagatorToken_);
+    auto const& magneticField = setup.getData(magneticFieldToken_);
+    // The standalone fits use their normal material-aware propagators between
+    // detector measurements.  Starting at the source-facing fitted endpoint,
+    // transport back to the external collision is through the assumed vacuum.
+    // Magnetic-volume navigation remains active, so the real CMS and fringe
+    // field map is used where defined and naturally vanishes far from CMS.
+    SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
+    vacuumPropagator.setMaterialMode(true);
+    vacuumPropagator.setUseMagVolumes(true);
+    vacuumPropagator.setUseMatVolumes(true);
+    vacuumPropagator.applyRadX0Correction(false);
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
 
     std::vector<Candidate> candidates;
-    auto append = [&candidates, &targetLinePropagator](auto const& handle, int source) {
+    auto append = [&candidates, &vacuumPropagator](auto const& handle, int source) {
       if (!handle.isValid())
         return;
       unsigned int index = 0;
@@ -383,7 +406,7 @@ public:
                               source,
                               index++,
                               hitFingerprints(track),
-                              propagateToTargetLine(track, targetLinePropagator)});
+                              propagateToTargetLine(track, vacuumPropagator)});
       }
     };
     // Preserve the public source numbering; representative precedence is
@@ -430,7 +453,8 @@ public:
       int const directionSign = candidate.timingDirectionSign != 0
                                     ? candidate.timingDirectionSign
                                     : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
-      candidate.targetLineState = propagateToTargetLine(*candidate.track, targetLinePropagator, directionSign);
+      candidate.physicalDirectionSign = directionSign;
+      candidate.targetLineState = propagateToTargetLine(*candidate.track, vacuumPropagator, directionSign);
     }
 
     // Do not select on reconstructed z.  Reject only invalid/empty fits and
@@ -562,8 +586,8 @@ public:
       duplicateGroupSize.push_back(group.size());
     }
     auto candidateDirectionSign = [eventSourceSide](Candidate const& candidate) {
-      return candidate.timingDirectionSign != 0
-                 ? candidate.timingDirectionSign
+      return candidate.physicalDirectionSign != 0
+                 ? candidate.physicalDirectionSign
                  : static_cast<int>(shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide));
     };
 
@@ -613,13 +637,12 @@ public:
       // Cosmic-style fits do not determine which way along the fitted helix
       // the particle travelled.  Orient it from the inferred source side
       // toward CMS, supporting both +z and -z SHIFT locations without truth.
-      double const sign = candidate->timingDirectionSign != 0
-                              ? candidate->timingDirectionSign
-                              : shiftDirectionSign(propagated.momentum, eventSourceSide);
+      double const sign = candidateDirectionSign(*candidate);
       bool const flip = sign < 0.;
-      double const storedPx = sign * propagated.momentum.x();
-      double const storedPy = sign * propagated.momentum.y();
-      double const storedPz = sign * propagated.momentum.z();
+      // The propagated state was already canonicalised before transport.
+      double const storedPx = propagated.momentum.x();
+      double const storedPy = propagated.momentum.y();
+      double const storedPz = propagated.momentum.z();
       double const storedPt = std::hypot(storedPx, storedPy);
       double const storedP = propagated.momentum.mag();
       pt.push_back(storedPt);
@@ -832,11 +855,9 @@ public:
       int const firstCharge = candidateDirectionSign(*selected[first]) * selected[first]->track->charge();
       int const secondCharge = candidateDirectionSign(*selected[second]) * selected[second]->track->charge();
 
-      auto canonicalMomentum = [&candidateDirectionSign](Candidate const& candidate) {
+      auto canonicalMomentum = [](Candidate const& candidate) {
         auto const& state = candidate.targetLineState;
-        double const sign = candidateDirectionSign(candidate);
-        return std::array<double, 3>{
-            sign * state.momentum.x(), sign * state.momentum.y(), sign * state.momentum.z()};
+        return std::array<double, 3>{state.momentum.x(), state.momentum.y(), state.momentum.z()};
       };
       auto const firstP = canonicalMomentum(*selected[first]);
       auto const secondP = canonicalMomentum(*selected[second]);
@@ -940,7 +961,6 @@ public:
     description.add<edm::InputTag>("cosmicTracks", edm::InputTag("shiftCosmicMuons"));
     description.add<edm::InputTag>("traversingTracks", edm::InputTag("shiftTraversingMuons"));
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
-    description.add<std::string>("targetLinePropagator", "SteppingHelixPropagatorAny");
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -966,7 +986,7 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> cosmicToken_;
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
-  edm::ESGetToken<Propagator, TrackingComponentsRecord> targetLinePropagatorToken_;
+  edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
