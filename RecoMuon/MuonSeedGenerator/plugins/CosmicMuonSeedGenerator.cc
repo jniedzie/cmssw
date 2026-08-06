@@ -58,6 +58,7 @@ CosmicMuonSeedGenerator::CosmicMuonSeedGenerator(const edm::ParameterSet& pset) 
   thePairSegmentPt = pset.getParameter<double>("PairSegmentPt");
   theUsePairPtEstimate = pset.getParameter<bool>("UsePairPtEstimate");
   theTryBothPairCharges = pset.getParameter<bool>("TryBothPairCharges");
+  theTryBothDirections = pset.getParameter<bool>("TryBothDirections");
 
   theForcePointDownFlag = pset.existsAs<bool>("ForcePointDown") ? pset.getParameter<bool>("ForcePointDown") : true;
   theKeepAllSegmentsFlag = pset.getParameter<bool>("KeepAllSegments");
@@ -348,14 +349,6 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const MuonRecHit
 
   polar *= fabs(pt) / polar.perp();
 
-  LocalVector segDir = hit->det()->toLocal(polar);
-
-  int charge = 1;
-  LocalTrajectoryParameters param(segPos, segDir, charge);
-
-  charge = -1;
-  LocalTrajectoryParameters param2(segPos, segDir, charge);
-
   mat = hit->parametersError().similarityT(hit->projectionMatrix());
 
   float p_err = 0.2;
@@ -364,20 +357,23 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const MuonRecHit
   LocalTrajectoryError error(asSMatrix<5>(mat));
 
   // Create the TrajectoryStateOnSurface
-  TrajectoryStateOnSurface tsos(param, error, hit->det()->surface(), &*theField);
-  TrajectoryStateOnSurface tsos2(param2, error, hit->det()->surface(), &*theField);
-
   LogTrace(category) << "Trajectory State on Surface of Seed";
-  LogTrace(category) << "mom: " << tsos.globalMomentum() << " phi: " << tsos.globalMomentum().phi();
-  LogTrace(category) << "pos: " << tsos.globalPosition();
   LogTrace(category) << "The RecSegment relies on: ";
   LogTrace(category) << dumper.dumpMuonId(hit->geographicalId());
 
-  edm::OwnVector<TrackingRecHit> container;
-  container.push_back(hit->hit()->clone());
-
-  result.push_back(tsosToSeed(tsos, hit->geographicalId().rawId(), container));
-  result.push_back(tsosToSeed(tsos2, hit->geographicalId().rawId(), container));
+  auto addDirection = [&](GlobalVector const& momentum) {
+    LocalVector const segDir = hit->det()->toLocal(momentum);
+    for (int const charge : {1, -1}) {
+      LocalTrajectoryParameters const param(segPos, segDir, charge);
+      TrajectoryStateOnSurface const tsos(param, error, hit->det()->surface(), &*theField);
+      edm::OwnVector<TrackingRecHit> container;
+      container.push_back(hit->hit()->clone());
+      result.push_back(tsosToSeed(tsos, hit->geographicalId().rawId(), container));
+    }
+  };
+  addDirection(polar);
+  if (theTryBothDirections)
+    addDirection(-polar);
 
   return result;
 }
@@ -515,10 +511,6 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const CosmicMuon
 
   polar *= fabs(pt) / polar.perp();
 
-  LocalVector segDir = hit->det()->toLocal(polar);
-
-  LocalTrajectoryParameters param(segPos, segDir, charge);
-
   mat = hit->parametersError().similarityT(hit->projectionMatrix());
 
   float p_err = 0.004 / paraC;
@@ -529,13 +521,7 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const CosmicMuon
   LocalTrajectoryError error(asSMatrix<5>(mat));
 
   // Create the TrajectoryStateOnSurface
-  TrajectoryStateOnSurface tsos(param, error, hit->det()->surface(), &*theField);
-  LocalTrajectoryParameters oppositeChargeParam(segPos, segDir, -charge);
-  TrajectoryStateOnSurface oppositeChargeTsos(oppositeChargeParam, error, hit->det()->surface(), &*theField);
-
   LogTrace(category) << "Trajectory State on Surface of Seed";
-  LogTrace(category) << "mom: " << tsos.globalMomentum() << " phi: " << tsos.globalMomentum().phi();
-  LogTrace(category) << "pos: " << tsos.globalPosition();
   LogTrace(category) << "The RecSegment relies on: ";
   LogTrace(category) << dumper.dumpMuonId(hit->geographicalId());
 
@@ -545,12 +531,21 @@ std::vector<TrajectorySeed> CosmicMuonSeedGenerator::createSeed(const CosmicMuon
     container.push_back(hitpair.second->hit()->clone());
     return container;
   };
-  auto container = makeHitContainer();
-  result.push_back(tsosToSeed(tsos, hit->geographicalId().rawId(), container));
-  if (theTryBothPairCharges) {
-    auto oppositeContainer = makeHitContainer();
-    result.push_back(tsosToSeed(oppositeChargeTsos, hit->geographicalId().rawId(), oppositeContainer));
-  }
+  auto addDirection = [&](GlobalVector const& momentum, int nominalCharge) {
+    LocalVector const segDir = hit->det()->toLocal(momentum);
+    auto addCharge = [&](int seedCharge) {
+      LocalTrajectoryParameters const param(segPos, segDir, seedCharge);
+      TrajectoryStateOnSurface const tsos(param, error, hit->det()->surface(), &*theField);
+      auto container = makeHitContainer();
+      result.push_back(tsosToSeed(tsos, hit->geographicalId().rawId(), container));
+    };
+    addCharge(nominalCharge);
+    if (theTryBothPairCharges)
+      addCharge(-nominalCharge);
+  };
+  addDirection(polar, charge);
+  if (theTryBothDirections)
+    addDirection(-polar, -charge);
 
   return result;
 }
@@ -587,6 +582,8 @@ void CosmicMuonSeedGenerator::fillDescriptions(edm::ConfigurationDescriptions& d
       ->setComment("use the empirical cosmic-muon segment-delta-phi pT estimate");
   desc.add<bool>("TryBothPairCharges", false)
       ->setComment("make both charge hypotheses for each two-segment seed");
+  desc.add<bool>("TryBothDirections", false)
+      ->setComment("fit both orientations of the timing-ambiguous segment axis");
   desc.add<bool>("ForcePointDown", true);
   desc.add<bool>("KeepAllSegments", false)
       ->setComment("Keep every qualified segment instead of cosmic-ray global-y correlation pruning");

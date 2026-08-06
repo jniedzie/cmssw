@@ -133,6 +133,7 @@ private:
   double thePairSegmentPt;
   bool theUsePairPtEstimate;
   bool theTryBothPairCharges;
+  bool theTryBothDirections;
   bool theForcePointDownFlag;
   bool theKeepAllSegmentsFlag;
   edm::ESHandle<MuonDetLayerGeometry> theMuonLayers;

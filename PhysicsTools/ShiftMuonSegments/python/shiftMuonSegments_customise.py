@@ -60,6 +60,7 @@ def customiseTraversingShiftMuonReco(process):
 
     process.shiftCosmicMuonSeed = CosmicMuonSeed.clone(
         ForcePointDown=False,
+        TryBothDirections=True,
         KeepAllSegments=True,
         MaxCSCChi2=1000.0,
         MaxDTChi2=1000.0,
@@ -143,6 +144,7 @@ def customiseRecoForShiftMuons(
     process.displacedMuonSeeds.PairSegmentPt = 0.01
     process.displacedMuonSeeds.UsePairPtEstimate = False
     process.displacedMuonSeeds.TryBothPairCharges = True
+    process.displacedMuonSeeds.TryBothDirections = True
     if hasattr(process, "displacedMuonReducedTrackExtras"):
         process.displacedMuonReducedTrackExtras.cut = cms.string("pt > 0")
 
