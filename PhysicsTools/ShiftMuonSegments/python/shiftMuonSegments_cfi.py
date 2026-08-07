@@ -14,8 +14,14 @@ shiftMuonTable = cms.EDProducer(
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
+    # Only loosen the q/p seed. Angular and position errors retain the useful
+    # original fit constraints while each nonlinear pass can re-estimate scale.
+    directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
+    # Backward-start uncertainty used internally by KFTrajectorySmoother.
     directionalRefitErrorRescale=cms.double(100.0),
     directionalRefitMaxHitChi2=cms.double(100000.0),
+    # Reject a second pass that moves too far from the first smoothed q/p.
+    directionalRefitMaxRelativeQoverPChange=cms.double(0.5),
     minSharedHitFraction=cms.double(0.5),
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),
