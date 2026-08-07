@@ -15,8 +15,11 @@
 <use name="Geometry/CommonTopologies"/>
 <use name="Geometry/Records"/>
 <use name="TrackingTools/GeomPropagators"/>
+<use name="TrackingTools/KalmanUpdators"/>
 <use name="TrackingTools/Records"/>
+<use name="TrackingTools/TrajectoryParametrization"/>
 <use name="TrackingTools/TrajectoryState"/>
+<use name="TrackingTools/TransientTrackingRecHit"/>
 <use name="TrackPropagation/SteppingHelixPropagator"/>
 <use name="MagneticField/Engine"/>
 <use name="MagneticField/Records"/>
