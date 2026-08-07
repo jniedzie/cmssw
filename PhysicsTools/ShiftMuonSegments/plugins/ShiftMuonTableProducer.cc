@@ -5,14 +5,24 @@
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegment.h"
 #include "DataFormats/DTRecHit/interface/DTRecSegment4D.h"
+#include "DataFormats/GeometrySurface/interface/Plane.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/ConsumesCollector.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "FWCore/Utilities/interface/ESInputTag.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
+#include "TrackingTools/KalmanUpdators/interface/Chi2MeasurementEstimator.h"
+#include "TrackingTools/KalmanUpdators/interface/KFUpdator.h"
+#include "TrackingTools/Records/interface/TransientRecHitRecord.h"
+#include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
+#include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
+#include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
+#include "TrackingTools/TransientTrackingRecHit/interface/TransientTrackingRecHitBuilder.h"
 #include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixPropagator.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
@@ -27,6 +37,7 @@
 #include <memory>
 #include <numeric>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -54,29 +65,43 @@ namespace {
     double timingChi2 = 0.;
     double timingDeltaChi2 = 0.;
     int physicalDirectionSign = 0;
+    bool directionalRefitAttempted = false;
+    bool directionalRefitValid = false;
+    unsigned int directionalRefitHits = 0;
+    double directionalRefitChi2 = 0.;
+    double directionalRefitNdof = 0.;
+    double directionalRefitUpstreamPt = 0.;
+    double preRefitPt = 0.;
   };
 
-  PropagatedState propagateToTargetLine(reco::Track const& track, Propagator const& propagator, int travelSign = 0) {
-    // Once the event side is known, start from the fitted endpoint closest in
-    // z to the external source.  This avoids beginning the backward transport
-    // from a state that has already crossed additional detector material.
-    auto const endpointDelta = track.outerPosition() - track.innerPosition();
-    bool const useOuter = travelSign != 0 &&
-                          travelSign * track.innerMomentum().Dot(endpointDelta) < 0.;
-    auto const& endpoint = useOuter ? track.outerPosition() : track.innerPosition();
-    auto const& endpointMomentum = useOuter ? track.outerMomentum() : track.innerMomentum();
-    GlobalPoint const position(endpoint.x(), endpoint.y(), endpoint.z());
-    // Momentum and charge must be reversed together to describe the same
-    // fitted helix with the physical time orientation.  Since the external
-    // target lies behind the incoming particle, the any-direction propagator
-    // then selects the opposite-to-momentum geometrical solution.
-    double const sign = travelSign == 0 ? 1. : travelSign;
-    GlobalVector const momentum(sign * endpointMomentum.x(),
-                                sign * endpointMomentum.y(),
-                                sign * endpointMomentum.z());
-    FreeTrajectoryState const start(position, momentum, sign * track.charge(), propagator.magneticField());
-    auto const propagated =
-        propagator.propagateWithPath(start, GlobalPoint(0., 0., -1.), GlobalPoint(0., 0., 1.));
+  PropagatedState propagateStateToTargetLine(GlobalPoint const& position,
+                                             GlobalVector const& momentum,
+                                             int charge,
+                                             Propagator const& vacuumPropagator,
+                                             Propagator const* materialPropagator = nullptr,
+                                             int sourceSide = 0) {
+    FreeTrajectoryState const start(position, momentum, charge, vacuumPropagator.magneticField());
+    // SteppingHelixPropagator uses an internal approximate R-Z material map,
+    // not the detailed detector geometry.  Its last modeled CMS endcap
+    // structures end near |z|=1073 cm, while more distant regions are not a
+    // reliable description of the evacuated SHIFT-to-CMS flight path.  Stop
+    // the material-aware transport just outside that envelope, then continue
+    // in vacuum to the external target line.
+    constexpr double materialBoundaryZ = 1100.;
+    FreeTrajectoryState vacuumStart = start;
+    double path = 0.;
+    if (materialPropagator && sourceSide != 0 && sourceSide * position.z() < materialBoundaryZ) {
+      auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryZ),
+                                         Surface::RotationType());
+      auto const toBoundary = materialPropagator->propagateWithPath(start, *boundary);
+      if (!toBoundary.first.isValid() || !toBoundary.first.freeState())
+        return {};
+      vacuumStart = *toBoundary.first.freeState();
+      path += toBoundary.second;
+    }
+
+    auto const propagated = vacuumPropagator.propagateWithPath(
+        vacuumStart, GlobalPoint(0., 0., -1.), GlobalPoint(0., 0., 1.));
     // A failed FreeTrajectoryState propagation is returned default-constructed
     // (zero charge and a null field pointer), unlike a TSOS it has no
     // isValid() accessor.  Check its sentinel before accessing position.
@@ -86,8 +111,146 @@ namespace {
     auto const resultMomentum = propagated.first.momentum();
     bool const valid = resultMomentum.mag2() > 0. && std::isfinite(resultPosition.x()) &&
                        std::isfinite(resultPosition.y()) && std::isfinite(resultPosition.z()) &&
-                       std::isfinite(propagated.second);
-    return {valid, resultPosition, resultMomentum, propagated.second};
+                       std::isfinite(path + propagated.second);
+    return {valid, resultPosition, resultMomentum, path + propagated.second};
+  }
+
+  PropagatedState propagateToTargetLine(reco::Track const& track,
+                                        Propagator const& vacuumPropagator,
+                                        int travelSign = 0,
+                                        Propagator const* materialPropagator = nullptr,
+                                        int sourceSide = 0) {
+    // Once the event side is known, start from the fitted endpoint closest in
+    // z to the external source.  This avoids beginning the backward transport
+    // from a state that has already crossed additional detector material.
+    auto const endpointDelta = track.outerPosition() - track.innerPosition();
+    bool const useOuter = travelSign != 0 && travelSign * track.innerMomentum().Dot(endpointDelta) < 0.;
+    auto const& endpoint = useOuter ? track.outerPosition() : track.innerPosition();
+    auto const& endpointMomentum = useOuter ? track.outerMomentum() : track.innerMomentum();
+    GlobalPoint const position(endpoint.x(), endpoint.y(), endpoint.z());
+    // Momentum and charge must be reversed together to describe the same
+    // fitted helix with the physical time orientation.  Since the external
+    // target lies behind the incoming particle, the any-direction propagator
+    // then selects the opposite-to-momentum geometrical solution.
+    double const sign = travelSign == 0 ? 1. : travelSign;
+    GlobalVector const momentum(
+        sign * endpointMomentum.x(), sign * endpointMomentum.y(), sign * endpointMomentum.z());
+    return propagateStateToTargetLine(position,
+                                      momentum,
+                                      sign * track.charge(),
+                                      vacuumPropagator,
+                                      materialPropagator,
+                                      sourceSide);
+  }
+
+  struct DirectionalRefitResult {
+    bool valid = false;
+    unsigned int hits = 0;
+    double chi2 = 0.;
+    double ndof = 0.;
+    double upstreamPt = 0.;
+    PropagatedState targetLineState;
+  };
+
+  DirectionalRefitResult directionalRefit(reco::Track const& track,
+                                          int directionSign,
+                                          int sourceSide,
+                                          MagneticField const& magneticField,
+                                          TransientTrackingRecHitBuilder const& hitBuilder,
+                                          Propagator const& vacuumPropagator,
+                                          Propagator const& materialPropagator,
+                                          double errorRescale,
+                                          double maxHitChi2) {
+    struct OrderedHit {
+      TransientTrackingRecHit::RecHitPointer hit;
+      double sourceCoordinate;
+    };
+    std::vector<OrderedHit> orderedHits;
+    for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
+      if (!(*hit)->isValid() || (*hit)->geographicalId().det() != DetId::Muon)
+        continue;
+      auto transientHit = hitBuilder.build(&**hit);
+      if (!transientHit || !transientHit->isValid() || !transientHit->det())
+        continue;
+      orderedHits.push_back({transientHit, sourceSide * transientHit->globalPosition().z()});
+    }
+    if (orderedHits.size() < 3)
+      return {};
+    std::stable_sort(orderedHits.begin(), orderedHits.end(), [](OrderedHit const& first, OrderedHit const& second) {
+      return first.sourceCoordinate > second.sourceCoordinate;
+    });
+
+    bool const useOuter = sourceSide * track.outerPosition().z() > sourceSide * track.innerPosition().z();
+    auto const original = useOuter ? trajectoryStateTransform::outerFreeState(track, &magneticField)
+                                   : trajectoryStateTransform::innerFreeState(track, &magneticField);
+    if (!original.hasError())
+      return {};
+    double const sign = directionSign == 0 ? 1. : directionSign;
+    auto const rawMomentum = original.momentum();
+    GlobalVector const momentum(sign * rawMomentum.x(), sign * rawMomentum.y(), sign * rawMomentum.z());
+    GlobalTrajectoryParameters const parameters(
+        original.position(), momentum, sign * original.charge(), &magneticField);
+    FreeTrajectoryState start(parameters, original.curvilinearError());
+    start.rescaleError(errorRescale);
+
+    KFUpdator updator;
+    Chi2MeasurementEstimator estimator(maxHitChi2);
+    auto filter = [&](FreeTrajectoryState const& initial,
+                      auto begin,
+                      auto end,
+                      bool skipFirst) -> std::tuple<TrajectoryStateOnSurface, unsigned int, double> {
+      TrajectoryStateOnSurface current;
+      unsigned int accepted = 0;
+      double chi2 = 0.;
+      for (auto iterator = begin; iterator != end; ++iterator) {
+        if (skipFirst) {
+          skipFirst = false;
+          continue;
+        }
+        auto const predicted = current.isValid()
+                                   ? materialPropagator.propagate(current, iterator->hit->det()->surface())
+                                   : materialPropagator.propagate(initial, iterator->hit->det()->surface());
+        if (!predicted.isValid())
+          continue;
+        auto const estimate = estimator.estimate(predicted, *iterator->hit);
+        if (!estimate.first)
+          continue;
+        auto const updated = updator.update(predicted, *iterator->hit);
+        if (!updated.isValid())
+          continue;
+        current = updated;
+        chi2 += estimate.second;
+        ++accepted;
+      }
+      return {current, accepted, chi2};
+    };
+
+    auto const [downstream, forwardHits, forwardChi2] =
+        filter(start, orderedHits.begin(), orderedHits.end(), false);
+    if (!downstream.isValid() || forwardHits < 3 || !downstream.freeState())
+      return {};
+    FreeTrajectoryState backwardStart = *downstream.freeState();
+    backwardStart.rescaleError(errorRescale);
+    auto const [upstream, backwardHits, backwardChi2] =
+        filter(backwardStart, orderedHits.rbegin(), orderedHits.rend(), true);
+    if (!upstream.isValid() || backwardHits < 2)
+      return {};
+
+    auto const upstreamMomentum = upstream.globalMomentum();
+    auto const targetLineState = propagateStateToTargetLine(upstream.globalPosition(),
+                                                            upstreamMomentum,
+                                                            upstream.charge(),
+                                                            vacuumPropagator,
+                                                            &materialPropagator,
+                                                            sourceSide);
+    if (!targetLineState.valid)
+      return {};
+    return {true,
+            std::min(forwardHits, backwardHits + 1),
+            forwardChi2 + backwardChi2,
+            std::max(1., 2. * static_cast<double>(std::min(forwardHits, backwardHits + 1)) - 5.),
+            upstreamMomentum.perp(),
+            targetLineState};
   }
 
   struct TimingResult {
@@ -357,6 +520,10 @@ public:
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
         magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
+        muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
+            "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
+        directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
+        directionalRefitMaxHitChi2_(parameters.getParameter<double>("directionalRefitMaxHitChi2")),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
@@ -384,17 +551,19 @@ public:
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
-    // The standalone fits use their normal material-aware propagators between
-    // detector measurements.  Starting at the source-facing fitted endpoint,
-    // transport back to the external collision is through the assumed vacuum.
-    // Magnetic-volume navigation remains active, so the real CMS and fringe
-    // field map is used where defined and naturally vanishes far from CMS.
+    // Use material effects only within the modeled CMS envelope.  Outside it,
+    // propagate through the evacuated SHIFT-to-CMS flight path without dE/dx.
+    SteppingHelixPropagator materialPropagator(&magneticField, anyDirection);
+    // In this API the argument is `noMaterial`, so false enables dE/dx.
+    materialPropagator.setMaterialMode(false);
+    materialPropagator.setUseMagVolumes(true);
+    materialPropagator.setUseMatVolumes(true);
+    materialPropagator.applyRadX0Correction(true);
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
     vacuumPropagator.setUseMagVolumes(true);
-    vacuumPropagator.setUseMatVolumes(true);
-    vacuumPropagator.applyRadX0Correction(false);
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
+    auto const& muonRecHitBuilder = setup.getData(muonRecHitBuilderToken_);
 
     std::vector<Candidate> candidates;
     auto append = [&candidates, &vacuumPropagator](auto const& handle, int source) {
@@ -454,7 +623,31 @@ public:
                                     ? candidate.timingDirectionSign
                                     : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
       candidate.physicalDirectionSign = directionSign;
-      candidate.targetLineState = propagateToTargetLine(*candidate.track, vacuumPropagator, directionSign);
+      auto const preRefitState = propagateToTargetLine(
+          *candidate.track, vacuumPropagator, directionSign, &materialPropagator, eventSourceSide);
+      candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
+      candidate.targetLineState = preRefitState;
+
+      // Refit the same reconstructed hits in their measured time-of-flight
+      // direction.  This changes the direction in which the Kalman filter
+      // applies material updates; flipping a completed fit cannot do that.
+      candidate.directionalRefitAttempted = true;
+      auto const refit = directionalRefit(*candidate.track,
+                                          directionSign,
+                                          eventSourceSide,
+                                          magneticField,
+                                          muonRecHitBuilder,
+                                          vacuumPropagator,
+                                          materialPropagator,
+                                          directionalRefitErrorRescale_,
+                                          directionalRefitMaxHitChi2_);
+      candidate.directionalRefitValid = refit.valid;
+      candidate.directionalRefitHits = refit.hits;
+      candidate.directionalRefitChi2 = refit.chi2;
+      candidate.directionalRefitNdof = refit.ndof;
+      candidate.directionalRefitUpstreamPt = refit.upstreamPt;
+      if (refit.valid)
+        candidate.targetLineState = refit.targetLineState;
     }
 
     // Do not select on reconstructed z.  Reject only invalid/empty fits and
@@ -622,12 +815,14 @@ public:
         }
     }
 
-    std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, ptError, etaError,
+    std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, preRefitPt,
+        directionalRefitUpstreamPt, directionalRefitChi2, directionalRefitNdof, ptError, etaError,
         phiError, vx, vy, vz, trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof,
         normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
     std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
-        inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements;
+        inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
+        directionalRefitValid, directionalRefitHits;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -660,6 +855,13 @@ public:
       auto const endpointDelta = track.outerPosition() - track.innerPosition();
       bool const upstreamIsOuter = sign * track.innerMomentum().Dot(endpointDelta) < 0.;
       upstreamPt.push_back(upstreamIsOuter ? track.outerMomentum().rho() : track.innerMomentum().rho());
+      preRefitPt.push_back(candidate->preRefitPt);
+      directionalRefitUpstreamPt.push_back(candidate->directionalRefitUpstreamPt);
+      directionalRefitAttempted.push_back(candidate->directionalRefitAttempted);
+      directionalRefitValid.push_back(candidate->directionalRefitValid);
+      directionalRefitHits.push_back(candidate->directionalRefitHits);
+      directionalRefitChi2.push_back(candidate->directionalRefitChi2);
+      directionalRefitNdof.push_back(candidate->directionalRefitNdof);
       ptError.push_back(track.ptError());
       etaError.push_back(track.etaError());
       phiError.push_back(track.phiError());
@@ -720,6 +922,18 @@ public:
     table->addColumn<float>("innerPt", innerPt, "pT at the geometrically inner detector state");
     table->addColumn<float>("outerPt", outerPt, "pT at the geometrically outer detector state");
     table->addColumn<float>("upstreamPt", upstreamPt, "pT at the fitted endpoint nearest the inferred source side");
+    table->addColumn<float>("preRefitPt", preRefitPt, "target-line pT before the timing-directed Kalman refit");
+    table->addColumn<float>(
+        "directionalRefitUpstreamPt", directionalRefitUpstreamPt, "pT at the source-facing refitted hit state");
+    table->addColumn<int>("directionalRefitAttempted",
+                          directionalRefitAttempted,
+                          "1 when the timing/inferred-direction Kalman refit was attempted");
+    table->addColumn<int>("directionalRefitValid",
+                          directionalRefitValid,
+                          "1 when final kinematics come from the timing/inferred-direction Kalman refit");
+    table->addColumn<int>("directionalRefitHits", directionalRefitHits, "valid hits retained by the directional refit");
+    table->addColumn<float>("directionalRefitChi2", directionalRefitChi2, "directional-refit trajectory chi2");
+    table->addColumn<float>("directionalRefitNdof", directionalRefitNdof, "directional-refit trajectory ndof");
     table->addColumn<float>("ptErr", ptError, "transverse-momentum uncertainty");
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
@@ -964,6 +1178,9 @@ public:
     description.add<edm::InputTag>("cosmicTracks", edm::InputTag("shiftCosmicMuons"));
     description.add<edm::InputTag>("traversingTracks", edm::InputTag("shiftTraversingMuons"));
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
+    description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
+    description.add<double>("directionalRefitErrorRescale", 100.0);
+    description.add<double>("directionalRefitMaxHitChi2", 100000.0);
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -991,6 +1208,9 @@ private:
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
+  edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
+  double directionalRefitErrorRescale_;
+  double directionalRefitMaxHitChi2_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;

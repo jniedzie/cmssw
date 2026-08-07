@@ -4,6 +4,9 @@ from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegmen
 shiftMuonSegmentsSequence = cms.Sequence(shiftMuonSegmentsCounter + shiftMuonTable + shiftMuonSegments)
 
 def addShiftMuonSegments(process):
+    # The directional two-pass fit uses only muon transient rechits; avoid the
+    # tracker-oriented TracksToTrajectories EventSetup chain in NanoAOD jobs.
+    process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
     # NanoAOD retains FlatTables with module labels matching ``*Table``.  Keep
