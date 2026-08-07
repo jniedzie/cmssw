@@ -23,6 +23,7 @@
 #include "TrackingTools/TrackFitters/interface/KFTrajectoryFitter.h"
 #include "TrackingTools/TrackFitters/interface/KFTrajectorySmoother.h"
 #include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
+#include "TrackingTools/TrajectoryParametrization/interface/CurvilinearTrajectoryError.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
@@ -75,6 +76,29 @@ namespace {
     double directionalRefitNdof = 0.;
     double directionalRefitUpstreamPt = 0.;
     double preRefitPt = 0.;
+    double preRefitPz = 0.;
+    bool directionalRefitFirstValid = false;
+    unsigned int directionalRefitFirstHits = 0;
+    double directionalRefitFirstChi2 = 0.;
+    double directionalRefitFirstNdof = 0.;
+    double directionalRefitFirstUpstreamPt = 0.;
+    double directionalRefitFirstQoverP = 0.;
+    double directionalRefitFirstTargetPt = 0.;
+    double directionalRefitFirstTargetPz = 0.;
+    bool directionalRefitSecondValid = false;
+    unsigned int directionalRefitSecondHits = 0;
+    double directionalRefitSecondChi2 = 0.;
+    double directionalRefitSecondNdof = 0.;
+    double directionalRefitSecondUpstreamPt = 0.;
+    double directionalRefitSecondQoverP = 0.;
+    double directionalRefitSecondTargetPt = 0.;
+    double directionalRefitSecondTargetPz = 0.;
+    bool directionalRefitSecondConverged = false;
+    double directionalRefitRelativeQoverPChange = -1.;
+    int directionalRefitSelectedIteration = 0;
+    double directionalRefitVacuumTargetPt = 0.;
+    double directionalRefitVacuumTargetPz = 0.;
+    double directionalRefitMaterialDeltaPt = 0.;
   };
 
   PropagatedState propagateStateToTargetLine(GlobalPoint const& position,
@@ -146,14 +170,38 @@ namespace {
                                       sourceSide);
   }
 
-  struct DirectionalRefitResult {
+  struct RefitIterationResult {
     bool valid = false;
     unsigned int hits = 0;
     double chi2 = 0.;
     double ndof = 0.;
     double upstreamPt = 0.;
-    PropagatedState targetLineState;
+    double signedInverseMomentum = 0.;
+    TrajectoryStateOnSurface upstreamState;
+    PropagatedState materialTargetState;
+    PropagatedState vacuumTargetState;
   };
+
+  struct DirectionalRefitResult {
+    bool valid = false;
+    RefitIterationResult first;
+    RefitIterationResult second;
+    bool secondConverged = false;
+    double relativeQoverPChange = -1.;
+    int selectedIteration = 0;
+    RefitIterationResult selected;
+  };
+
+  FreeTrajectoryState inflateCurvatureError(FreeTrajectoryState const& state, double scale) {
+    auto covariance = state.curvilinearError().matrix();
+    // Curvilinear parameter zero is signed inverse momentum.  Inflate its
+    // uncertainty, and its covariances so correlation coefficients remain
+    // unchanged, without weakening the already useful angular/position seed.
+    covariance(0, 0) *= scale * scale;
+    for (unsigned int index = 1; index < 5; ++index)
+      covariance(index, 0) *= scale;
+    return FreeTrajectoryState(state.parameters(), CurvilinearTrajectoryError(covariance));
+  }
 
   DirectionalRefitResult directionalRefit(reco::Track const& track,
                                           int directionSign,
@@ -163,8 +211,10 @@ namespace {
                                           TkCloner const& hitCloner,
                                           Propagator const& vacuumPropagator,
                                           Propagator const& materialPropagator,
-                                          double errorRescale,
-                                          double maxHitChi2) {
+                                          double seedCurvatureErrorRescale,
+                                          double smootherErrorRescale,
+                                          double maxHitChi2,
+                                          double maxRelativeQoverPChange) {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
       double sourceCoordinate;
@@ -194,57 +244,85 @@ namespace {
     GlobalVector const momentum(sign * rawMomentum.x(), sign * rawMomentum.y(), sign * rawMomentum.z());
     GlobalTrajectoryParameters const parameters(
         original.position(), momentum, sign * original.charge(), &magneticField);
-    FreeTrajectoryState start(parameters, original.curvilinearError());
-    start.rescaleError(errorRescale);
+    FreeTrajectoryState const originalSeed(parameters, original.curvilinearError());
 
     Trajectory::RecHitContainer fitHits;
     fitHits.reserve(orderedHits.size());
     for (auto const& orderedHit : orderedHits)
       fitHits.push_back(orderedHit.hit);
 
-    auto const firstPredicted = materialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
-    if (!firstPredicted.isValid())
-      return {};
-
     KFUpdator updator;
     Chi2MeasurementEstimator estimator(maxHitChi2);
     KFTrajectoryFitter fitter(materialPropagator, updator, estimator, 3, nullptr, &hitCloner);
-    TrajectorySeed const seed(
-        PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
-    auto const filtered = fitter.fitOne(seed, fitHits, firstPredicted, TrajectoryFitter::standard);
-    if (!filtered.isValid() || filtered.foundHits() < 3)
-      return {};
-
     KFTrajectorySmoother smoother(
-        materialPropagator, updator, estimator, static_cast<float>(errorRescale), 3);
+        materialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
     smoother.setHitCloner(&hitCloner);
-    auto const smoothed = smoother.trajectory(filtered);
-    if (!smoothed.isValid() || smoothed.foundHits() < 3 || smoothed.empty())
-      return {};
 
-    // The smoother returns measurements in the reverse order of the forward
-    // source-to-CMS fit.  Its last measurement is therefore the source-facing
-    // state, consistently combining the forward and backward information
-    // without applying the same measurement twice.
-    auto const& upstream = smoothed.lastMeasurement().updatedState();
-    if (!upstream.isValid())
-      return {};
-    auto const upstreamMomentum = upstream.globalMomentum();
-    auto const targetLineState = propagateStateToTargetLine(upstream.globalPosition(),
-                                                            upstreamMomentum,
-                                                            upstream.charge(),
-                                                            vacuumPropagator,
-                                                            &materialPropagator,
-                                                            sourceSide);
-    if (!targetLineState.valid)
-      return {};
-    auto const refitHits = static_cast<unsigned int>(smoothed.foundHits());
-    return {true,
-            refitHits,
-            smoothed.chiSquared(),
-            std::max(1., 2. * static_cast<double>(refitHits) - 5.),
-            upstreamMomentum.perp(),
-            targetLineState};
+    auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed) {
+      RefitIterationResult result;
+      auto const start = inflateCurvatureError(uninflatedSeed, seedCurvatureErrorRescale);
+      auto const firstPredicted = materialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
+      if (!firstPredicted.isValid())
+        return result;
+      TrajectorySeed const seed(
+          PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
+      auto const filtered = fitter.fitOne(seed, fitHits, firstPredicted, TrajectoryFitter::standard);
+      if (!filtered.isValid() || filtered.foundHits() < 3)
+        return result;
+      auto const smoothed = smoother.trajectory(filtered);
+      if (!smoothed.isValid() || smoothed.foundHits() < 3 || smoothed.empty())
+        return result;
+
+      // The smoother returns measurements in the reverse order of the
+      // source-to-CMS filter. Its last state is therefore source-facing.
+      auto const& upstream = smoothed.lastMeasurement().updatedState();
+      if (!upstream.isValid() || !upstream.freeState())
+        return result;
+      auto const upstreamMomentum = upstream.globalMomentum();
+      auto const materialTargetState = propagateStateToTargetLine(upstream.globalPosition(),
+                                                                  upstreamMomentum,
+                                                                  upstream.charge(),
+                                                                  vacuumPropagator,
+                                                                  &materialPropagator,
+                                                                  sourceSide);
+      auto const vacuumTargetState = propagateStateToTargetLine(upstream.globalPosition(),
+                                                                upstreamMomentum,
+                                                                upstream.charge(),
+                                                                vacuumPropagator,
+                                                                nullptr,
+                                                                sourceSide);
+      if (!materialTargetState.valid)
+        return result;
+      auto const refitHits = static_cast<unsigned int>(smoothed.foundHits());
+      result.valid = true;
+      result.hits = refitHits;
+      result.chi2 = smoothed.chiSquared();
+      result.ndof = std::max(1., 2. * static_cast<double>(refitHits) - 5.);
+      result.upstreamPt = upstreamMomentum.perp();
+      result.signedInverseMomentum = upstream.signedInverseMomentum();
+      result.upstreamState = upstream;
+      result.materialTargetState = materialTargetState;
+      result.vacuumTargetState = vacuumTargetState;
+      return result;
+    };
+
+    DirectionalRefitResult result;
+    result.first = runIteration(originalSeed);
+    if (!result.first.valid)
+      return result;
+
+    result.second = runIteration(*result.first.upstreamState.freeState());
+    if (result.second.valid) {
+      double const denominator = std::max(std::abs(result.first.signedInverseMomentum), 1.e-12);
+      result.relativeQoverPChange =
+          std::abs(result.second.signedInverseMomentum - result.first.signedInverseMomentum) / denominator;
+      result.secondConverged = std::isfinite(result.relativeQoverPChange) &&
+                               result.relativeQoverPChange <= maxRelativeQoverPChange;
+    }
+    result.selectedIteration = result.secondConverged ? 2 : 1;
+    result.selected = result.secondConverged ? result.second : result.first;
+    result.valid = result.selected.valid;
+    return result;
   }
 
   struct TimingResult {
@@ -516,8 +594,12 @@ public:
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
+        directionalRefitSeedCurvatureErrorRescale_(
+            parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
         directionalRefitMaxHitChi2_(parameters.getParameter<double>("directionalRefitMaxHitChi2")),
+        directionalRefitMaxRelativeQoverPChange_(
+            parameters.getParameter<double>("directionalRefitMaxRelativeQoverPChange")),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
@@ -625,6 +707,7 @@ public:
       auto const preRefitState = propagateToTargetLine(
           *candidate.track, vacuumPropagator, directionSign, &materialPropagator, eventSourceSide);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
+      candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
 
       // Refit the same reconstructed hits in their measured time-of-flight
@@ -639,15 +722,48 @@ public:
                                           hitCloner,
                                           vacuumPropagator,
                                           materialPropagator,
+                                          directionalRefitSeedCurvatureErrorRescale_,
                                           directionalRefitErrorRescale_,
-                                          directionalRefitMaxHitChi2_);
+                                          directionalRefitMaxHitChi2_,
+                                          directionalRefitMaxRelativeQoverPChange_);
       candidate.directionalRefitValid = refit.valid;
-      candidate.directionalRefitHits = refit.hits;
-      candidate.directionalRefitChi2 = refit.chi2;
-      candidate.directionalRefitNdof = refit.ndof;
-      candidate.directionalRefitUpstreamPt = refit.upstreamPt;
-      if (refit.valid)
-        candidate.targetLineState = refit.targetLineState;
+      candidate.directionalRefitFirstValid = refit.first.valid;
+      candidate.directionalRefitFirstHits = refit.first.hits;
+      candidate.directionalRefitFirstChi2 = refit.first.chi2;
+      candidate.directionalRefitFirstNdof = refit.first.ndof;
+      candidate.directionalRefitFirstUpstreamPt = refit.first.upstreamPt;
+      candidate.directionalRefitFirstQoverP = refit.first.signedInverseMomentum;
+      candidate.directionalRefitFirstTargetPt =
+          refit.first.materialTargetState.valid ? refit.first.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitFirstTargetPz =
+          refit.first.materialTargetState.valid ? refit.first.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitSecondValid = refit.second.valid;
+      candidate.directionalRefitSecondHits = refit.second.hits;
+      candidate.directionalRefitSecondChi2 = refit.second.chi2;
+      candidate.directionalRefitSecondNdof = refit.second.ndof;
+      candidate.directionalRefitSecondUpstreamPt = refit.second.upstreamPt;
+      candidate.directionalRefitSecondQoverP = refit.second.signedInverseMomentum;
+      candidate.directionalRefitSecondTargetPt =
+          refit.second.materialTargetState.valid ? refit.second.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitSecondTargetPz =
+          refit.second.materialTargetState.valid ? refit.second.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitSecondConverged = refit.secondConverged;
+      candidate.directionalRefitRelativeQoverPChange = refit.relativeQoverPChange;
+      candidate.directionalRefitSelectedIteration = refit.selectedIteration;
+      candidate.directionalRefitHits = refit.selected.hits;
+      candidate.directionalRefitChi2 = refit.selected.chi2;
+      candidate.directionalRefitNdof = refit.selected.ndof;
+      candidate.directionalRefitUpstreamPt = refit.selected.upstreamPt;
+      if (refit.valid) {
+        candidate.targetLineState = refit.selected.materialTargetState;
+        if (refit.selected.vacuumTargetState.valid) {
+          candidate.directionalRefitVacuumTargetPt = refit.selected.vacuumTargetState.momentum.perp();
+          candidate.directionalRefitVacuumTargetPz = refit.selected.vacuumTargetState.momentum.z();
+          candidate.directionalRefitMaterialDeltaPt =
+              refit.selected.materialTargetState.momentum.perp() -
+              refit.selected.vacuumTargetState.momentum.perp();
+        }
+      }
     }
 
     // Do not select on reconstructed z.  Reject only invalid/empty fits and
@@ -816,13 +932,21 @@ public:
     }
 
     std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, preRefitPt,
-        directionalRefitUpstreamPt, directionalRefitChi2, directionalRefitNdof, ptError, etaError,
-        phiError, vx, vy, vz, trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof,
-        normalizedChi2, linePcaR, linePcaZ,
+        preRefitPz, directionalRefitUpstreamPt, directionalRefitChi2, directionalRefitNdof,
+        directionalRefitFirstChi2, directionalRefitFirstNdof, directionalRefitFirstUpstreamPt,
+        directionalRefitFirstQoverP,
+        directionalRefitFirstTargetPt, directionalRefitFirstTargetPz, directionalRefitSecondChi2,
+        directionalRefitSecondNdof, directionalRefitSecondUpstreamPt, directionalRefitSecondQoverP,
+        directionalRefitSecondTargetPt,
+        directionalRefitSecondTargetPz, directionalRefitRelativeQoverPChange, directionalRefitVacuumTargetPt,
+        directionalRefitVacuumTargetPz, directionalRefitMaterialDeltaPt, ptError, etaError, phiError, vx, vy, vz,
+        trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
     std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
-        directionalRefitValid, directionalRefitHits;
+        directionalRefitValid, directionalRefitHits, directionalRefitFirstValid, directionalRefitFirstHits,
+        directionalRefitSecondValid, directionalRefitSecondHits, directionalRefitSecondConverged,
+        directionalRefitSelectedIteration;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -856,12 +980,35 @@ public:
       bool const upstreamIsOuter = sign * track.innerMomentum().Dot(endpointDelta) < 0.;
       upstreamPt.push_back(upstreamIsOuter ? track.outerMomentum().rho() : track.innerMomentum().rho());
       preRefitPt.push_back(candidate->preRefitPt);
+      preRefitPz.push_back(candidate->preRefitPz);
       directionalRefitUpstreamPt.push_back(candidate->directionalRefitUpstreamPt);
       directionalRefitAttempted.push_back(candidate->directionalRefitAttempted);
       directionalRefitValid.push_back(candidate->directionalRefitValid);
       directionalRefitHits.push_back(candidate->directionalRefitHits);
       directionalRefitChi2.push_back(candidate->directionalRefitChi2);
       directionalRefitNdof.push_back(candidate->directionalRefitNdof);
+      directionalRefitFirstValid.push_back(candidate->directionalRefitFirstValid);
+      directionalRefitFirstHits.push_back(candidate->directionalRefitFirstHits);
+      directionalRefitFirstChi2.push_back(candidate->directionalRefitFirstChi2);
+      directionalRefitFirstNdof.push_back(candidate->directionalRefitFirstNdof);
+      directionalRefitFirstUpstreamPt.push_back(candidate->directionalRefitFirstUpstreamPt);
+      directionalRefitFirstQoverP.push_back(candidate->directionalRefitFirstQoverP);
+      directionalRefitFirstTargetPt.push_back(candidate->directionalRefitFirstTargetPt);
+      directionalRefitFirstTargetPz.push_back(candidate->directionalRefitFirstTargetPz);
+      directionalRefitSecondValid.push_back(candidate->directionalRefitSecondValid);
+      directionalRefitSecondHits.push_back(candidate->directionalRefitSecondHits);
+      directionalRefitSecondChi2.push_back(candidate->directionalRefitSecondChi2);
+      directionalRefitSecondNdof.push_back(candidate->directionalRefitSecondNdof);
+      directionalRefitSecondUpstreamPt.push_back(candidate->directionalRefitSecondUpstreamPt);
+      directionalRefitSecondQoverP.push_back(candidate->directionalRefitSecondQoverP);
+      directionalRefitSecondTargetPt.push_back(candidate->directionalRefitSecondTargetPt);
+      directionalRefitSecondTargetPz.push_back(candidate->directionalRefitSecondTargetPz);
+      directionalRefitSecondConverged.push_back(candidate->directionalRefitSecondConverged);
+      directionalRefitRelativeQoverPChange.push_back(candidate->directionalRefitRelativeQoverPChange);
+      directionalRefitSelectedIteration.push_back(candidate->directionalRefitSelectedIteration);
+      directionalRefitVacuumTargetPt.push_back(candidate->directionalRefitVacuumTargetPt);
+      directionalRefitVacuumTargetPz.push_back(candidate->directionalRefitVacuumTargetPz);
+      directionalRefitMaterialDeltaPt.push_back(candidate->directionalRefitMaterialDeltaPt);
       ptError.push_back(track.ptError());
       etaError.push_back(track.etaError());
       phiError.push_back(track.phiError());
@@ -923,6 +1070,7 @@ public:
     table->addColumn<float>("outerPt", outerPt, "pT at the geometrically outer detector state");
     table->addColumn<float>("upstreamPt", upstreamPt, "pT at the fitted endpoint nearest the inferred source side");
     table->addColumn<float>("preRefitPt", preRefitPt, "target-line pT before the timing-directed Kalman refit");
+    table->addColumn<float>("preRefitPz", preRefitPz, "target-line pz before the timing-directed Kalman refit");
     table->addColumn<float>(
         "directionalRefitUpstreamPt", directionalRefitUpstreamPt, "pT at the source-facing refitted hit state");
     table->addColumn<int>("directionalRefitAttempted",
@@ -934,6 +1082,72 @@ public:
     table->addColumn<int>("directionalRefitHits", directionalRefitHits, "valid hits retained by the directional refit");
     table->addColumn<float>("directionalRefitChi2", directionalRefitChi2, "directional-refit trajectory chi2");
     table->addColumn<float>("directionalRefitNdof", directionalRefitNdof, "directional-refit trajectory ndof");
+    table->addColumn<int>("directionalRefitFirstValid",
+                          directionalRefitFirstValid,
+                          "1 when the first fitter-smoother iteration is valid");
+    table->addColumn<int>("directionalRefitFirstHits",
+                          directionalRefitFirstHits,
+                          "valid hits in the first fitter-smoother iteration");
+    table->addColumn<float>("directionalRefitFirstChi2",
+                            directionalRefitFirstChi2,
+                            "trajectory chi2 from the first fitter-smoother iteration");
+    table->addColumn<float>("directionalRefitFirstNdof",
+                            directionalRefitFirstNdof,
+                            "trajectory ndof from the first fitter-smoother iteration");
+    table->addColumn<float>("directionalRefitFirstUpstreamPt",
+                            directionalRefitFirstUpstreamPt,
+                            "source-facing pT from the first fitter-smoother iteration");
+    table->addColumn<float>("directionalRefitFirstQoverP",
+                            directionalRefitFirstQoverP,
+                            "source-facing signed inverse momentum from the first iteration");
+    table->addColumn<float>("directionalRefitFirstTargetPt",
+                            directionalRefitFirstTargetPt,
+                            "material-aware target-line pT from the first iteration");
+    table->addColumn<float>("directionalRefitFirstTargetPz",
+                            directionalRefitFirstTargetPz,
+                            "material-aware target-line pz from the first iteration");
+    table->addColumn<int>("directionalRefitSecondValid",
+                          directionalRefitSecondValid,
+                          "1 when the second nonlinear fitter-smoother iteration is valid");
+    table->addColumn<int>("directionalRefitSecondHits",
+                          directionalRefitSecondHits,
+                          "valid hits in the second nonlinear iteration");
+    table->addColumn<float>("directionalRefitSecondChi2",
+                            directionalRefitSecondChi2,
+                            "trajectory chi2 from the second nonlinear iteration");
+    table->addColumn<float>("directionalRefitSecondNdof",
+                            directionalRefitSecondNdof,
+                            "trajectory ndof from the second nonlinear iteration");
+    table->addColumn<float>("directionalRefitSecondUpstreamPt",
+                            directionalRefitSecondUpstreamPt,
+                            "source-facing pT from the second nonlinear iteration");
+    table->addColumn<float>("directionalRefitSecondQoverP",
+                            directionalRefitSecondQoverP,
+                            "source-facing signed inverse momentum from the second iteration");
+    table->addColumn<float>("directionalRefitSecondTargetPt",
+                            directionalRefitSecondTargetPt,
+                            "material-aware target-line pT from the second nonlinear iteration");
+    table->addColumn<float>("directionalRefitSecondTargetPz",
+                            directionalRefitSecondTargetPz,
+                            "material-aware target-line pz from the second nonlinear iteration");
+    table->addColumn<int>("directionalRefitSecondConverged",
+                          directionalRefitSecondConverged,
+                          "1 when iteration two passes the relative q-over-p convergence guard");
+    table->addColumn<float>("directionalRefitRelativeQoverPChange",
+                            directionalRefitRelativeQoverPChange,
+                            "absolute relative q-over-p change from iteration one to two, or -1");
+    table->addColumn<int>("directionalRefitSelectedIteration",
+                          directionalRefitSelectedIteration,
+                          "iteration used for final kinematics: 0=none, 1=first, 2=second");
+    table->addColumn<float>("directionalRefitVacuumTargetPt",
+                            directionalRefitVacuumTargetPt,
+                            "selected-iteration target-line pT with vacuum-only propagation");
+    table->addColumn<float>("directionalRefitVacuumTargetPz",
+                            directionalRefitVacuumTargetPz,
+                            "selected-iteration target-line pz with vacuum-only propagation");
+    table->addColumn<float>("directionalRefitMaterialDeltaPt",
+                            directionalRefitMaterialDeltaPt,
+                            "selected material-aware target pT minus vacuum-only target pT");
     table->addColumn<float>("ptErr", ptError, "transverse-momentum uncertainty");
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
@@ -1179,8 +1393,10 @@ public:
     description.add<edm::InputTag>("traversingTracks", edm::InputTag("shiftTraversingMuons"));
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
+    description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
     description.add<double>("directionalRefitErrorRescale", 100.0);
     description.add<double>("directionalRefitMaxHitChi2", 100000.0);
+    description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -1209,8 +1425,10 @@ private:
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
+  double directionalRefitSeedCurvatureErrorRescale_;
   double directionalRefitErrorRescale_;
   double directionalRefitMaxHitChi2_;
+  double directionalRefitMaxRelativeQoverPChange_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
