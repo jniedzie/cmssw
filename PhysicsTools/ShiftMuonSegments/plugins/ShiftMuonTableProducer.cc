@@ -14,10 +14,14 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Utilities/interface/ESInputTag.h"
+#include "RecoTracker/TransientTrackingRecHit/interface/TkClonerImpl.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
 #include "TrackingTools/KalmanUpdators/interface/Chi2MeasurementEstimator.h"
 #include "TrackingTools/KalmanUpdators/interface/KFUpdator.h"
+#include "TrackingTools/PatternTools/interface/Trajectory.h"
 #include "TrackingTools/Records/interface/TransientRecHitRecord.h"
+#include "TrackingTools/TrackFitters/interface/KFTrajectoryFitter.h"
+#include "TrackingTools/TrackFitters/interface/KFTrajectorySmoother.h"
 #include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
@@ -37,7 +41,6 @@
 #include <memory>
 #include <numeric>
 #include <string>
-#include <tuple>
 #include <vector>
 
 namespace {
@@ -157,6 +160,7 @@ namespace {
                                           int sourceSide,
                                           MagneticField const& magneticField,
                                           TransientTrackingRecHitBuilder const& hitBuilder,
+                                          TkCloner const& hitCloner,
                                           Propagator const& vacuumPropagator,
                                           Propagator const& materialPropagator,
                                           double errorRescale,
@@ -193,49 +197,38 @@ namespace {
     FreeTrajectoryState start(parameters, original.curvilinearError());
     start.rescaleError(errorRescale);
 
+    Trajectory::RecHitContainer fitHits;
+    fitHits.reserve(orderedHits.size());
+    for (auto const& orderedHit : orderedHits)
+      fitHits.push_back(orderedHit.hit);
+
+    auto const firstPredicted = materialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
+    if (!firstPredicted.isValid())
+      return {};
+
     KFUpdator updator;
     Chi2MeasurementEstimator estimator(maxHitChi2);
-    auto filter = [&](FreeTrajectoryState const& initial,
-                      auto begin,
-                      auto end,
-                      bool skipFirst) -> std::tuple<TrajectoryStateOnSurface, unsigned int, double> {
-      TrajectoryStateOnSurface current;
-      unsigned int accepted = 0;
-      double chi2 = 0.;
-      for (auto iterator = begin; iterator != end; ++iterator) {
-        if (skipFirst) {
-          skipFirst = false;
-          continue;
-        }
-        auto const predicted = current.isValid()
-                                   ? materialPropagator.propagate(current, iterator->hit->det()->surface())
-                                   : materialPropagator.propagate(initial, iterator->hit->det()->surface());
-        if (!predicted.isValid())
-          continue;
-        auto const estimate = estimator.estimate(predicted, *iterator->hit);
-        if (!estimate.first)
-          continue;
-        auto const updated = updator.update(predicted, *iterator->hit);
-        if (!updated.isValid())
-          continue;
-        current = updated;
-        chi2 += estimate.second;
-        ++accepted;
-      }
-      return {current, accepted, chi2};
-    };
-
-    auto const [downstream, forwardHits, forwardChi2] =
-        filter(start, orderedHits.begin(), orderedHits.end(), false);
-    if (!downstream.isValid() || forwardHits < 3 || !downstream.freeState())
-      return {};
-    FreeTrajectoryState backwardStart = *downstream.freeState();
-    backwardStart.rescaleError(errorRescale);
-    auto const [upstream, backwardHits, backwardChi2] =
-        filter(backwardStart, orderedHits.rbegin(), orderedHits.rend(), true);
-    if (!upstream.isValid() || backwardHits < 2)
+    KFTrajectoryFitter fitter(materialPropagator, updator, estimator, 3, nullptr, &hitCloner);
+    TrajectorySeed const seed(
+        PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
+    auto const filtered = fitter.fitOne(seed, fitHits, firstPredicted, TrajectoryFitter::standard);
+    if (!filtered.isValid() || filtered.foundHits() < 3)
       return {};
 
+    KFTrajectorySmoother smoother(
+        materialPropagator, updator, estimator, static_cast<float>(errorRescale), 3);
+    smoother.setHitCloner(&hitCloner);
+    auto const smoothed = smoother.trajectory(filtered);
+    if (!smoothed.isValid() || smoothed.foundHits() < 3 || smoothed.empty())
+      return {};
+
+    // The smoother returns measurements in the reverse order of the forward
+    // source-to-CMS fit.  Its last measurement is therefore the source-facing
+    // state, consistently combining the forward and backward information
+    // without applying the same measurement twice.
+    auto const& upstream = smoothed.lastMeasurement().updatedState();
+    if (!upstream.isValid())
+      return {};
     auto const upstreamMomentum = upstream.globalMomentum();
     auto const targetLineState = propagateStateToTargetLine(upstream.globalPosition(),
                                                             upstreamMomentum,
@@ -245,10 +238,11 @@ namespace {
                                                             sourceSide);
     if (!targetLineState.valid)
       return {};
+    auto const refitHits = static_cast<unsigned int>(smoothed.foundHits());
     return {true,
-            std::min(forwardHits, backwardHits + 1),
-            forwardChi2 + backwardChi2,
-            std::max(1., 2. * static_cast<double>(std::min(forwardHits, backwardHits + 1)) - 5.),
+            refitHits,
+            smoothed.chiSquared(),
+            std::max(1., 2. * static_cast<double>(refitHits) - 5.),
             upstreamMomentum.perp(),
             targetLineState};
   }
@@ -564,6 +558,11 @@ public:
     vacuumPropagator.setUseMagVolumes(true);
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
     auto const& muonRecHitBuilder = setup.getData(muonRecHitBuilderToken_);
+    // KFTrajectoryFitter/Smoother use TkCloner as a generic rechit clone-or-
+    // reuse helper. Muon transient rechits cannot improve with a tracker CPE,
+    // so a default cloner simply returns their existing shared pointers and
+    // never accesses tracker calibration objects.
+    TkClonerImpl const hitCloner;
 
     std::vector<Candidate> candidates;
     auto append = [&candidates, &vacuumPropagator](auto const& handle, int source) {
@@ -637,6 +636,7 @@ public:
                                           eventSourceSide,
                                           magneticField,
                                           muonRecHitBuilder,
+                                          hitCloner,
                                           vacuumPropagator,
                                           materialPropagator,
                                           directionalRefitErrorRescale_,
