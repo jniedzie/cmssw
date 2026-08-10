@@ -375,7 +375,8 @@ namespace {
                                           TransientTrackingRecHitBuilder const& hitBuilder,
                                           TkCloner const& hitCloner,
                                           Propagator const& vacuumPropagator,
-                                          Propagator const& materialPropagator,
+                                          Propagator const& fitMaterialPropagator,
+                                          Propagator const& targetMaterialPropagator,
                                           double seedCurvatureErrorRescale,
                                           double smootherErrorRescale,
                                           double initialMaxHitChi2,
@@ -459,12 +460,12 @@ namespace {
     auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed, double iterationMaxHitChi2) {
       RefitIterationResult result;
       Chi2MeasurementEstimator estimator(iterationMaxHitChi2);
-      KFTrajectoryFitter fitter(materialPropagator, updator, estimator, 3, nullptr, &hitCloner);
+      KFTrajectoryFitter fitter(fitMaterialPropagator, updator, estimator, 3, nullptr, &hitCloner);
       KFTrajectorySmoother smoother(
-          materialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
+          fitMaterialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
       smoother.setHitCloner(&hitCloner);
       auto const start = inflateCurvatureError(uninflatedSeed, seedCurvatureErrorRescale);
-      auto const firstPredicted = materialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
+      auto const firstPredicted = fitMaterialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
       if (!firstPredicted.isValid())
         return result;
       TrajectorySeed const seed(
@@ -489,7 +490,7 @@ namespace {
       auto const upstreamMomentum = upstream.globalMomentum();
       auto const upstreamFreeState = *upstream.freeState();
       auto const materialTargetState =
-          propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, &materialPropagator, sourceSide);
+          propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, &targetMaterialPropagator, sourceSide);
       auto const vacuumTargetState =
           propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, nullptr, sourceSide);
       if (!materialTargetState.valid)
@@ -835,22 +836,25 @@ public:
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
-    // Keep the established R-Z material propagator as the production default
-    // and vary detailed Geant4e transport independently from path ordering,
-    // iteration selection, and the precision-only refit below.
+    // Keep the established R-Z material propagator inside the Kalman
+    // fitter/smoother. Detailed Geant4e transport is tested only on the
+    // backward leg from the source-facing fitted state to the material
+    // boundary, independently from path ordering and precision-hit selection.
     SteppingHelixPropagator approximateMaterialPropagator(&magneticField, anyDirection);
     approximateMaterialPropagator.setMaterialMode(false);
     approximateMaterialPropagator.setUseMagVolumes(true);
     approximateMaterialPropagator.setUseMatVolumes(true);
     approximateMaterialPropagator.applyRadX0Correction(true);
     std::unique_ptr<Geant4ePropagator> detailedMaterialPropagator;
-    Propagator const* materialPropagator = &approximateMaterialPropagator;
+    Propagator const* targetMaterialPropagator = &approximateMaterialPropagator;
     if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
       // The stock Geant4e limits (10 mm steps and 200 cm total path) are too
-      // coarse/short for a complete endcap-to-endcap SHIFT trajectory.
+      // coarse/short for the source-facing state to material-boundary leg.
+      // This leg is geometrically behind the incoming muon's momentum, so use
+      // an explicit direction instead of Geant4e's ambiguous anyDirection.
       detailedMaterialPropagator =
-          std::make_unique<Geant4ePropagator>(&magneticField, "mu", anyDirection, 0.05, 2.0, 2500.0);
-      materialPropagator = detailedMaterialPropagator.get();
+          std::make_unique<Geant4ePropagator>(&magneticField, "mu", oppositeToMomentum, 0.05, 2.0, 2500.0);
+      targetMaterialPropagator = detailedMaterialPropagator.get();
     }
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
@@ -922,7 +926,7 @@ public:
                                     : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
       candidate.physicalDirectionSign = directionSign;
       auto const preRefitState = propagateToTargetLine(
-          *candidate.track, vacuumPropagator, directionSign, materialPropagator, eventSourceSide);
+          *candidate.track, vacuumPropagator, directionSign, targetMaterialPropagator, eventSourceSide);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
       candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
@@ -945,7 +949,8 @@ public:
                                 muonRecHitBuilder,
                                 hitCloner,
                                 vacuumPropagator,
-                                *materialPropagator,
+                                approximateMaterialPropagator,
+                                *targetMaterialPropagator,
                                 directionalRefitSeedCurvatureErrorRescale_,
                                 useImprovedMomentumRefit_ ? directionalRefitErrorRescale_ : 100.,
                                 useImprovedMomentumRefit_ ? directionalRefitInitialMaxHitChi2_ : 100000.,

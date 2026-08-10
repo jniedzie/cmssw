@@ -18,9 +18,9 @@ def addShiftMuonSegments(process):
         process.shiftMuonTable.useImprovedMomentumRefit.value()
         and process.shiftMuonTable.useDetailedMaterialPropagation.value()
     ):
-        # The optional detailed-material study needs the full DD4hep Geant4
-        # geometry.  Do not pay its initialization or single-stream cost while
-        # the study is disabled.
+        # The optional target-leg material correction needs the full DD4hep
+        # Geant4 geometry. Do not pay its initialization or single-stream cost
+        # while the correction is disabled.
         process.load("Configuration.Geometry.GeometryDD4hepSimDB_cff")
         from SimG4Core.Application.g4SimHits_cfi import g4SimHits as _g4SimHits
         process.shiftMuonGeant4Geometry = cms.EDProducer(
