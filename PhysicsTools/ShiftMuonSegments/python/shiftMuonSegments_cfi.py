@@ -14,14 +14,29 @@ shiftMuonTable = cms.EDProducer(
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
+    # Optional scale-improvement study: detailed Geant4e material transport,
+    # propagated-path hit ordering, robust staged hit rejection, and the
+    # guarded precision-only refit.  The latest validation worsened the
+    # single-muon momentum scale, so retain the implementation but keep the
+    # established directional refit as the production default.
+    useImprovedMomentumRefit=cms.bool(False),
     # Only loosen the q/p seed. Angular and position errors retain the useful
     # original fit constraints while each nonlinear pass can re-estimate scale.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
     # Backward-start uncertainty used internally by KFTrajectorySmoother.
-    directionalRefitErrorRescale=cms.double(100.0),
-    directionalRefitMaxHitChi2=cms.double(100000.0),
+    directionalRefitErrorRescale=cms.double(10.0),
+    # Use a loose first pass to recover the unusual incoming trajectory, then
+    # a substantially tighter second pass to suppress incompatible hits.
+    directionalRefitInitialMaxHitChi2=cms.double(1000.0),
+    directionalRefitMaxHitChi2=cms.double(100.0),
     # Reject a second pass that moves too far from the first smoothed q/p.
-    directionalRefitMaxRelativeQoverPChange=cms.double(0.5),
+    directionalRefitMaxRelativeQoverPChange=cms.double(0.25),
+    # Use the precision-only result canonically only when it spans at least
+    # two independent DT, CSC, or GEM station layers.
+    directionalRefitMinPrecisionStations=cms.uint32(2),
+    # Reject a precision-only solution that is incompatible with the all-hit
+    # curvature; its diagnostic branches are still retained.
+    directionalRefitMaxPrecisionRelativeQoverPChange=cms.double(0.25),
     minSharedHitFraction=cms.double(0.5),
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),

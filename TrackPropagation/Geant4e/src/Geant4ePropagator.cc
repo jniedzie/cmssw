@@ -42,13 +42,17 @@
 Geant4ePropagator::Geant4ePropagator(const MagneticField *field,
                                      std::string particleName,
                                      PropagationDirection dir,
-                                     double plimit)
+                                     double plimit,
+                                     double maximumStepLengthMm,
+                                     double maximumPathLengthCm)
     : Propagator(dir),
       theField(field),
       theParticleName(particleName),
       theG4eManager(G4ErrorPropagatorManager::GetErrorPropagatorManager()),
       theG4eData(G4ErrorPropagatorData::GetErrorPropagatorData()),
-      plimit_(plimit) {
+      plimit_(plimit),
+      maximumStepLengthMm_(maximumStepLengthMm),
+      maximumPathLengthCm_(maximumPathLengthCm) {
   LogDebug("Geant4e") << "Geant4e Propagator initialized";
 
   // has to be called here, doing it later will not load the G4 physics list
@@ -82,8 +86,11 @@ void Geant4ePropagator::ensureGeant4eIsInitilized(bool) const {
     man->SetVerboseLevel(0);
     theG4eManager->InitGeant4e();
 
-    // define 10 mm step limit for propagator
-    G4UImanager::GetUIpointer()->ApplyCommand("/geant4e/limits/stepLength 10.0 mm");
+    // A smaller step can be required when crossing sharp magnetic-field
+    // transitions; expose the limit instead of fixing it globally at 10 mm.
+    std::ostringstream command;
+    command << "/geant4e/limits/stepLength " << maximumStepLengthMm_ << " mm";
+    G4UImanager::GetUIpointer()->ApplyCommand(command.str());
   }
   const G4Field *field = G4TransportationManager::GetTransportationManager()->GetFieldManager()->GetDetectorField();
   if (field == nullptr) {
@@ -336,8 +343,7 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
 
     finalPathLength += thisPathLength;
 
-    // if (std::fabs(finalPathLength) > 10000.0f)
-    if (std::fabs(finalPathLength) > 200.0f) {
+    if (std::fabs(finalPathLength) > maximumPathLengthCm_) {
       LogDebug("Geant4e") << "ERROR: Quitting propagation: path length mega large" << std::endl;
       theG4eManager->GetPropagator()->InvokePostUserTrackingAction(g4eTrajState.GetG4Track());
       continuePropagation = false;
