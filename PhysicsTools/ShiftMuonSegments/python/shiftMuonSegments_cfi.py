@@ -21,6 +21,10 @@ shiftMuonTable = cms.EDProducer(
     # Geant4e transport to recover material losses between the source-facing
     # fitted state and the CMS material boundary.
     useDetailedMaterialPropagation=cms.bool(True),
+    # Isolate hit ordering from the other refit changes. Use the established
+    # source-side signed-z ordering for this comparison while retaining the
+    # precision refit, both iterations, and target-only Geant4e correction.
+    usePropagatedPathOrdering=cms.bool(False),
     # Only loosen the q/p seed. Angular and position errors retain the useful
     # original fit constraints while each nonlinear pass can re-estimate scale.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
