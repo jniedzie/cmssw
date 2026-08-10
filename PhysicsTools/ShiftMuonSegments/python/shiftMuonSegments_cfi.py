@@ -23,7 +23,7 @@ shiftMuonTable = cms.EDProducer(
     # original fit constraints while each nonlinear pass can re-estimate scale.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
     # Backward-start uncertainty used internally by KFTrajectorySmoother.
-    directionalRefitErrorRescale=cms.double(100.0),
+    directionalRefitErrorRescale=cms.double(10.0),
     # Match the established refit for both nonlinear iterations.  Hit
     # rejection can be revisited independently after the transport comparison.
     directionalRefitInitialMaxHitChi2=cms.double(100000.0),

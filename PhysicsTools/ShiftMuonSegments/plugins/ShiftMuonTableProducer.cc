@@ -1914,7 +1914,7 @@ public:
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
-    description.add<double>("directionalRefitErrorRescale", 100.0);
+    description.add<double>("directionalRefitErrorRescale", 10.0);
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
