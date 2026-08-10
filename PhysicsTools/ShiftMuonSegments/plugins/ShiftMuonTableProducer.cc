@@ -338,6 +338,36 @@ namespace {
     return FreeTrajectoryState(state.parameters(), CurvilinearTrajectoryError(covariance));
   }
 
+  bool finiteTrajectoryState(TrajectoryStateOnSurface const& state) {
+    if (!state.isValid())
+      return false;
+    auto const& parameters = state.localParameters().vector();
+    for (int index = 0; index < 5; ++index)
+      if (!std::isfinite(parameters[index]))
+        return false;
+    auto const& error = state.curvilinearError();
+    if (!error.posDef())
+      return false;
+    auto const& covariance = error.matrix();
+    for (int row = 0; row < 5; ++row)
+      for (int column = 0; column <= row; ++column)
+        if (!std::isfinite(covariance(row, column)))
+          return false;
+    return true;
+  }
+
+  bool finiteTrajectory(Trajectory const& trajectory) {
+    if (!trajectory.isValid() || !std::isfinite(trajectory.chiSquared()))
+      return false;
+    for (auto const& measurement : trajectory.measurements()) {
+      if (!std::isfinite(measurement.estimate()) ||
+          !finiteTrajectoryState(measurement.forwardPredictedState()) ||
+          !finiteTrajectoryState(measurement.updatedState()))
+        return false;
+    }
+    return true;
+  }
+
   DirectionalRefitResult directionalRefit(reco::Track const& track,
                                           int directionSign,
                                           int sourceSide,
@@ -440,10 +470,15 @@ namespace {
       TrajectorySeed const seed(
           PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
       auto const filtered = fitter.fitOne(seed, fitHits, firstPredicted, TrajectoryFitter::standard);
-      if (!filtered.isValid() || filtered.foundHits() < 3)
+      // KFTrajectoryFitter deliberately has a no-fail policy: after a failed
+      // propagation/update it can return an otherwise valid Trajectory whose
+      // last measurement contains an invalid or NaN state.  Geant4e cannot
+      // safely smooth such a trajectory and may segfault in MakeOneStep, so
+      // reject the refit candidate before entering the smoother.
+      if (filtered.foundHits() < 3 || !finiteTrajectory(filtered))
         return result;
       auto const smoothed = smoother.trajectory(filtered);
-      if (!smoothed.isValid() || smoothed.foundHits() < 3 || smoothed.empty())
+      if (smoothed.foundHits() < 3 || smoothed.empty() || !finiteTrajectory(smoothed))
         return result;
 
       // The smoother returns measurements in the reverse order of the
