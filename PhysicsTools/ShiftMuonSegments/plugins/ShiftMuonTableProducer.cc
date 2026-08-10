@@ -797,6 +797,7 @@ public:
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
+        usePropagatedPathOrdering_(parameters.getParameter<bool>("usePropagatedPathOrdering")),
         directionalRefitSeedCurvatureErrorRescale_(
             parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
@@ -957,7 +958,7 @@ public:
                                 useImprovedMomentumRefit_ ? directionalRefitMaxHitChi2_ : 100000.,
                                 useImprovedMomentumRefit_ ? directionalRefitMaxRelativeQoverPChange_ : 0.5,
                                 precisionHitsOnly,
-                                useImprovedMomentumRefit_);
+                                useImprovedMomentumRefit_ && usePropagatedPathOrdering_);
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -1919,6 +1920,7 @@ public:
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
+    description.add<bool>("usePropagatedPathOrdering", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
     description.add<double>("directionalRefitErrorRescale", 10.0);
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
@@ -1956,6 +1958,7 @@ private:
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
+  bool usePropagatedPathOrdering_;
   double directionalRefitSeedCurvatureErrorRescale_;
   double directionalRefitErrorRescale_;
   double directionalRefitInitialMaxHitChi2_;
