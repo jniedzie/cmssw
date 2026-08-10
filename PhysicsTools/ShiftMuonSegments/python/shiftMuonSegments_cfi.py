@@ -17,10 +17,10 @@ shiftMuonTable = cms.EDProducer(
     # Optional scale-improvement study: propagated-path hit ordering and the
     # guarded precision-only refit. Keep it enabled for the current iteration.
     useImprovedMomentumRefit=cms.bool(True),
-    # Isolate detailed Geant4e material transport from the rest of the improved
-    # refit. Keep the implementation available, but use the established
-    # SteppingHelixPropagator for this comparison.
-    useDetailedMaterialPropagation=cms.bool(False),
+    # Keep SteppingHelix inside the Kalman fit, but use explicitly backward
+    # Geant4e transport to recover material losses between the source-facing
+    # fitted state and the CMS material boundary.
+    useDetailedMaterialPropagation=cms.bool(True),
     # Only loosen the q/p seed. Angular and position errors retain the useful
     # original fit constraints while each nonlinear pass can re-estimate scale.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
