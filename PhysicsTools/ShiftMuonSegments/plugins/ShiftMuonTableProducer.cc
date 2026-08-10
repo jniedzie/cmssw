@@ -5,9 +5,15 @@
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegment.h"
 #include "DataFormats/DTRecHit/interface/DTRecSegment4D.h"
+#include "DataFormats/MuonDetId/interface/CSCDetId.h"
+#include "DataFormats/MuonDetId/interface/DTChamberId.h"
+#include "DataFormats/MuonDetId/interface/GEMDetId.h"
+#include "DataFormats/MuonDetId/interface/MuonSubdetId.h"
+#include "DataFormats/MuonDetId/interface/RPCDetId.h"
 #include "DataFormats/GeometrySurface/interface/Plane.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Framework/interface/ConsumesCollector.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
@@ -29,6 +35,7 @@
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
 #include "TrackingTools/TransientTrackingRecHit/interface/TransientTrackingRecHitBuilder.h"
 #include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixPropagator.h"
+#include "TrackPropagation/Geant4e/interface/Geant4ePropagator.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
@@ -41,6 +48,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -50,6 +58,9 @@ namespace {
     GlobalPoint position;
     GlobalVector momentum;
     double path = 0.;
+    bool materialBoundaryValid = false;
+    GlobalVector materialBoundaryMomentum;
+    double materialPath = 0.;
   };
 
   struct HitFingerprint {
@@ -99,32 +110,144 @@ namespace {
     double directionalRefitVacuumTargetPt = 0.;
     double directionalRefitVacuumTargetPz = 0.;
     double directionalRefitMaterialDeltaPt = 0.;
+    bool directionalRefitMaterialBoundaryValid = false;
+    double directionalRefitMaterialBoundaryPt = 0.;
+    double directionalRefitMaterialBoundaryPz = 0.;
+    double directionalRefitMaterialPath = 0.;
+    unsigned int directionalRefitAllHitsInput = 0;
+    unsigned int directionalRefitAllHitsOrderingFallback = 0;
+    double directionalRefitAllHitsOrderingSpan = 0.;
+    unsigned int directionalRefitAllHitsFirstRejected = 0;
+    unsigned int directionalRefitAllHitsSecondRejected = 0;
+    unsigned int directionalRefitPrecisionInput = 0;
+    unsigned int directionalRefitPrecisionOrderingFallback = 0;
+    double directionalRefitPrecisionOrderingSpan = 0.;
+    unsigned int directionalRefitPrecisionFirstRejected = 0;
+    unsigned int directionalRefitPrecisionSecondRejected = 0;
+    unsigned int nDTRefitHits = 0;
+    unsigned int nCSCRefitHits = 0;
+    unsigned int nRPCRefitHits = 0;
+    unsigned int nGEMRefitHits = 0;
+    unsigned int nPrecisionRefitStations = 0;
+    double precisionRefitLeverArm = 0.;
+    bool directionalRefitUsedPrecisionHits = false;
+    bool directionalRefitAllHitsValid = false;
+    unsigned int directionalRefitAllHits = 0;
+    double directionalRefitAllHitsChi2 = 0.;
+    double directionalRefitAllHitsNdof = 0.;
+    double directionalRefitAllHitsTargetPt = 0.;
+    double directionalRefitAllHitsTargetPz = 0.;
+    int directionalRefitAllHitsSelectedIteration = 0;
+    bool directionalRefitPrecisionValid = false;
+    unsigned int directionalRefitPrecisionHits = 0;
+    double directionalRefitPrecisionChi2 = 0.;
+    double directionalRefitPrecisionNdof = 0.;
+    double directionalRefitPrecisionUpstreamPt = 0.;
+    double directionalRefitPrecisionQoverP = 0.;
+    double directionalRefitPrecisionTargetPt = 0.;
+    double directionalRefitPrecisionTargetPz = 0.;
+    bool directionalRefitPrecisionSecondValid = false;
+    bool directionalRefitPrecisionSecondConverged = false;
+    double directionalRefitPrecisionRelativeQoverPChange = -1.;
+    int directionalRefitPrecisionSelectedIteration = 0;
+    double directionalRefitPrecisionFirstTargetPt = 0.;
+    double directionalRefitPrecisionFirstTargetPz = 0.;
+    double directionalRefitPrecisionSecondTargetPt = 0.;
+    double directionalRefitPrecisionSecondTargetPz = 0.;
+    double directionalRefitPrecisionRelativeToAllQoverP = -1.;
+    double directionalRefitPrecisionTargetDca = -1.;
   };
 
-  PropagatedState propagateStateToTargetLine(GlobalPoint const& position,
-                                             GlobalVector const& momentum,
-                                             int charge,
+  struct MuonHitTopology {
+    unsigned int dt = 0;
+    unsigned int csc = 0;
+    unsigned int rpc = 0;
+    unsigned int gem = 0;
+    unsigned int precisionStations = 0;
+  };
+
+  bool isPrecisionMuonSubdetector(int subdetector) {
+    return subdetector == MuonSubdetId::DT || subdetector == MuonSubdetId::CSC ||
+           subdetector == MuonSubdetId::GEM;
+  }
+
+  unsigned int precisionStationKey(DetId const& id) {
+    switch (id.subdetId()) {
+      case MuonSubdetId::DT:
+        return 100 + DTChamberId(id).station();
+      case MuonSubdetId::CSC: {
+        CSCDetId const csc(id);
+        return 200 + 10 * csc.endcap() + csc.station();
+      }
+      case MuonSubdetId::GEM: {
+        GEMDetId const gem(id);
+        return 400 + 10 * (gem.region() + 1) + gem.station();
+      }
+      default:
+        return 0;
+    }
+  }
+
+  MuonHitTopology muonHitTopology(reco::Track const& track) {
+    MuonHitTopology result;
+    std::set<unsigned int> stations;
+    for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
+      if (!(*hit)->isValid() || (*hit)->geographicalId().det() != DetId::Muon)
+        continue;
+      auto const id = (*hit)->geographicalId();
+      switch (id.subdetId()) {
+        case MuonSubdetId::DT:
+          ++result.dt;
+          break;
+        case MuonSubdetId::CSC:
+          ++result.csc;
+          break;
+        case MuonSubdetId::RPC:
+          ++result.rpc;
+          break;
+        case MuonSubdetId::GEM:
+          ++result.gem;
+          break;
+      }
+      auto const station = precisionStationKey(id);
+      if (station != 0)
+        stations.insert(station);
+    }
+    result.precisionStations = stations.size();
+    return result;
+  }
+
+  PropagatedState propagateStateToTargetLine(FreeTrajectoryState const& start,
                                              Propagator const& vacuumPropagator,
                                              Propagator const* materialPropagator = nullptr,
                                              int sourceSide = 0) {
-    FreeTrajectoryState const start(position, momentum, charge, vacuumPropagator.magneticField());
-    // SteppingHelixPropagator uses an internal approximate R-Z material map,
-    // not the detailed detector geometry.  Its last modeled CMS endcap
-    // structures end near |z|=1073 cm, while more distant regions are not a
-    // reliable description of the evacuated SHIFT-to-CMS flight path.  Stop
-    // the material-aware transport just outside that envelope, then continue
-    // in vacuum to the external target line.
+    auto const position = start.position();
+    // Geant4e uses the detailed CMS detector geometry and material.  Stop its
+    // transport just beyond the last endcap structures, while still inside
+    // the Geant4 world, then continue through the evacuated SHIFT-to-CMS
+    // flight path with the no-material propagator.
     constexpr double materialBoundaryZ = 1100.;
     FreeTrajectoryState vacuumStart = start;
     double path = 0.;
+    bool materialBoundaryValid = false;
+    GlobalVector materialBoundaryMomentum;
+    double materialPath = 0.;
     if (materialPropagator && sourceSide != 0 && sourceSide * position.z() < materialBoundaryZ) {
       auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryZ),
                                          Surface::RotationType());
       auto const toBoundary = materialPropagator->propagateWithPath(start, *boundary);
-      if (!toBoundary.first.isValid() || !toBoundary.first.freeState())
+      if (!toBoundary.first.isValid() || !toBoundary.first.freeState()) {
+        edm::LogWarning("ShiftMuonMaterialPropagation")
+            << "Detailed-material propagation failed before the CMS boundary: position=" << position
+            << " momentum=" << start.momentum() << " charge=" << start.charge() << " sourceSide=" << sourceSide
+            << " boundaryZ=" << sourceSide * materialBoundaryZ;
         return {};
+      }
       vacuumStart = *toBoundary.first.freeState();
       path += toBoundary.second;
+      materialBoundaryValid = true;
+      materialBoundaryMomentum = vacuumStart.momentum();
+      materialPath = toBoundary.second;
     }
 
     auto const propagated = vacuumPropagator.propagateWithPath(
@@ -139,7 +262,15 @@ namespace {
     bool const valid = resultMomentum.mag2() > 0. && std::isfinite(resultPosition.x()) &&
                        std::isfinite(resultPosition.y()) && std::isfinite(resultPosition.z()) &&
                        std::isfinite(path + propagated.second);
-    return {valid, resultPosition, resultMomentum, path + propagated.second};
+    PropagatedState result;
+    result.valid = valid;
+    result.position = resultPosition;
+    result.momentum = resultMomentum;
+    result.path = path + propagated.second;
+    result.materialBoundaryValid = materialBoundaryValid;
+    result.materialBoundaryMomentum = materialBoundaryMomentum;
+    result.materialPath = materialPath;
+    return result;
   }
 
   PropagatedState propagateToTargetLine(reco::Track const& track,
@@ -152,22 +283,21 @@ namespace {
     // from a state that has already crossed additional detector material.
     auto const endpointDelta = track.outerPosition() - track.innerPosition();
     bool const useOuter = travelSign != 0 && travelSign * track.innerMomentum().Dot(endpointDelta) < 0.;
-    auto const& endpoint = useOuter ? track.outerPosition() : track.innerPosition();
-    auto const& endpointMomentum = useOuter ? track.outerMomentum() : track.innerMomentum();
-    GlobalPoint const position(endpoint.x(), endpoint.y(), endpoint.z());
+    auto const original = useOuter ? trajectoryStateTransform::outerFreeState(track, vacuumPropagator.magneticField())
+                                   : trajectoryStateTransform::innerFreeState(track, vacuumPropagator.magneticField());
+    if (!original.hasError())
+      return {};
     // Momentum and charge must be reversed together to describe the same
     // fitted helix with the physical time orientation.  Since the external
     // target lies behind the incoming particle, the any-direction propagator
     // then selects the opposite-to-momentum geometrical solution.
     double const sign = travelSign == 0 ? 1. : travelSign;
-    GlobalVector const momentum(
-        sign * endpointMomentum.x(), sign * endpointMomentum.y(), sign * endpointMomentum.z());
-    return propagateStateToTargetLine(position,
-                                      momentum,
-                                      sign * track.charge(),
-                                      vacuumPropagator,
-                                      materialPropagator,
-                                      sourceSide);
+    auto const endpointMomentum = original.momentum();
+    GlobalVector const momentum(sign * endpointMomentum.x(), sign * endpointMomentum.y(), sign * endpointMomentum.z());
+    GlobalTrajectoryParameters const parameters(
+        original.position(), momentum, sign * original.charge(), vacuumPropagator.magneticField());
+    FreeTrajectoryState const physicalState(parameters, original.curvilinearError());
+    return propagateStateToTargetLine(physicalState, vacuumPropagator, materialPropagator, sourceSide);
   }
 
   struct RefitIterationResult {
@@ -190,6 +320,11 @@ namespace {
     double relativeQoverPChange = -1.;
     int selectedIteration = 0;
     RefitIterationResult selected;
+    unsigned int inputHits = 0;
+    unsigned int inputStations = 0;
+    double inputLeverArm = 0.;
+    unsigned int pathOrderingFallbackHits = 0;
+    double pathOrderingSpan = 0.;
   };
 
   FreeTrajectoryState inflateCurvatureError(FreeTrajectoryState const& state, double scale) {
@@ -213,32 +348,45 @@ namespace {
                                           Propagator const& materialPropagator,
                                           double seedCurvatureErrorRescale,
                                           double smootherErrorRescale,
+                                          double initialMaxHitChi2,
                                           double maxHitChi2,
-                                          double maxRelativeQoverPChange) {
+                                          double maxRelativeQoverPChange,
+                                          bool precisionHitsOnly = false,
+                                          bool usePathOrdering = true) {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
-      double sourceCoordinate;
+      double path;
     };
     std::vector<OrderedHit> orderedHits;
     for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
       if (!(*hit)->isValid() || (*hit)->geographicalId().det() != DetId::Muon)
         continue;
+      if (precisionHitsOnly && !isPrecisionMuonSubdetector((*hit)->geographicalId().subdetId()))
+        continue;
       auto transientHit = hitBuilder.build(&**hit);
       if (!transientHit || !transientHit->isValid() || !transientHit->det())
         continue;
-      orderedHits.push_back({transientHit, sourceSide * transientHit->globalPosition().z()});
+      orderedHits.push_back(
+          {transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
     }
+
+    DirectionalRefitResult result;
+    result.inputHits = orderedHits.size();
+    std::set<unsigned int> inputStations;
+    for (auto const& orderedHit : orderedHits) {
+      auto const station = precisionStationKey(orderedHit.hit->geographicalId());
+      if (station != 0)
+        inputStations.insert(station);
+    }
+    result.inputStations = inputStations.size();
     if (orderedHits.size() < 3)
-      return {};
-    std::stable_sort(orderedHits.begin(), orderedHits.end(), [](OrderedHit const& first, OrderedHit const& second) {
-      return first.sourceCoordinate > second.sourceCoordinate;
-    });
+      return result;
 
     bool const useOuter = sourceSide * track.outerPosition().z() > sourceSide * track.innerPosition().z();
     auto const original = useOuter ? trajectoryStateTransform::outerFreeState(track, &magneticField)
                                    : trajectoryStateTransform::innerFreeState(track, &magneticField);
     if (!original.hasError())
-      return {};
+      return result;
     double const sign = directionSign == 0 ? 1. : directionSign;
     auto const rawMomentum = original.momentum();
     GlobalVector const momentum(sign * rawMomentum.x(), sign * rawMomentum.y(), sign * rawMomentum.z());
@@ -246,20 +394,45 @@ namespace {
         original.position(), momentum, sign * original.charge(), &magneticField);
     FreeTrajectoryState const originalSeed(parameters, original.curvilinearError());
 
+    if (usePathOrdering) {
+      // Order measurements by actual propagated path from the source-facing
+      // endpoint.  Global z is not a valid trajectory coordinate for barrel,
+      // bending, or traversing tracks.  If the propagation to a measurement
+      // surface fails, retain that hit using its signed projection along the
+      // seed direction and expose the fallback count as a diagnostic.
+      auto const seedDirection = momentum.unit();
+      for (auto& orderedHit : orderedHits) {
+        auto const propagated = vacuumPropagator.propagateWithPath(originalSeed, orderedHit.hit->det()->surface());
+        if (propagated.first.isValid() && std::isfinite(propagated.second)) {
+          orderedHit.path = propagated.second;
+        } else {
+          auto const displacement = orderedHit.hit->globalPosition() - original.position();
+          orderedHit.path = displacement.dot(seedDirection);
+          ++result.pathOrderingFallbackHits;
+        }
+      }
+    }
+    std::stable_sort(orderedHits.begin(), orderedHits.end(), [usePathOrdering](OrderedHit const& first,
+                                                                              OrderedHit const& second) {
+      return usePathOrdering ? first.path < second.path : first.path > second.path;
+    });
+    result.pathOrderingSpan = orderedHits.back().path - orderedHits.front().path;
+    result.inputLeverArm =
+        (orderedHits.front().hit->globalPosition() - orderedHits.back().hit->globalPosition()).mag();
+
     Trajectory::RecHitContainer fitHits;
     fitHits.reserve(orderedHits.size());
     for (auto const& orderedHit : orderedHits)
       fitHits.push_back(orderedHit.hit);
 
     KFUpdator updator;
-    Chi2MeasurementEstimator estimator(maxHitChi2);
-    KFTrajectoryFitter fitter(materialPropagator, updator, estimator, 3, nullptr, &hitCloner);
-    KFTrajectorySmoother smoother(
-        materialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
-    smoother.setHitCloner(&hitCloner);
-
-    auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed) {
+    auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed, double iterationMaxHitChi2) {
       RefitIterationResult result;
+      Chi2MeasurementEstimator estimator(iterationMaxHitChi2);
+      KFTrajectoryFitter fitter(materialPropagator, updator, estimator, 3, nullptr, &hitCloner);
+      KFTrajectorySmoother smoother(
+          materialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
+      smoother.setHitCloner(&hitCloner);
       auto const start = inflateCurvatureError(uninflatedSeed, seedCurvatureErrorRescale);
       auto const firstPredicted = materialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
       if (!firstPredicted.isValid())
@@ -279,18 +452,11 @@ namespace {
       if (!upstream.isValid() || !upstream.freeState())
         return result;
       auto const upstreamMomentum = upstream.globalMomentum();
-      auto const materialTargetState = propagateStateToTargetLine(upstream.globalPosition(),
-                                                                  upstreamMomentum,
-                                                                  upstream.charge(),
-                                                                  vacuumPropagator,
-                                                                  &materialPropagator,
-                                                                  sourceSide);
-      auto const vacuumTargetState = propagateStateToTargetLine(upstream.globalPosition(),
-                                                                upstreamMomentum,
-                                                                upstream.charge(),
-                                                                vacuumPropagator,
-                                                                nullptr,
-                                                                sourceSide);
+      auto const upstreamFreeState = *upstream.freeState();
+      auto const materialTargetState =
+          propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, &materialPropagator, sourceSide);
+      auto const vacuumTargetState =
+          propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, nullptr, sourceSide);
       if (!materialTargetState.valid)
         return result;
       auto const refitHits = static_cast<unsigned int>(smoothed.foundHits());
@@ -306,12 +472,11 @@ namespace {
       return result;
     };
 
-    DirectionalRefitResult result;
-    result.first = runIteration(originalSeed);
+    result.first = runIteration(originalSeed, initialMaxHitChi2);
     if (!result.first.valid)
       return result;
 
-    result.second = runIteration(*result.first.upstreamState.freeState());
+    result.second = runIteration(*result.first.upstreamState.freeState(), maxHitChi2);
     if (result.second.valid) {
       double const denominator = std::max(std::abs(result.first.signedInverseMomentum), 1.e-12);
       result.relativeQoverPChange =
@@ -594,12 +759,19 @@ public:
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
+        useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         directionalRefitSeedCurvatureErrorRescale_(
             parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
+        directionalRefitInitialMaxHitChi2_(
+            parameters.getParameter<double>("directionalRefitInitialMaxHitChi2")),
         directionalRefitMaxHitChi2_(parameters.getParameter<double>("directionalRefitMaxHitChi2")),
         directionalRefitMaxRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxRelativeQoverPChange")),
+        directionalRefitMinPrecisionStations_(
+            parameters.getParameter<unsigned int>("directionalRefitMinPrecisionStations")),
+        directionalRefitMaxPrecisionRelativeQoverPChange_(
+            parameters.getParameter<double>("directionalRefitMaxPrecisionRelativeQoverPChange")),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
@@ -627,14 +799,24 @@ public:
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
-    // Use material effects only within the modeled CMS envelope.  Outside it,
-    // propagate through the evacuated SHIFT-to-CMS flight path without dE/dx.
-    SteppingHelixPropagator materialPropagator(&magneticField, anyDirection);
-    // In this API the argument is `noMaterial`, so false enables dE/dx.
-    materialPropagator.setMaterialMode(false);
-    materialPropagator.setUseMagVolumes(true);
-    materialPropagator.setUseMatVolumes(true);
-    materialPropagator.applyRadX0Correction(true);
+    // Keep the established R-Z material propagator as the production default.
+    // The optional scale-improvement study replaces it with detailed Geant4e
+    // transport and also enables path ordering, robust thresholds, and the
+    // precision-only refit below.
+    SteppingHelixPropagator approximateMaterialPropagator(&magneticField, anyDirection);
+    approximateMaterialPropagator.setMaterialMode(false);
+    approximateMaterialPropagator.setUseMagVolumes(true);
+    approximateMaterialPropagator.setUseMatVolumes(true);
+    approximateMaterialPropagator.applyRadX0Correction(true);
+    std::unique_ptr<Geant4ePropagator> detailedMaterialPropagator;
+    Propagator const* materialPropagator = &approximateMaterialPropagator;
+    if (useImprovedMomentumRefit_) {
+      // The stock Geant4e limits (10 mm steps and 200 cm total path) are too
+      // coarse/short for a complete endcap-to-endcap SHIFT trajectory.
+      detailedMaterialPropagator =
+          std::make_unique<Geant4ePropagator>(&magneticField, "mu", anyDirection, 0.05, 2.0, 2500.0);
+      materialPropagator = detailedMaterialPropagator.get();
+    }
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
     vacuumPropagator.setUseMagVolumes(true);
@@ -705,51 +887,144 @@ public:
                                     : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
       candidate.physicalDirectionSign = directionSign;
       auto const preRefitState = propagateToTargetLine(
-          *candidate.track, vacuumPropagator, directionSign, &materialPropagator, eventSourceSide);
+          *candidate.track, vacuumPropagator, directionSign, materialPropagator, eventSourceSide);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
       candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
+      auto const topology = muonHitTopology(*candidate.track);
+      candidate.nDTRefitHits = topology.dt;
+      candidate.nCSCRefitHits = topology.csc;
+      candidate.nRPCRefitHits = topology.rpc;
+      candidate.nGEMRefitHits = topology.gem;
+      candidate.nPrecisionRefitStations = topology.precisionStations;
 
       // Refit the same reconstructed hits in their measured time-of-flight
       // direction.  This changes the direction in which the Kalman filter
       // applies material updates; flipping a completed fit cannot do that.
       candidate.directionalRefitAttempted = true;
-      auto const refit = directionalRefit(*candidate.track,
-                                          directionSign,
-                                          eventSourceSide,
-                                          magneticField,
-                                          muonRecHitBuilder,
-                                          hitCloner,
-                                          vacuumPropagator,
-                                          materialPropagator,
-                                          directionalRefitSeedCurvatureErrorRescale_,
-                                          directionalRefitErrorRescale_,
-                                          directionalRefitMaxHitChi2_,
-                                          directionalRefitMaxRelativeQoverPChange_);
+      auto runDirectionalRefit = [&](bool precisionHitsOnly) {
+        return directionalRefit(*candidate.track,
+                                directionSign,
+                                eventSourceSide,
+                                magneticField,
+                                muonRecHitBuilder,
+                                hitCloner,
+                                vacuumPropagator,
+                                *materialPropagator,
+                                directionalRefitSeedCurvatureErrorRescale_,
+                                useImprovedMomentumRefit_ ? directionalRefitErrorRescale_ : 100.,
+                                useImprovedMomentumRefit_ ? directionalRefitInitialMaxHitChi2_ : 100000.,
+                                useImprovedMomentumRefit_ ? directionalRefitMaxHitChi2_ : 100000.,
+                                useImprovedMomentumRefit_ ? directionalRefitMaxRelativeQoverPChange_ : 0.5,
+                                precisionHitsOnly,
+                                useImprovedMomentumRefit_);
+      };
+      auto const allHitsRefit = runDirectionalRefit(false);
+      auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
+      double precisionRelativeToAllQoverP = -1.;
+      bool precisionAgreesWithAllHits = true;
+      if (precisionRefit.valid && allHitsRefit.valid) {
+        double const denominator = std::max(std::abs(allHitsRefit.selected.signedInverseMomentum), 1.e-12);
+        precisionRelativeToAllQoverP =
+            std::abs(precisionRefit.selected.signedInverseMomentum - allHitsRefit.selected.signedInverseMomentum) /
+            denominator;
+        precisionAgreesWithAllHits = std::isfinite(precisionRelativeToAllQoverP) &&
+                                     precisionRelativeToAllQoverP <=
+                                         directionalRefitMaxPrecisionRelativeQoverPChange_;
+      }
+      double precisionTargetDca = -1.;
+      bool precisionHasShiftTopology = false;
+      if (precisionRefit.valid) {
+        auto const& precisionTarget = precisionRefit.selected.materialTargetState;
+        precisionTargetDca = precisionTarget.position.perp();
+        double const precisionPt = precisionTarget.momentum.perp();
+        double const precisionAbsEta =
+            precisionPt > 0. ? std::abs(std::asinh(precisionTarget.momentum.z() / precisionPt))
+                             : std::numeric_limits<double>::infinity();
+        precisionHasShiftTopology = precisionTargetDca <= maxTargetLineDca_ && precisionAbsEta >= minAbsEta_;
+      }
+      bool const usePrecisionRefit = useImprovedMomentumRefit_ && precisionRefit.valid &&
+                                     precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
+                                     precisionHasShiftTopology && precisionAgreesWithAllHits;
+      auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+
+      candidate.precisionRefitLeverArm = precisionRefit.inputLeverArm;
+      candidate.directionalRefitUsedPrecisionHits = usePrecisionRefit;
+      candidate.directionalRefitAllHitsValid = allHitsRefit.valid;
+      candidate.directionalRefitAllHits = allHitsRefit.selected.hits;
+      candidate.directionalRefitAllHitsChi2 = allHitsRefit.selected.chi2;
+      candidate.directionalRefitAllHitsNdof = allHitsRefit.selected.ndof;
+      candidate.directionalRefitAllHitsTargetPt =
+          allHitsRefit.valid ? allHitsRefit.selected.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitAllHitsTargetPz =
+          allHitsRefit.valid ? allHitsRefit.selected.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitAllHitsSelectedIteration = allHitsRefit.selectedIteration;
+      candidate.directionalRefitAllHitsInput = allHitsRefit.inputHits;
+      candidate.directionalRefitAllHitsOrderingFallback = allHitsRefit.pathOrderingFallbackHits;
+      candidate.directionalRefitAllHitsOrderingSpan = allHitsRefit.pathOrderingSpan;
+      candidate.directionalRefitAllHitsFirstRejected =
+          allHitsRefit.inputHits > allHitsRefit.first.hits ? allHitsRefit.inputHits - allHitsRefit.first.hits : 0;
+      candidate.directionalRefitAllHitsSecondRejected =
+          allHitsRefit.inputHits > allHitsRefit.second.hits ? allHitsRefit.inputHits - allHitsRefit.second.hits : 0;
+      candidate.directionalRefitPrecisionValid = precisionRefit.valid;
+      candidate.directionalRefitPrecisionHits = precisionRefit.selected.hits;
+      candidate.directionalRefitPrecisionChi2 = precisionRefit.selected.chi2;
+      candidate.directionalRefitPrecisionNdof = precisionRefit.selected.ndof;
+      candidate.directionalRefitPrecisionUpstreamPt = precisionRefit.selected.upstreamPt;
+      candidate.directionalRefitPrecisionQoverP = precisionRefit.selected.signedInverseMomentum;
+      candidate.directionalRefitPrecisionTargetPt =
+          precisionRefit.valid ? precisionRefit.selected.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitPrecisionTargetPz =
+          precisionRefit.valid ? precisionRefit.selected.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitPrecisionSecondValid = precisionRefit.second.valid;
+      candidate.directionalRefitPrecisionSecondConverged = precisionRefit.secondConverged;
+      candidate.directionalRefitPrecisionRelativeQoverPChange = precisionRefit.relativeQoverPChange;
+      candidate.directionalRefitPrecisionSelectedIteration = precisionRefit.selectedIteration;
+      candidate.directionalRefitPrecisionFirstTargetPt =
+          precisionRefit.first.valid ? precisionRefit.first.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitPrecisionFirstTargetPz =
+          precisionRefit.first.valid ? precisionRefit.first.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitPrecisionSecondTargetPt =
+          precisionRefit.second.valid ? precisionRefit.second.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitPrecisionSecondTargetPz =
+          precisionRefit.second.valid ? precisionRefit.second.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitPrecisionRelativeToAllQoverP = precisionRelativeToAllQoverP;
+      candidate.directionalRefitPrecisionTargetDca = precisionTargetDca;
+      candidate.directionalRefitPrecisionInput = precisionRefit.inputHits;
+      candidate.directionalRefitPrecisionOrderingFallback = precisionRefit.pathOrderingFallbackHits;
+      candidate.directionalRefitPrecisionOrderingSpan = precisionRefit.pathOrderingSpan;
+      candidate.directionalRefitPrecisionFirstRejected =
+          precisionRefit.inputHits > precisionRefit.first.hits ? precisionRefit.inputHits - precisionRefit.first.hits : 0;
+      candidate.directionalRefitPrecisionSecondRejected =
+          precisionRefit.inputHits > precisionRefit.second.hits ? precisionRefit.inputHits - precisionRefit.second.hits : 0;
+
+      // Keep the established first/second diagnostic branches tied to the
+      // all-hit control fit so this production can compare it directly with
+      // the new precision-only variant.
       candidate.directionalRefitValid = refit.valid;
-      candidate.directionalRefitFirstValid = refit.first.valid;
-      candidate.directionalRefitFirstHits = refit.first.hits;
-      candidate.directionalRefitFirstChi2 = refit.first.chi2;
-      candidate.directionalRefitFirstNdof = refit.first.ndof;
-      candidate.directionalRefitFirstUpstreamPt = refit.first.upstreamPt;
-      candidate.directionalRefitFirstQoverP = refit.first.signedInverseMomentum;
+      candidate.directionalRefitFirstValid = allHitsRefit.first.valid;
+      candidate.directionalRefitFirstHits = allHitsRefit.first.hits;
+      candidate.directionalRefitFirstChi2 = allHitsRefit.first.chi2;
+      candidate.directionalRefitFirstNdof = allHitsRefit.first.ndof;
+      candidate.directionalRefitFirstUpstreamPt = allHitsRefit.first.upstreamPt;
+      candidate.directionalRefitFirstQoverP = allHitsRefit.first.signedInverseMomentum;
       candidate.directionalRefitFirstTargetPt =
-          refit.first.materialTargetState.valid ? refit.first.materialTargetState.momentum.perp() : 0.;
+          allHitsRefit.first.materialTargetState.valid ? allHitsRefit.first.materialTargetState.momentum.perp() : 0.;
       candidate.directionalRefitFirstTargetPz =
-          refit.first.materialTargetState.valid ? refit.first.materialTargetState.momentum.z() : 0.;
-      candidate.directionalRefitSecondValid = refit.second.valid;
-      candidate.directionalRefitSecondHits = refit.second.hits;
-      candidate.directionalRefitSecondChi2 = refit.second.chi2;
-      candidate.directionalRefitSecondNdof = refit.second.ndof;
-      candidate.directionalRefitSecondUpstreamPt = refit.second.upstreamPt;
-      candidate.directionalRefitSecondQoverP = refit.second.signedInverseMomentum;
+          allHitsRefit.first.materialTargetState.valid ? allHitsRefit.first.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitSecondValid = allHitsRefit.second.valid;
+      candidate.directionalRefitSecondHits = allHitsRefit.second.hits;
+      candidate.directionalRefitSecondChi2 = allHitsRefit.second.chi2;
+      candidate.directionalRefitSecondNdof = allHitsRefit.second.ndof;
+      candidate.directionalRefitSecondUpstreamPt = allHitsRefit.second.upstreamPt;
+      candidate.directionalRefitSecondQoverP = allHitsRefit.second.signedInverseMomentum;
       candidate.directionalRefitSecondTargetPt =
-          refit.second.materialTargetState.valid ? refit.second.materialTargetState.momentum.perp() : 0.;
+          allHitsRefit.second.materialTargetState.valid ? allHitsRefit.second.materialTargetState.momentum.perp() : 0.;
       candidate.directionalRefitSecondTargetPz =
-          refit.second.materialTargetState.valid ? refit.second.materialTargetState.momentum.z() : 0.;
-      candidate.directionalRefitSecondConverged = refit.secondConverged;
-      candidate.directionalRefitRelativeQoverPChange = refit.relativeQoverPChange;
-      candidate.directionalRefitSelectedIteration = refit.selectedIteration;
+          allHitsRefit.second.materialTargetState.valid ? allHitsRefit.second.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitSecondConverged = allHitsRefit.secondConverged;
+      candidate.directionalRefitRelativeQoverPChange = allHitsRefit.relativeQoverPChange;
+      candidate.directionalRefitSelectedIteration = allHitsRefit.selectedIteration;
       candidate.directionalRefitHits = refit.selected.hits;
       candidate.directionalRefitChi2 = refit.selected.chi2;
       candidate.directionalRefitNdof = refit.selected.ndof;
@@ -762,6 +1037,13 @@ public:
           candidate.directionalRefitMaterialDeltaPt =
               refit.selected.materialTargetState.momentum.perp() -
               refit.selected.vacuumTargetState.momentum.perp();
+        }
+        auto const& boundaryState = refit.selected.materialTargetState;
+        candidate.directionalRefitMaterialBoundaryValid = boundaryState.materialBoundaryValid;
+        if (boundaryState.materialBoundaryValid) {
+          candidate.directionalRefitMaterialBoundaryPt = boundaryState.materialBoundaryMomentum.perp();
+          candidate.directionalRefitMaterialBoundaryPz = boundaryState.materialBoundaryMomentum.z();
+          candidate.directionalRefitMaterialPath = boundaryState.materialPath;
         }
       }
     }
@@ -856,6 +1138,11 @@ public:
         return a.timingDirectionSign > 0;
       if (aHasTiming && bHasTiming && a.timingChi2 != b.timingChi2)
         return a.timingChi2 < b.timingChi2;
+      // A successfully refitted duplicate is preferable to a candidate that
+      // would fall back to the original biased endpoint state. This remains a
+      // reconstruction-only decision and is evaluated before source labels.
+      if (a.directionalRefitValid != b.directionalRefitValid)
+        return a.directionalRefitValid;
       auto geometryPriority = [](int source) {
         // Traversing and cosmic fits use both detector legs and give much
         // better direction/origin resolution.  DSA remains available when no
@@ -939,14 +1226,33 @@ public:
         directionalRefitSecondNdof, directionalRefitSecondUpstreamPt, directionalRefitSecondQoverP,
         directionalRefitSecondTargetPt,
         directionalRefitSecondTargetPz, directionalRefitRelativeQoverPChange, directionalRefitVacuumTargetPt,
-        directionalRefitVacuumTargetPz, directionalRefitMaterialDeltaPt, ptError, etaError, phiError, vx, vy, vz,
+        directionalRefitVacuumTargetPz, directionalRefitMaterialDeltaPt,
+        directionalRefitMaterialBoundaryPt, directionalRefitMaterialBoundaryPz, directionalRefitMaterialPath,
+        directionalRefitAllHitsOrderingSpan, directionalRefitPrecisionOrderingSpan, precisionRefitLeverArm,
+        directionalRefitAllHitsChi2, directionalRefitAllHitsNdof, directionalRefitAllHitsTargetPt,
+        directionalRefitAllHitsTargetPz, directionalRefitPrecisionChi2, directionalRefitPrecisionNdof,
+        directionalRefitPrecisionUpstreamPt, directionalRefitPrecisionQoverP, directionalRefitPrecisionTargetPt,
+        directionalRefitPrecisionTargetPz, directionalRefitPrecisionRelativeQoverPChange,
+        directionalRefitPrecisionFirstTargetPt, directionalRefitPrecisionFirstTargetPz,
+        directionalRefitPrecisionSecondTargetPt, directionalRefitPrecisionSecondTargetPz,
+        directionalRefitPrecisionRelativeToAllQoverP, directionalRefitPrecisionTargetDca,
+        ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
     std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
         directionalRefitValid, directionalRefitHits, directionalRefitFirstValid, directionalRefitFirstHits,
         directionalRefitSecondValid, directionalRefitSecondHits, directionalRefitSecondConverged,
-        directionalRefitSelectedIteration;
+        directionalRefitSelectedIteration, nDTRefitHits, nCSCRefitHits, nRPCRefitHits, nGEMRefitHits,
+        nPrecisionRefitStations, directionalRefitUsedPrecisionHits, directionalRefitAllHitsValid,
+        directionalRefitAllHits, directionalRefitAllHitsSelectedIteration, directionalRefitPrecisionValid,
+        directionalRefitPrecisionHits, directionalRefitPrecisionSecondValid,
+        directionalRefitPrecisionSecondConverged, directionalRefitPrecisionSelectedIteration,
+        directionalRefitMaterialBoundaryValid, directionalRefitAllHitsInput,
+        directionalRefitAllHitsOrderingFallback, directionalRefitAllHitsFirstRejected,
+        directionalRefitAllHitsSecondRejected, directionalRefitPrecisionInput,
+        directionalRefitPrecisionOrderingFallback, directionalRefitPrecisionFirstRejected,
+        directionalRefitPrecisionSecondRejected;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -1009,6 +1315,54 @@ public:
       directionalRefitVacuumTargetPt.push_back(candidate->directionalRefitVacuumTargetPt);
       directionalRefitVacuumTargetPz.push_back(candidate->directionalRefitVacuumTargetPz);
       directionalRefitMaterialDeltaPt.push_back(candidate->directionalRefitMaterialDeltaPt);
+      directionalRefitMaterialBoundaryValid.push_back(candidate->directionalRefitMaterialBoundaryValid);
+      directionalRefitMaterialBoundaryPt.push_back(candidate->directionalRefitMaterialBoundaryPt);
+      directionalRefitMaterialBoundaryPz.push_back(candidate->directionalRefitMaterialBoundaryPz);
+      directionalRefitMaterialPath.push_back(candidate->directionalRefitMaterialPath);
+      directionalRefitAllHitsInput.push_back(candidate->directionalRefitAllHitsInput);
+      directionalRefitAllHitsOrderingFallback.push_back(candidate->directionalRefitAllHitsOrderingFallback);
+      directionalRefitAllHitsOrderingSpan.push_back(candidate->directionalRefitAllHitsOrderingSpan);
+      directionalRefitAllHitsFirstRejected.push_back(candidate->directionalRefitAllHitsFirstRejected);
+      directionalRefitAllHitsSecondRejected.push_back(candidate->directionalRefitAllHitsSecondRejected);
+      directionalRefitPrecisionInput.push_back(candidate->directionalRefitPrecisionInput);
+      directionalRefitPrecisionOrderingFallback.push_back(candidate->directionalRefitPrecisionOrderingFallback);
+      directionalRefitPrecisionOrderingSpan.push_back(candidate->directionalRefitPrecisionOrderingSpan);
+      directionalRefitPrecisionFirstRejected.push_back(candidate->directionalRefitPrecisionFirstRejected);
+      directionalRefitPrecisionSecondRejected.push_back(candidate->directionalRefitPrecisionSecondRejected);
+      nDTRefitHits.push_back(candidate->nDTRefitHits);
+      nCSCRefitHits.push_back(candidate->nCSCRefitHits);
+      nRPCRefitHits.push_back(candidate->nRPCRefitHits);
+      nGEMRefitHits.push_back(candidate->nGEMRefitHits);
+      nPrecisionRefitStations.push_back(candidate->nPrecisionRefitStations);
+      precisionRefitLeverArm.push_back(candidate->precisionRefitLeverArm);
+      directionalRefitUsedPrecisionHits.push_back(candidate->directionalRefitUsedPrecisionHits);
+      directionalRefitAllHitsValid.push_back(candidate->directionalRefitAllHitsValid);
+      directionalRefitAllHits.push_back(candidate->directionalRefitAllHits);
+      directionalRefitAllHitsChi2.push_back(candidate->directionalRefitAllHitsChi2);
+      directionalRefitAllHitsNdof.push_back(candidate->directionalRefitAllHitsNdof);
+      directionalRefitAllHitsTargetPt.push_back(candidate->directionalRefitAllHitsTargetPt);
+      directionalRefitAllHitsTargetPz.push_back(candidate->directionalRefitAllHitsTargetPz);
+      directionalRefitAllHitsSelectedIteration.push_back(candidate->directionalRefitAllHitsSelectedIteration);
+      directionalRefitPrecisionValid.push_back(candidate->directionalRefitPrecisionValid);
+      directionalRefitPrecisionHits.push_back(candidate->directionalRefitPrecisionHits);
+      directionalRefitPrecisionChi2.push_back(candidate->directionalRefitPrecisionChi2);
+      directionalRefitPrecisionNdof.push_back(candidate->directionalRefitPrecisionNdof);
+      directionalRefitPrecisionUpstreamPt.push_back(candidate->directionalRefitPrecisionUpstreamPt);
+      directionalRefitPrecisionQoverP.push_back(candidate->directionalRefitPrecisionQoverP);
+      directionalRefitPrecisionTargetPt.push_back(candidate->directionalRefitPrecisionTargetPt);
+      directionalRefitPrecisionTargetPz.push_back(candidate->directionalRefitPrecisionTargetPz);
+      directionalRefitPrecisionSecondValid.push_back(candidate->directionalRefitPrecisionSecondValid);
+      directionalRefitPrecisionSecondConverged.push_back(candidate->directionalRefitPrecisionSecondConverged);
+      directionalRefitPrecisionRelativeQoverPChange.push_back(
+          candidate->directionalRefitPrecisionRelativeQoverPChange);
+      directionalRefitPrecisionSelectedIteration.push_back(candidate->directionalRefitPrecisionSelectedIteration);
+      directionalRefitPrecisionFirstTargetPt.push_back(candidate->directionalRefitPrecisionFirstTargetPt);
+      directionalRefitPrecisionFirstTargetPz.push_back(candidate->directionalRefitPrecisionFirstTargetPz);
+      directionalRefitPrecisionSecondTargetPt.push_back(candidate->directionalRefitPrecisionSecondTargetPt);
+      directionalRefitPrecisionSecondTargetPz.push_back(candidate->directionalRefitPrecisionSecondTargetPz);
+      directionalRefitPrecisionRelativeToAllQoverP.push_back(
+          candidate->directionalRefitPrecisionRelativeToAllQoverP);
+      directionalRefitPrecisionTargetDca.push_back(candidate->directionalRefitPrecisionTargetDca);
       ptError.push_back(track.ptError());
       etaError.push_back(track.etaError());
       phiError.push_back(track.phiError());
@@ -1084,61 +1438,61 @@ public:
     table->addColumn<float>("directionalRefitNdof", directionalRefitNdof, "directional-refit trajectory ndof");
     table->addColumn<int>("directionalRefitFirstValid",
                           directionalRefitFirstValid,
-                          "1 when the first fitter-smoother iteration is valid");
+                          "1 when the first all-hit control fitter-smoother iteration is valid");
     table->addColumn<int>("directionalRefitFirstHits",
                           directionalRefitFirstHits,
-                          "valid hits in the first fitter-smoother iteration");
+                          "valid hits in the first all-hit control fitter-smoother iteration");
     table->addColumn<float>("directionalRefitFirstChi2",
                             directionalRefitFirstChi2,
-                            "trajectory chi2 from the first fitter-smoother iteration");
+                            "trajectory chi2 from the first all-hit control fitter-smoother iteration");
     table->addColumn<float>("directionalRefitFirstNdof",
                             directionalRefitFirstNdof,
-                            "trajectory ndof from the first fitter-smoother iteration");
+                            "trajectory ndof from the first all-hit control fitter-smoother iteration");
     table->addColumn<float>("directionalRefitFirstUpstreamPt",
                             directionalRefitFirstUpstreamPt,
-                            "source-facing pT from the first fitter-smoother iteration");
+                            "source-facing pT from the first all-hit control fitter-smoother iteration");
     table->addColumn<float>("directionalRefitFirstQoverP",
                             directionalRefitFirstQoverP,
-                            "source-facing signed inverse momentum from the first iteration");
+                            "source-facing signed inverse momentum from all-hit control iteration one");
     table->addColumn<float>("directionalRefitFirstTargetPt",
                             directionalRefitFirstTargetPt,
-                            "material-aware target-line pT from the first iteration");
+                            "material-aware target-line pT from all-hit control iteration one");
     table->addColumn<float>("directionalRefitFirstTargetPz",
                             directionalRefitFirstTargetPz,
-                            "material-aware target-line pz from the first iteration");
+                            "material-aware target-line pz from all-hit control iteration one");
     table->addColumn<int>("directionalRefitSecondValid",
                           directionalRefitSecondValid,
-                          "1 when the second nonlinear fitter-smoother iteration is valid");
+                          "1 when the second all-hit control nonlinear iteration is valid");
     table->addColumn<int>("directionalRefitSecondHits",
                           directionalRefitSecondHits,
-                          "valid hits in the second nonlinear iteration");
+                          "valid hits in the second all-hit control nonlinear iteration");
     table->addColumn<float>("directionalRefitSecondChi2",
                             directionalRefitSecondChi2,
-                            "trajectory chi2 from the second nonlinear iteration");
+                            "trajectory chi2 from the second all-hit control nonlinear iteration");
     table->addColumn<float>("directionalRefitSecondNdof",
                             directionalRefitSecondNdof,
-                            "trajectory ndof from the second nonlinear iteration");
+                            "trajectory ndof from the second all-hit control nonlinear iteration");
     table->addColumn<float>("directionalRefitSecondUpstreamPt",
                             directionalRefitSecondUpstreamPt,
-                            "source-facing pT from the second nonlinear iteration");
+                            "source-facing pT from the second all-hit control nonlinear iteration");
     table->addColumn<float>("directionalRefitSecondQoverP",
                             directionalRefitSecondQoverP,
-                            "source-facing signed inverse momentum from the second iteration");
+                            "source-facing signed inverse momentum from all-hit control iteration two");
     table->addColumn<float>("directionalRefitSecondTargetPt",
                             directionalRefitSecondTargetPt,
-                            "material-aware target-line pT from the second nonlinear iteration");
+                            "material-aware target-line pT from all-hit control iteration two");
     table->addColumn<float>("directionalRefitSecondTargetPz",
                             directionalRefitSecondTargetPz,
-                            "material-aware target-line pz from the second nonlinear iteration");
+                            "material-aware target-line pz from all-hit control iteration two");
     table->addColumn<int>("directionalRefitSecondConverged",
                           directionalRefitSecondConverged,
-                          "1 when iteration two passes the relative q-over-p convergence guard");
+                          "1 when all-hit control iteration two passes the relative q-over-p guard");
     table->addColumn<float>("directionalRefitRelativeQoverPChange",
                             directionalRefitRelativeQoverPChange,
-                            "absolute relative q-over-p change from iteration one to two, or -1");
+                            "absolute all-hit control q-over-p change from iteration one to two, or -1");
     table->addColumn<int>("directionalRefitSelectedIteration",
                           directionalRefitSelectedIteration,
-                          "iteration used for final kinematics: 0=none, 1=first, 2=second");
+                          "selected all-hit control iteration: 0=none, 1=first, 2=second");
     table->addColumn<float>("directionalRefitVacuumTargetPt",
                             directionalRefitVacuumTargetPt,
                             "selected-iteration target-line pT with vacuum-only propagation");
@@ -1148,6 +1502,136 @@ public:
     table->addColumn<float>("directionalRefitMaterialDeltaPt",
                             directionalRefitMaterialDeltaPt,
                             "selected material-aware target pT minus vacuum-only target pT");
+    table->addColumn<int>("directionalRefitMaterialBoundaryValid",
+                          directionalRefitMaterialBoundaryValid,
+                          "1 when detailed Geant4e propagation reached the outer CMS boundary");
+    table->addColumn<float>("directionalRefitMaterialBoundaryPt",
+                            directionalRefitMaterialBoundaryPt,
+                            "pT at the outer CMS boundary after detailed Geant4e back-propagation");
+    table->addColumn<float>("directionalRefitMaterialBoundaryPz",
+                            directionalRefitMaterialBoundaryPz,
+                            "pz at the outer CMS boundary after detailed Geant4e back-propagation");
+    table->addColumn<float>("directionalRefitMaterialPath",
+                            directionalRefitMaterialPath,
+                            "signed Geant4e path length from the source-facing refit state to the CMS boundary");
+    table->addColumn<int>("nDTRefitHits", nDTRefitHits, "valid DT inputs available to the directional refit");
+    table->addColumn<int>("nCSCRefitHits", nCSCRefitHits, "valid CSC inputs available to the directional refit");
+    table->addColumn<int>("nRPCRefitHits", nRPCRefitHits, "valid RPC inputs available to the directional refit");
+    table->addColumn<int>("nGEMRefitHits", nGEMRefitHits, "valid GEM inputs available to the directional refit");
+    table->addColumn<int>("nPrecisionRefitStations",
+                          nPrecisionRefitStations,
+                          "distinct DT, CSC, or GEM station layers available to the precision-only refit");
+    table->addColumn<float>("precisionRefitLeverArm",
+                            precisionRefitLeverArm,
+                            "three-dimensional separation of the endpoint precision-hit positions in cm");
+    table->addColumn<int>("directionalRefitUsedPrecisionHits",
+                          directionalRefitUsedPrecisionHits,
+                          "1 when canonical momentum uses the guarded precision-only refit");
+    table->addColumn<int>("directionalRefitAllHitsValid",
+                          directionalRefitAllHitsValid,
+                          "1 when the all-muon-hit control refit is valid");
+    table->addColumn<int>("directionalRefitAllHits",
+                          directionalRefitAllHits,
+                          "hits retained by the selected all-hit control iteration");
+    table->addColumn<float>("directionalRefitAllHitsChi2",
+                            directionalRefitAllHitsChi2,
+                            "trajectory chi2 of the selected all-hit control iteration");
+    table->addColumn<float>("directionalRefitAllHitsNdof",
+                            directionalRefitAllHitsNdof,
+                            "trajectory ndof of the selected all-hit control iteration");
+    table->addColumn<float>("directionalRefitAllHitsTargetPt",
+                            directionalRefitAllHitsTargetPt,
+                            "target-line pT from the selected all-hit control iteration");
+    table->addColumn<float>("directionalRefitAllHitsTargetPz",
+                            directionalRefitAllHitsTargetPz,
+                            "target-line pz from the selected all-hit control iteration");
+    table->addColumn<int>("directionalRefitAllHitsSelectedIteration",
+                          directionalRefitAllHitsSelectedIteration,
+                          "selected all-hit control iteration: 0=none, 1=first, 2=second");
+    table->addColumn<int>("directionalRefitAllHitsInput",
+                          directionalRefitAllHitsInput,
+                          "valid all-muon-system hits supplied to the refit");
+    table->addColumn<int>("directionalRefitAllHitsOrderingFallback",
+                          directionalRefitAllHitsOrderingFallback,
+                          "all-hit measurements ordered by projection after path propagation failed");
+    table->addColumn<float>("directionalRefitAllHitsOrderingSpan",
+                            directionalRefitAllHitsOrderingSpan,
+                            "ordered all-hit path span in cm");
+    table->addColumn<int>("directionalRefitAllHitsFirstRejected",
+                          directionalRefitAllHitsFirstRejected,
+                          "all-hit inputs rejected by the loose first fit");
+    table->addColumn<int>("directionalRefitAllHitsSecondRejected",
+                          directionalRefitAllHitsSecondRejected,
+                          "all-hit inputs rejected by the tight second fit");
+    table->addColumn<int>("directionalRefitPrecisionValid",
+                          directionalRefitPrecisionValid,
+                          "1 when the DT, CSC, and GEM-only refit is valid");
+    table->addColumn<int>("directionalRefitPrecisionHits",
+                          directionalRefitPrecisionHits,
+                          "precision hits retained by its selected nonlinear iteration");
+    table->addColumn<float>("directionalRefitPrecisionChi2",
+                            directionalRefitPrecisionChi2,
+                            "trajectory chi2 of the selected precision-only iteration");
+    table->addColumn<float>("directionalRefitPrecisionNdof",
+                            directionalRefitPrecisionNdof,
+                            "trajectory ndof of the selected precision-only iteration");
+    table->addColumn<float>("directionalRefitPrecisionUpstreamPt",
+                            directionalRefitPrecisionUpstreamPt,
+                            "source-facing pT from the selected precision-only iteration");
+    table->addColumn<float>("directionalRefitPrecisionQoverP",
+                            directionalRefitPrecisionQoverP,
+                            "source-facing signed inverse momentum from the precision-only refit");
+    table->addColumn<float>("directionalRefitPrecisionTargetPt",
+                            directionalRefitPrecisionTargetPt,
+                            "target-line pT from the selected precision-only iteration");
+    table->addColumn<float>("directionalRefitPrecisionTargetPz",
+                            directionalRefitPrecisionTargetPz,
+                            "target-line pz from the selected precision-only iteration");
+    table->addColumn<int>("directionalRefitPrecisionSecondValid",
+                          directionalRefitPrecisionSecondValid,
+                          "1 when the second precision-only nonlinear iteration is valid");
+    table->addColumn<int>("directionalRefitPrecisionSecondConverged",
+                          directionalRefitPrecisionSecondConverged,
+                          "1 when the second precision-only iteration passes the q-over-p guard");
+    table->addColumn<float>("directionalRefitPrecisionRelativeQoverPChange",
+                            directionalRefitPrecisionRelativeQoverPChange,
+                            "absolute relative q-over-p change between precision-only iterations");
+    table->addColumn<int>("directionalRefitPrecisionSelectedIteration",
+                          directionalRefitPrecisionSelectedIteration,
+                          "selected precision-only iteration: 0=none, 1=first, 2=second");
+    table->addColumn<float>("directionalRefitPrecisionFirstTargetPt",
+                            directionalRefitPrecisionFirstTargetPt,
+                            "target-line pT from precision-only iteration one");
+    table->addColumn<float>("directionalRefitPrecisionFirstTargetPz",
+                            directionalRefitPrecisionFirstTargetPz,
+                            "target-line pz from precision-only iteration one");
+    table->addColumn<float>("directionalRefitPrecisionSecondTargetPt",
+                            directionalRefitPrecisionSecondTargetPt,
+                            "target-line pT from precision-only iteration two");
+    table->addColumn<float>("directionalRefitPrecisionSecondTargetPz",
+                            directionalRefitPrecisionSecondTargetPz,
+                            "target-line pz from precision-only iteration two");
+    table->addColumn<float>("directionalRefitPrecisionRelativeToAllQoverP",
+                            directionalRefitPrecisionRelativeToAllQoverP,
+                            "relative selected q-over-p difference between precision-only and all-hit refits");
+    table->addColumn<float>("directionalRefitPrecisionTargetDca",
+                            directionalRefitPrecisionTargetDca,
+                            "precision-only selected-state transverse DCA to the target line in cm");
+    table->addColumn<int>("directionalRefitPrecisionInput",
+                          directionalRefitPrecisionInput,
+                          "valid DT, CSC, and GEM hits supplied to the precision refit");
+    table->addColumn<int>("directionalRefitPrecisionOrderingFallback",
+                          directionalRefitPrecisionOrderingFallback,
+                          "precision measurements ordered by projection after path propagation failed");
+    table->addColumn<float>("directionalRefitPrecisionOrderingSpan",
+                            directionalRefitPrecisionOrderingSpan,
+                            "ordered precision-hit path span in cm");
+    table->addColumn<int>("directionalRefitPrecisionFirstRejected",
+                          directionalRefitPrecisionFirstRejected,
+                          "precision inputs rejected by the loose first fit");
+    table->addColumn<int>("directionalRefitPrecisionSecondRejected",
+                          directionalRefitPrecisionSecondRejected,
+                          "precision inputs rejected by the tight second fit");
     table->addColumn<float>("ptErr", ptError, "transverse-momentum uncertainty");
     table->addColumn<float>("etaErr", etaError, "pseudorapidity uncertainty");
     table->addColumn<float>("phiErr", phiError, "azimuthal-angle uncertainty");
@@ -1393,10 +1877,14 @@ public:
     description.add<edm::InputTag>("traversingTracks", edm::InputTag("shiftTraversingMuons"));
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
+    description.add<bool>("useImprovedMomentumRefit", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
-    description.add<double>("directionalRefitErrorRescale", 100.0);
-    description.add<double>("directionalRefitMaxHitChi2", 100000.0);
-    description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
+    description.add<double>("directionalRefitErrorRescale", 10.0);
+    description.add<double>("directionalRefitInitialMaxHitChi2", 1000.0);
+    description.add<double>("directionalRefitMaxHitChi2", 100.0);
+    description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.25);
+    description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
+    description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.25);
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -1425,10 +1913,14 @@ private:
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
+  bool useImprovedMomentumRefit_;
   double directionalRefitSeedCurvatureErrorRescale_;
   double directionalRefitErrorRescale_;
+  double directionalRefitInitialMaxHitChi2_;
   double directionalRefitMaxHitChi2_;
   double directionalRefitMaxRelativeQoverPChange_;
+  unsigned int directionalRefitMinPrecisionStations_;
+  double directionalRefitMaxPrecisionRelativeQoverPChange_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;

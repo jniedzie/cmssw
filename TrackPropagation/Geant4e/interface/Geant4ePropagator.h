@@ -28,7 +28,9 @@ public:
   Geant4ePropagator(const MagneticField *field = nullptr,
                     std::string particleName = "mu",
                     PropagationDirection dir = alongMomentum,
-                    double plimit = 1.0);
+                    double plimit = 1.0,
+                    double maximumStepLengthMm = 10.0,
+                    double maximumPathLengthCm = 200.0);
 
   ~Geant4ePropagator() override;
 
@@ -69,6 +71,8 @@ private:
   G4ErrorPropagatorManager *theG4eManager;
   G4ErrorPropagatorData *theG4eData;
   double plimit_;
+  double maximumStepLengthMm_;
+  double maximumPathLengthCm_;
 
   // Transform a CMS Reco detector surface into a Geant4 Target for the error
   // propagation

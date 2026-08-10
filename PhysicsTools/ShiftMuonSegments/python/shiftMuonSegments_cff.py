@@ -4,8 +4,6 @@ from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegmen
 shiftMuonSegmentsSequence = cms.Sequence(shiftMuonSegmentsCounter + shiftMuonTable + shiftMuonSegments)
 
 def addShiftMuonSegments(process):
-    # The directional Kalman fit and smoother use only muon transient rechits;
-    # avoid the tracker-oriented TracksToTrajectories EventSetup chain.
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
@@ -13,9 +11,26 @@ def addShiftMuonSegments(process):
     # that suffix here so the standard NanoAOD output commands write both
     # ShiftDT/CSC/GEM segment tables and ShiftRPC reconstructed-hit table.
     process.shiftMuonSegmentsTable = shiftMuonSegments.clone()
-    process.shiftMuonSegmentsSequence = cms.Sequence(
+    shift_muon_modules = (
         process.shiftMuonSegmentsCounter + process.shiftMuonTable + process.shiftMuonSegmentsTable
     )
+    if process.shiftMuonTable.useImprovedMomentumRefit.value():
+        # The optional detailed-material study needs the full DD4hep Geant4
+        # geometry.  Do not pay its initialization or single-stream cost while
+        # the study is disabled.
+        process.load("Configuration.Geometry.GeometryDD4hepSimDB_cff")
+        from SimG4Core.Application.g4SimHits_cfi import g4SimHits as _g4SimHits
+        process.shiftMuonGeant4Geometry = cms.EDProducer(
+            "GeometryProducer",
+            GeoFromDD4hep=cms.bool(True),
+            UseMagneticField=cms.bool(True),
+            UseSensitiveDetectors=cms.bool(False),
+            MagneticField=_g4SimHits.MagneticField.clone(),
+        )
+        process.options.numberOfThreads = cms.untracked.uint32(1)
+        process.options.numberOfStreams = cms.untracked.uint32(1)
+        shift_muon_modules = process.shiftMuonGeant4Geometry + shift_muon_modules
+    process.shiftMuonSegmentsSequence = cms.Sequence(shift_muon_modules)
 
     # Be explicit as well as following the standard ``*Table`` convention:
     # this makes the tables resilient to a future restrictive NanoAOD output
