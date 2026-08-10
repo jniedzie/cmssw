@@ -795,6 +795,7 @@ public:
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
+        useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         directionalRefitSeedCurvatureErrorRescale_(
             parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
@@ -834,10 +835,9 @@ public:
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
-    // Keep the established R-Z material propagator as the production default.
-    // The optional scale-improvement study replaces it with detailed Geant4e
-    // transport and also enables path ordering, robust thresholds, and the
-    // precision-only refit below.
+    // Keep the established R-Z material propagator as the production default
+    // and vary detailed Geant4e transport independently from path ordering,
+    // iteration selection, and the precision-only refit below.
     SteppingHelixPropagator approximateMaterialPropagator(&magneticField, anyDirection);
     approximateMaterialPropagator.setMaterialMode(false);
     approximateMaterialPropagator.setUseMagVolumes(true);
@@ -845,7 +845,7 @@ public:
     approximateMaterialPropagator.applyRadX0Correction(true);
     std::unique_ptr<Geant4ePropagator> detailedMaterialPropagator;
     Propagator const* materialPropagator = &approximateMaterialPropagator;
-    if (useImprovedMomentumRefit_) {
+    if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
       // The stock Geant4e limits (10 mm steps and 200 cm total path) are too
       // coarse/short for a complete endcap-to-endcap SHIFT trajectory.
       detailedMaterialPropagator =
@@ -1913,6 +1913,7 @@ public:
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
+    description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
     description.add<double>("directionalRefitErrorRescale", 10.0);
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
@@ -1949,6 +1950,7 @@ private:
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
   bool useImprovedMomentumRefit_;
+  bool useDetailedMaterialPropagation_;
   double directionalRefitSeedCurvatureErrorRescale_;
   double directionalRefitErrorRescale_;
   double directionalRefitInitialMaxHitChi2_;
