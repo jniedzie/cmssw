@@ -1,18 +1,34 @@
 import FWCore.ParameterSet.Config as cms
 
+from PhysicsTools.NanoAOD.common_cff import Var
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cff import addShiftMuonSegments
 
 
 def customise(process):
     process = addShiftMuonSegments(process)
-    # EXONanoAOD stores GenPart vertex coordinates with only eight mantissa
-    # bits.  At the O(150 m) SHIFT displacement this quantises z in steps of
-    # tens of centimetres.  Keep the standard GenPart names and float type,
-    # but retain the full IEEE-754 float mantissa for vertex coordinates.
+    # Standard NanoAOD already provides every generator quantity used by the
+    # SHIFT TEA analysis except pz and the production vertex.  Add only those
+    # four columns here instead of enabling the much larger EXONanoAOD table
+    # set.  Full float precision is important at the O(150 m) SHIFT baseline:
+    # EXONanoAOD's eight-bit vertex precision quantises z by tens of cm.
     if hasattr(process, "genParticleTable"):
+        process.genParticleTable.variables.pz = Var(
+            "pz",
+            float,
+            doc="gen particle longitudinal momentum",
+            precision=23,
+        )
         for coordinate in ("vx", "vy", "vz"):
-            if hasattr(process.genParticleTable.variables, coordinate):
-                getattr(process.genParticleTable.variables, coordinate).precision = cms.int32(23)
+            setattr(
+                process.genParticleTable.variables,
+                coordinate,
+                Var(
+                    coordinate,
+                    float,
+                    doc=f"gen particle production vertex {coordinate[-1]} coordinate (cm)",
+                    precision=23,
+                ),
+            )
     return process
 
 
