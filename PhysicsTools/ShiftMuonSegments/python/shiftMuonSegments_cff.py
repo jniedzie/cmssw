@@ -14,7 +14,10 @@ def addShiftMuonSegments(process):
     shift_muon_modules = (
         process.shiftMuonSegmentsCounter + process.shiftMuonTable + process.shiftMuonSegmentsTable
     )
-    if process.shiftMuonTable.useImprovedMomentumRefit.value():
+    if (
+        process.shiftMuonTable.useImprovedMomentumRefit.value()
+        and process.shiftMuonTable.useDetailedMaterialPropagation.value()
+    ):
         # The optional detailed-material study needs the full DD4hep Geant4
         # geometry.  Do not pay its initialization or single-stream cost while
         # the study is disabled.

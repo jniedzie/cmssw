@@ -14,11 +14,13 @@ shiftMuonTable = cms.EDProducer(
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
-    # Optional scale-improvement study: detailed Geant4e material transport,
-    # propagated-path hit ordering, and the guarded precision-only refit.
-    # Enable it for the current iteration with the established refit's loose
-    # fit thresholds restored, so the new transport/order can be tested alone.
+    # Optional scale-improvement study: propagated-path hit ordering and the
+    # guarded precision-only refit. Keep it enabled for the current iteration.
     useImprovedMomentumRefit=cms.bool(True),
+    # Isolate detailed Geant4e material transport from the rest of the improved
+    # refit. Keep the implementation available, but use the established
+    # SteppingHelixPropagator for this comparison.
+    useDetailedMaterialPropagation=cms.bool(False),
     # Only loosen the q/p seed. Angular and position errors retain the useful
     # original fit constraints while each nonlinear pass can re-estimate scale.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
