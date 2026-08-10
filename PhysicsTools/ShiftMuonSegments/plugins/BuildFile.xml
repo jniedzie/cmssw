@@ -3,6 +3,7 @@
 <use name="DataFormats/CSCRecHit"/>
 <use name="DataFormats/GEMRecHit"/>
 <use name="DataFormats/RPCRecHit"/>
+<use name="DataFormats/MuonDetId"/>
 <use name="DataFormats/MuonSeed"/>
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/TrajectorySeed"/>
@@ -24,6 +25,7 @@
 <use name="TrackingTools/TransientTrackingRecHit"/>
 <use name="RecoTracker/TransientTrackingRecHit"/>
 <use name="TrackPropagation/SteppingHelixPropagator"/>
+<use name="TrackPropagation/Geant4e"/>
 <use name="MagneticField/Engine"/>
 <use name="MagneticField/Records"/>
 <use name="FWCore/Framework"/>
