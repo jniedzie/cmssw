@@ -18,10 +18,13 @@ shiftMuonTable = cms.EDProducer(
     # Optional scale-improvement study: propagated-path hit ordering and the
     # guarded precision-only refit. Keep it enabled for the current iteration.
     useImprovedMomentumRefit=cms.bool(True),
-    # Keep SteppingHelix inside the Kalman fit, but use explicitly backward
-    # Geant4e transport to recover material losses between the source-facing
-    # fitted state and the CMS material boundary.
+    # Use explicitly backward Geant4e transport to recover material losses
+    # between the source-facing fitted state and the CMS material boundary.
     useDetailedMaterialPropagation=cms.bool(True),
+    # V9 experiment: isolate material updates inside the Kalman fitter and
+    # smoother. The material-aware SteppingHelix implementation remains
+    # available by enabling this switch; target-leg propagation is unchanged.
+    directionalRefitUseMaterialEffects=cms.bool(False),
     # Isolate hit ordering from the other refit changes. Use the established
     # source-side signed-z ordering for this comparison while retaining the
     # precision refit, both iterations, and target-only Geant4e correction.
