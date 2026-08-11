@@ -1,5 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 
+# Commit marker for the workflow-wide CMSSW conditions consistency test.
 shiftMuonSegments = cms.EDProducer(
     "ShiftMuonSegmentsTableProducer",
     dtSegments=cms.InputTag("dt4DSegments"),
