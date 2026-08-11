@@ -806,6 +806,8 @@ public:
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
+        directionalRefitUseMaterialEffects_(
+            parameters.getParameter<bool>("directionalRefitUseMaterialEffects")),
         usePropagatedPathOrdering_(parameters.getParameter<bool>("usePropagatedPathOrdering")),
         directionalRefitUseFullSeedErrorRescale_(
             parameters.getParameter<bool>("directionalRefitUseFullSeedErrorRescale")),
@@ -871,6 +873,9 @@ public:
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
     vacuumPropagator.setUseMagVolumes(true);
+    Propagator const& directionalRefitPropagator =
+        directionalRefitUseMaterialEffects_ ? static_cast<Propagator const&>(approximateMaterialPropagator)
+                                            : static_cast<Propagator const&>(vacuumPropagator);
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
     auto const& muonRecHitBuilder = setup.getData(muonRecHitBuilderToken_);
     // KFTrajectoryFitter/Smoother use TkCloner as a generic rechit clone-or-
@@ -961,7 +966,7 @@ public:
                                 muonRecHitBuilder,
                                 hitCloner,
                                 vacuumPropagator,
-                                approximateMaterialPropagator,
+                                directionalRefitPropagator,
                                 *targetMaterialPropagator,
                                 directionalRefitSeedCurvatureErrorRescale_,
                                 directionalRefitUseFullSeedErrorRescale_,
@@ -1932,6 +1937,7 @@ public:
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
+    description.add<bool>("directionalRefitUseMaterialEffects", false);
     description.add<bool>("usePropagatedPathOrdering", false);
     description.add<bool>("directionalRefitUseFullSeedErrorRescale", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
@@ -1971,6 +1977,7 @@ private:
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
+  bool directionalRefitUseMaterialEffects_;
   bool usePropagatedPathOrdering_;
   bool directionalRefitUseFullSeedErrorRescale_;
   double directionalRefitSeedCurvatureErrorRescale_;
