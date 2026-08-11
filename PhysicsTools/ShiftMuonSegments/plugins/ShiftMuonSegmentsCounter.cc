@@ -1,4 +1,5 @@
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -15,12 +16,23 @@
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
 #include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
 #include "SimDataFormats/Vertex/interface/SimVertexContainer.h"
+#include "DataFormats/GeometrySurface/interface/Plane.h"
+#include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
+#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+#include "MagneticField/Engine/interface/MagneticField.h"
+#include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
+#include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
+#include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
+#include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixPropagator.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace {
   template <typename T>
@@ -51,9 +63,12 @@ public:
         cscSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("cscSimHits"))),
         rpcSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("rpcSimHits"))),
         gemSimHits_(consumes<edm::PSimHitContainer>(p.getParameter<edm::InputTag>("gemSimHits"))),
-        printDetails_(p.getParameter<bool>("printDetails")) {}
+        magneticField_(esConsumes()),
+        trackingGeometry_(esConsumes()),
+        printDetails_(p.getParameter<bool>("printDetails")),
+        printPropagationClosure_(p.getParameter<bool>("printPropagationClosure")) {}
 
-  void analyze(edm::Event const& event, edm::EventSetup const&) override {
+  void analyze(edm::Event const& event, edm::EventSetup const& setup) override {
     auto dtHits = event.getHandle(dtHits_);
     auto dtSegments = event.getHandle(dtSegments_);
     auto cscHits = event.getHandle(cscHits_);
@@ -73,6 +88,125 @@ public:
     auto rpcSimHits = event.getHandle(rpcSimHits_);
     auto gemSimHits = event.getHandle(gemSimHits_);
 
+    if (printPropagationClosure_) {
+      auto const& field = setup.getData(magneticField_);
+      auto const& geometry = setup.getData(trackingGeometry_);
+      SteppingHelixPropagator material(&field, alongMomentum);
+      material.setMaterialMode(false);
+      material.setUseMagVolumes(true);
+      material.setUseMatVolumes(true);
+      material.applyRadX0Correction(true);
+      SteppingHelixPropagator vacuum(&field, alongMomentum);
+      vacuum.setMaterialMode(true);
+      vacuum.setUseMagVolumes(true);
+      SteppingHelixPropagator backwardMaterial(&field, oppositeToMomentum);
+      backwardMaterial.setMaterialMode(false);
+      backwardMaterial.setUseMagVolumes(true);
+      backwardMaterial.setUseMatVolumes(true);
+      backwardMaterial.applyRadX0Correction(true);
+
+      std::unordered_map<unsigned int, std::vector<PSimHit const*>> hitsByTrack;
+      auto collectHits = [&hitsByTrack](auto const& handle) {
+        if (!handle.isValid())
+          return;
+        for (auto const& hit : *handle)
+          if (std::abs(hit.particleType()) == 13)
+            hitsByTrack[hit.trackId()].push_back(&hit);
+      };
+      collectHits(dtSimHits);
+      collectHits(cscSimHits);
+      collectHits(rpcSimHits);
+      collectHits(gemSimHits);
+
+      unsigned int pairs = 0, materialValid = 0, vacuumValid = 0;
+      double materialResidualSum = 0., materialResidual2Sum = 0.;
+      double vacuumResidualSum = 0., truthChangeSum = 0.;
+      unsigned int targetStates = 0, targetValid = 0;
+      double targetResidualSum = 0., targetResidual2Sum = 0.;
+      for (auto& [trackId, hits] : hitsByTrack) {
+        if (!simTracks.isValid() || !simVertices.isValid())
+          continue;
+        auto const simTrack = std::find_if(simTracks->begin(), simTracks->end(), [trackId](auto const& track) {
+          return track.trackId() == trackId && std::abs(track.type()) == 13;
+        });
+        // Closure is defined for the primary SHIFT muons. Secondary muons can
+        // start inside CMS material and test a different transport problem.
+        if (simTrack == simTracks->end() || simTrack->vertIndex() != 0 || simVertices->empty() ||
+            !(simTrack->momentum().P() > 0.))
+          continue;
+        auto const& vertex = (*simVertices)[0].position();
+        GlobalPoint const vertexPosition(vertex.x(), vertex.y(), vertex.z());
+        GlobalVector const truthDirection(
+            simTrack->momentum().px(), simTrack->momentum().py(), simTrack->momentum().pz());
+        auto const pathFromVertex = [&geometry, &vertexPosition, &truthDirection](PSimHit const* hit) {
+          auto const* det = geometry.idToDetUnit(DetId(hit->detUnitId()));
+          if (!det)
+            return std::numeric_limits<double>::infinity();
+          return static_cast<double>(
+              (det->surface().toGlobal(hit->entryPoint()) - vertexPosition).dot(truthDirection.unit()));
+        };
+        std::sort(hits.begin(), hits.end(), [&pathFromVertex](PSimHit const* first, PSimHit const* second) {
+          return pathFromVertex(first) < pathFromVertex(second);
+        });
+        for (unsigned int index = 0; index + 1 < hits.size(); ++index) {
+          auto const& first = *hits[index];
+          auto const& second = *hits[index + 1];
+          auto const* firstDet = geometry.idToDetUnit(DetId(first.detUnitId()));
+          auto const* secondDet = geometry.idToDetUnit(DetId(second.detUnitId()));
+          if (!firstDet || !secondDet || !(second.pabs() > 0.))
+            continue;
+          GlobalPoint const position = firstDet->surface().toGlobal(first.entryPoint());
+          GlobalVector const momentum = firstDet->surface().toGlobal(first.momentumAtEntry());
+          int const charge = first.particleType() > 0 ? -1 : 1;
+          FreeTrajectoryState const state(GlobalTrajectoryParameters(position, momentum, charge, &field));
+          ++pairs;
+          truthChangeSum += (first.pabs() - second.pabs()) / second.pabs();
+          auto const materialState = material.propagate(state, secondDet->surface());
+          if (materialState.isValid()) {
+            double const residual = (materialState.globalMomentum().mag() - second.pabs()) / second.pabs();
+            ++materialValid;
+            materialResidualSum += residual;
+            materialResidual2Sum += residual * residual;
+          }
+          auto const vacuumState = vacuum.propagate(state, secondDet->surface());
+          if (vacuumState.isValid()) {
+            ++vacuumValid;
+            vacuumResidualSum += (vacuumState.globalMomentum().mag() - second.pabs()) / second.pabs();
+          }
+        }
+
+        if (hits.empty())
+          continue;
+        auto const& first = *hits.front();
+        auto const* firstDet = geometry.idToDetUnit(DetId(first.detUnitId()));
+        if (!firstDet)
+          continue;
+        GlobalPoint const position = firstDet->surface().toGlobal(first.entryPoint());
+        GlobalVector const momentum = firstDet->surface().toGlobal(first.momentumAtEntry());
+        int const charge = simTrack->type() > 0 ? -1 : 1;
+        FreeTrajectoryState const state(GlobalTrajectoryParameters(position, momentum, charge, &field));
+        int const sourceSide = (*simVertices)[0].position().z() < 0. ? -1 : 1;
+        auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * 1100.), Surface::RotationType());
+        ++targetStates;
+        auto const propagated = backwardMaterial.propagate(state, *boundary);
+        if (propagated.isValid()) {
+          double const residual =
+              (propagated.globalMomentum().mag() - simTrack->momentum().P()) / simTrack->momentum().P();
+          ++targetValid;
+          targetResidualSum += residual;
+          targetResidual2Sum += residual * residual;
+        }
+      }
+      edm::LogPrint("ShiftMuonPropagationClosure")
+          << "[ShiftMuonPropagationClosure] run=" << event.id().run() << " event=" << event.id().event()
+          << " pairs=" << pairs << " materialValid=" << materialValid
+          << " materialResidualSum=" << materialResidualSum
+          << " materialResidual2Sum=" << materialResidual2Sum << " vacuumValid=" << vacuumValid
+          << " vacuumResidualSum=" << vacuumResidualSum << " truthChangeSum=" << truthChangeSum
+          << " targetStates=" << targetStates << " targetValid=" << targetValid
+          << " targetResidualSum=" << targetResidualSum << " targetResidual2Sum=" << targetResidual2Sum;
+    }
+
     edm::LogPrint("ShiftMuonRecoDebug")
         << "[ShiftMuonRecoDebug][summary] run=" << event.id().run() << " lumi=" << event.luminosityBlock()
         << " event=" << event.id().event() << " dtRecHits=" << sizeOrMissing(dtHits)
@@ -90,12 +224,36 @@ public:
     if (!printDetails_)
       return;
 
+    struct SimHitRange {
+      PSimHit const* first = nullptr;
+      PSimHit const* last = nullptr;
+      unsigned int firstDetector = 4;
+      unsigned int lastDetector = 4;
+    };
+    constexpr std::array<char const*, 5> detectorNames{{"DT", "CSC", "RPC", "GEM", "none"}};
     std::unordered_map<unsigned int, std::array<unsigned int, 4>> muonHitCounts;
-    auto countSimHits = [&muonHitCounts](auto const& handle, unsigned int detectorIndex) {
+    std::unordered_map<unsigned int, SimHitRange> muonHitRanges;
+    std::unordered_map<unsigned int, SimHitRange> precisionHitRanges;
+    auto updateRange = [](SimHitRange& range, PSimHit const& hit, unsigned int detectorIndex) {
+      if (!range.first || hit.timeOfFlight() < range.first->timeOfFlight()) {
+        range.first = &hit;
+        range.firstDetector = detectorIndex;
+      }
+      if (!range.last || hit.timeOfFlight() > range.last->timeOfFlight()) {
+        range.last = &hit;
+        range.lastDetector = detectorIndex;
+      }
+    };
+    auto countSimHits = [&muonHitCounts, &muonHitRanges, &precisionHitRanges, &updateRange](
+                            auto const& handle, unsigned int detectorIndex) {
       if (!handle.isValid())
         return;
-      for (auto const& hit : *handle)
+      for (auto const& hit : *handle) {
         ++muonHitCounts[hit.trackId()][detectorIndex];
+        updateRange(muonHitRanges[hit.trackId()], hit, detectorIndex);
+        if (detectorIndex < 2)
+          updateRange(precisionHitRanges[hit.trackId()], hit, detectorIndex);
+      }
     };
     countSimHits(dtSimHits, 0);
     countSimHits(cscSimHits, 1);
@@ -105,18 +263,56 @@ public:
       for (auto const& simTrack : *simTracks) {
         if (std::abs(simTrack.type()) != 13)
           continue;
+        auto const rangeIt = muonHitRanges.find(simTrack.trackId());
+        SimHitRange const emptyRange;
+        auto const& range = rangeIt != muonHitRanges.end() ? rangeIt->second : emptyRange;
+        PSimHit const* firstMuonHit = range.first;
+        PSimHit const* lastMuonHit = range.last;
+        char const* firstMuonDetector = detectorNames[range.firstDetector];
+        char const* lastMuonDetector = detectorNames[range.lastDetector];
+        auto const precisionRangeIt = precisionHitRanges.find(simTrack.trackId());
+        auto const& precisionRange =
+            precisionRangeIt != precisionHitRanges.end() ? precisionRangeIt->second : emptyRange;
+        PSimHit const* firstPrecisionHit = precisionRange.first;
+        PSimHit const* lastPrecisionHit = precisionRange.last;
         double vertexZ = -999999.;
         if (simVertices.isValid() && simTrack.vertIndex() >= 0 &&
             static_cast<std::size_t>(simTrack.vertIndex()) < simVertices->size())
           vertexZ = (*simVertices)[simTrack.vertIndex()].position().z();
         auto const counts = muonHitCounts[simTrack.trackId()];
+        double const simMomentum = simTrack.momentum().P();
+        double const firstHitMomentum = firstMuonHit ? firstMuonHit->pabs() : -1.;
+        double const lastHitMomentum = lastMuonHit ? lastMuonHit->pabs() : -1.;
+        double const firstPrecisionHitMomentum = firstPrecisionHit ? firstPrecisionHit->pabs() : -1.;
+        double const lastPrecisionHitMomentum = lastPrecisionHit ? lastPrecisionHit->pabs() : -1.;
+        double const boundaryMomentum = simTrack.crossedBoundary() ? simTrack.getMomentumAtBoundary().P() : -1.;
         edm::LogPrint("ShiftMuonRecoDebug")
             << "[ShiftMuonRecoDebug][SimMuon] event=" << event.id().event()
             << " trackId=" << simTrack.trackId() << " type=" << simTrack.type()
             << " vertIndex=" << simTrack.vertIndex() << " vertexZ=" << vertexZ
             << " pt=" << simTrack.momentum().pt() << " eta=" << simTrack.momentum().eta()
             << " phi=" << simTrack.momentum().phi() << " dtHits=" << counts[0]
-            << " cscHits=" << counts[1] << " rpcHits=" << counts[2] << " gemHits=" << counts[3];
+            << " cscHits=" << counts[1] << " rpcHits=" << counts[2] << " gemHits=" << counts[3]
+            << " simP=" << simMomentum << " crossedBoundary=" << simTrack.crossedBoundary()
+            << " boundaryP=" << boundaryMomentum << " firstHitDetector=" << firstMuonDetector
+            << " firstHitTof=" << (firstMuonHit ? firstMuonHit->timeOfFlight() : -1.)
+            << " firstHitP=" << firstHitMomentum << " lastHitDetector=" << lastMuonDetector
+            << " lastHitTof=" << (lastMuonHit ? lastMuonHit->timeOfFlight() : -1.)
+            << " lastHitP=" << lastHitMomentum
+            << " firstPrecisionHitDetector=" << detectorNames[precisionRange.firstDetector]
+            << " firstPrecisionHitP=" << firstPrecisionHitMomentum
+            << " lastPrecisionHitDetector=" << detectorNames[precisionRange.lastDetector]
+            << " lastPrecisionHitP=" << lastPrecisionHitMomentum
+            << " fractionalLossToFirstHit="
+            << (simMomentum > 0. && firstHitMomentum >= 0. ? (simMomentum - firstHitMomentum) / simMomentum : -1.)
+            << " fractionalLossAcrossMuonHits="
+            << (firstHitMomentum > 0. && lastHitMomentum >= 0.
+                    ? (firstHitMomentum - lastHitMomentum) / firstHitMomentum
+                    : -1.)
+            << " fractionalLossAcrossPrecisionHits="
+            << (firstPrecisionHitMomentum > 0. && lastPrecisionHitMomentum >= 0.
+                    ? (firstPrecisionHitMomentum - lastPrecisionHitMomentum) / firstPrecisionHitMomentum
+                    : -1.);
       }
     }
     if (dtSegments.isValid())
@@ -235,7 +431,10 @@ private:
   edm::EDGetTokenT<edm::PSimHitContainer> cscSimHits_;
   edm::EDGetTokenT<edm::PSimHitContainer> rpcSimHits_;
   edm::EDGetTokenT<edm::PSimHitContainer> gemSimHits_;
+  edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticField_;
+  edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometry_;
   bool printDetails_;
+  bool printPropagationClosure_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"

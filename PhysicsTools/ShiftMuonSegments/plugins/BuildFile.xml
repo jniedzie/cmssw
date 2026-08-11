@@ -26,6 +26,7 @@
 <use name="RecoTracker/TransientTrackingRecHit"/>
 <use name="TrackPropagation/SteppingHelixPropagator"/>
 <use name="TrackPropagation/Geant4e"/>
+<use name="geant4"/>
 <use name="MagneticField/Engine"/>
 <use name="MagneticField/Records"/>
 <use name="FWCore/Framework"/>

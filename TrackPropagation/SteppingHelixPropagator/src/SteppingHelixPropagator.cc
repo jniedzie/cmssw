@@ -53,7 +53,11 @@ void SteppingHelixPropagator::initStateArraySHPSpecific(StateArray& svBuf, bool 
 
 SteppingHelixPropagator::~SteppingHelixPropagator() {}
 
-SteppingHelixPropagator::SteppingHelixPropagator() : Propagator(anyDirection) { field_ = nullptr; }
+SteppingHelixPropagator::SteppingHelixPropagator() : Propagator(anyDirection) {
+  field_ = nullptr;
+  energyLossScale_ = 1.;
+  materialEffectsProvider_.reset();
+}
 
 SteppingHelixPropagator::SteppingHelixPropagator(const MagneticField* field, PropagationDirection dir)
     : Propagator(dir), unit55_(AlgebraicMatrixID()) {
@@ -71,6 +75,8 @@ SteppingHelixPropagator::SteppingHelixPropagator(const MagneticField* field, Pro
   sendLogWarning_ = false;
   useTuningForL2Speed_ = false;
   defaultStep_ = 5.;
+  energyLossScale_ = 1.;
+  materialEffectsProvider_.reset();
 
   ecShiftPos_ = 0;
   ecShiftNeg_ = 0;
@@ -1324,6 +1330,25 @@ double SteppingHelixPropagator::getDeDx(const SteppingHelixPropagator::StateInfo
   if (noMaterialMode_)
     return 0;
 
+  if (materialEffectsProvider_) {
+    double momentumLossPerCm = 0.;
+    double momentumLossDerivative = 0.;
+    double radiationLengthCm = 1.e24;
+    GlobalPoint const position(sv.r3.x(), sv.r3.y(), sv.r3.z());
+    GlobalVector const momentum(sv.p3.x(), sv.p3.y(), sv.p3.z());
+    if (materialEffectsProvider_->compute(position,
+                                          momentum,
+                                          sv.q > 0. ? 1 : -1,
+                                          momentumLossPerCm,
+                                          momentumLossDerivative,
+                                          radiationLengthCm)) {
+      dEdXPrime = momentumLossDerivative * energyLossScale_;
+      radX0 = radiationLengthCm;
+      return momentumLossPerCm * energyLossScale_;
+    }
+    return 0.;
+  }
+
   double dEdx = 0.;
 
   double lR = sv.r3.perp();
@@ -1766,6 +1791,8 @@ double SteppingHelixPropagator::getDeDx(const SteppingHelixPropagator::StateInfo
 
   dEdXPrime = dEdx == 0 ? 0 : -dEdx * (0.96 / p0 + 0.033 - 0.022 * p0powN33) * 1e-3;  //== d(dEdX)/dp
   dEdx *= dEdX_mat;
+  dEdXPrime *= energyLossScale_;
+  dEdx *= energyLossScale_;
 
   return dEdx;
 }
