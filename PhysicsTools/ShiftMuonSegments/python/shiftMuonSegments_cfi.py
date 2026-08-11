@@ -25,8 +25,11 @@ shiftMuonTable = cms.EDProducer(
     # source-side signed-z ordering for this comparison while retaining the
     # precision refit, both iterations, and target-only Geant4e correction.
     usePropagatedPathOrdering=cms.bool(False),
-    # Only loosen the q/p seed. Angular and position errors retain the useful
-    # original fit constraints while each nonlinear pass can re-estimate scale.
+    # V7 experiment: restore the established refit's full five-parameter seed
+    # covariance inflation while keeping the smoother uncertainty at 10.
+    directionalRefitUseFullSeedErrorRescale=cms.bool(True),
+    # Scale either the full seed covariance above or only q/p in the retained
+    # curvature-only implementation.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
     # Backward-start uncertainty used internally by KFTrajectorySmoother.
     directionalRefitErrorRescale=cms.double(10.0),
