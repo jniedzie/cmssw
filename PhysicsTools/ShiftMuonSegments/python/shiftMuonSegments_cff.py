@@ -3,10 +3,32 @@ from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegmen
 
 shiftMuonSegmentsSequence = cms.Sequence(shiftMuonSegmentsCounter + shiftMuonTable + shiftMuonSegments)
 
-def addShiftMuonSegments(process):
+def addShiftMuonSegments(
+    process,
+    directionalRefitUseDetailedMaterialEffects=None,
+    directionalRefitUseGeometryMaterialEffects=None,
+    directionalRefitUseGeometryMaterialEffectsInFitter=None,
+    directionalRefitUseGeometryMaterialEffectsInSmoother=None,
+):
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
+    if directionalRefitUseDetailedMaterialEffects is not None:
+        process.shiftMuonTable.directionalRefitUseDetailedMaterialEffects = cms.bool(
+            directionalRefitUseDetailedMaterialEffects
+        )
+    if directionalRefitUseGeometryMaterialEffects is not None:
+        process.shiftMuonTable.directionalRefitUseGeometryMaterialEffects = cms.bool(
+            directionalRefitUseGeometryMaterialEffects
+        )
+    if directionalRefitUseGeometryMaterialEffectsInFitter is not None:
+        process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInFitter = cms.bool(
+            directionalRefitUseGeometryMaterialEffectsInFitter
+        )
+    if directionalRefitUseGeometryMaterialEffectsInSmoother is not None:
+        process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInSmoother = cms.bool(
+            directionalRefitUseGeometryMaterialEffectsInSmoother
+        )
     # NanoAOD retains FlatTables with module labels matching ``*Table``.  Keep
     # that suffix here so the standard NanoAOD output commands write both
     # ShiftDT/CSC/GEM segment tables and ShiftRPC reconstructed-hit table.
@@ -16,11 +38,18 @@ def addShiftMuonSegments(process):
     )
     if (
         process.shiftMuonTable.useImprovedMomentumRefit.value()
-        and process.shiftMuonTable.useDetailedMaterialPropagation.value()
+        and (
+            process.shiftMuonTable.useDetailedMaterialPropagation.value()
+            or process.shiftMuonTable.directionalRefitUseFirstPrinciplesMaterialEffects.value()
+            or process.shiftMuonTable.directionalRefitUseDetailedMaterialEffects.value()
+            or process.shiftMuonTable.directionalRefitUseGeometryMaterialEffects.value()
+            or process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInFitter.value()
+            or process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInSmoother.value()
+        )
     ):
-        # The optional target-leg material correction needs the full DD4hep
-        # Geant4 geometry. Do not pay its initialization or single-stream cost
-        # while the correction is disabled.
+        # Detailed material transport in either the target leg or the Kalman
+        # refit needs the full DD4hep Geant4 geometry. Do not pay its
+        # initialization or single-stream cost while both are disabled.
         process.load("Configuration.Geometry.GeometryDD4hepSimDB_cff")
         from SimG4Core.Application.g4SimHits_cfi import g4SimHits as _g4SimHits
         process.shiftMuonGeant4Geometry = cms.EDProducer(

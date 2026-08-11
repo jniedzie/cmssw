@@ -4,8 +4,20 @@ from PhysicsTools.NanoAOD.common_cff import Var
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cff import addShiftMuonSegments
 
 
-def customise(process):
-    process = addShiftMuonSegments(process)
+def customise(
+    process,
+    directionalRefitUseDetailedMaterialEffects=None,
+    directionalRefitUseGeometryMaterialEffects=None,
+    directionalRefitUseGeometryMaterialEffectsInFitter=None,
+    directionalRefitUseGeometryMaterialEffectsInSmoother=None,
+):
+    process = addShiftMuonSegments(
+        process,
+        directionalRefitUseDetailedMaterialEffects=directionalRefitUseDetailedMaterialEffects,
+        directionalRefitUseGeometryMaterialEffects=directionalRefitUseGeometryMaterialEffects,
+        directionalRefitUseGeometryMaterialEffectsInFitter=directionalRefitUseGeometryMaterialEffectsInFitter,
+        directionalRefitUseGeometryMaterialEffectsInSmoother=directionalRefitUseGeometryMaterialEffectsInSmoother,
+    )
     # Standard NanoAOD already provides every generator quantity used by the
     # SHIFT TEA analysis except pz and the production vertex.  Add only those
     # four columns here instead of enabling the much larger EXONanoAOD table

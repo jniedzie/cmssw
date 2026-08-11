@@ -11,6 +11,7 @@
 #include "DataFormats/MuonDetId/interface/MuonSubdetId.h"
 #include "DataFormats/MuonDetId/interface/RPCDetId.h"
 #include "DataFormats/GeometrySurface/interface/Plane.h"
+#include "DataFormats/GeometrySurface/interface/Cylinder.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -20,6 +21,7 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Utilities/interface/ESInputTag.h"
+#include "FWCore/Utilities/interface/Exception.h"
 #include "RecoTracker/TransientTrackingRecHit/interface/TkClonerImpl.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
 #include "TrackingTools/KalmanUpdators/interface/Chi2MeasurementEstimator.h"
@@ -41,6 +43,16 @@
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
 #include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
 
+#include "G4EnergyLossForExtrapolator.hh"
+#include "G4LogicalVolume.hh"
+#include "G4Material.hh"
+#include "G4MuonMinus.hh"
+#include "G4MuonPlus.hh"
+#include "G4Navigator.hh"
+#include "G4SystemOfUnits.hh"
+#include "G4TransportationManager.hh"
+#include "G4VPhysicalVolume.hh"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -53,6 +65,200 @@
 #include <vector>
 
 namespace {
+  class Geant4MaterialEffectsProvider final : public SteppingHelixMaterialEffects {
+  public:
+    bool compute(GlobalPoint const& position,
+                 GlobalVector const& momentum,
+                 int charge,
+                 double& momentumLossPerCm,
+                 double& momentumLossDerivative,
+                 double& radiationLengthCm) const override {
+      auto* navigator = G4TransportationManager::GetTransportationManager()->GetNavigatorForTracking();
+      if (!navigator || !navigator->GetWorldVolume() || !(momentum.mag() > 0.))
+        return false;
+      G4ThreeVector const point(position.x() * cm, position.y() * cm, position.z() * cm);
+      G4ThreeVector const direction(momentum.x() / momentum.mag(),
+                                    momentum.y() / momentum.mag(),
+                                    momentum.z() / momentum.mag());
+      auto* volume = navigator->LocateGlobalPointAndSetup(point, &direction, false, false);
+      if (!volume || !volume->GetLogicalVolume() || !volume->GetLogicalVolume()->GetMaterial())
+        return false;
+      auto const* material = volume->GetLogicalVolume()->GetMaterial();
+      G4ParticleDefinition const* particle =
+          charge > 0 ? static_cast<G4ParticleDefinition const*>(G4MuonPlus::MuonPlusDefinition())
+                     : static_cast<G4ParticleDefinition const*>(G4MuonMinus::MuonMinusDefinition());
+      constexpr double muonMassGeV = 0.1056583755;
+      thread_local G4EnergyLossForExtrapolator energyLoss(0);
+      auto momentumRate = [&](double momentumGeV) {
+        double const energyGeV = std::sqrt(momentumGeV * momentumGeV + muonMassGeV * muonMassGeV);
+        double const kineticEnergy = (energyGeV - muonMassGeV) * GeV;
+        double const energyLossGeVPerCm = energyLoss.ComputeDEDX(kineticEnergy, particle, material) / (GeV / cm);
+        return -energyLossGeVPerCm * energyGeV / momentumGeV;
+      };
+      double const momentumGeV = momentum.mag();
+      momentumLossPerCm = momentumRate(momentumGeV);
+      double const delta = std::max(1.e-4, 1.e-3 * momentumGeV);
+      double const lower = std::max(1.e-5, momentumGeV - delta);
+      double const upper = momentumGeV + delta;
+      momentumLossDerivative = (momentumRate(upper) - momentumRate(lower)) / (upper - lower);
+      radiationLengthCm = material->GetRadlen() / cm;
+      return std::isfinite(momentumLossPerCm) && std::isfinite(momentumLossDerivative) &&
+             radiationLengthCm > 0. && std::isfinite(radiationLengthCm);
+    }
+  };
+
+  class GeometryMaterialPropagator final : public Propagator {
+  public:
+    GeometryMaterialPropagator(SteppingHelixPropagator const& covariancePropagator,
+                               SteppingHelixPropagator const& comparisonPropagator,
+                               double integrationStepCm,
+                               bool logComparison)
+        : Propagator(covariancePropagator.propagationDirection()),
+          covariancePropagator_(covariancePropagator),
+          comparisonPropagator_(comparisonPropagator),
+          integrationStepCm_(integrationStepCm),
+          logComparison_(logComparison) {}
+
+    GeometryMaterialPropagator* clone() const override { return new GeometryMaterialPropagator(*this); }
+
+    MagneticField const* magneticField() const override { return covariancePropagator_.magneticField(); }
+
+    void setPropagationDirection(PropagationDirection direction) override {
+      Propagator::setPropagationDirection(direction);
+      covariancePropagator_.setPropagationDirection(direction);
+      comparisonPropagator_.setPropagationDirection(direction);
+    }
+
+    std::pair<TrajectoryStateOnSurface, double> propagateWithPath(FreeTrajectoryState const& state,
+                                                                  Plane const& surface) const override {
+      return applyGeometryEnergyLoss(state,
+                                     covariancePropagator_.propagateWithPath(state, surface),
+                                     comparisonPropagator_.propagateWithPath(state, surface).first);
+    }
+
+    std::pair<TrajectoryStateOnSurface, double> propagateWithPath(FreeTrajectoryState const& state,
+                                                                  Cylinder const& surface) const override {
+      return applyGeometryEnergyLoss(state,
+                                     covariancePropagator_.propagateWithPath(state, surface),
+                                     comparisonPropagator_.propagateWithPath(state, surface).first);
+    }
+
+    std::pair<TrajectoryStateOnSurface, double> propagateWithPath(TrajectoryStateOnSurface const& state,
+                                                                  Plane const& surface) const override {
+      if (!state.isValid() || !state.freeState())
+        return {TrajectoryStateOnSurface(), 0.};
+      return applyGeometryEnergyLoss(*state.freeState(),
+                                     covariancePropagator_.propagateWithPath(state, surface),
+                                     comparisonPropagator_.propagateWithPath(state, surface).first);
+    }
+
+    std::pair<TrajectoryStateOnSurface, double> propagateWithPath(TrajectoryStateOnSurface const& state,
+                                                                  Cylinder const& surface) const override {
+      if (!state.isValid() || !state.freeState())
+        return {TrajectoryStateOnSurface(), 0.};
+      return applyGeometryEnergyLoss(*state.freeState(),
+                                     covariancePropagator_.propagateWithPath(state, surface),
+                                     comparisonPropagator_.propagateWithPath(state, surface).first);
+    }
+
+  private:
+    std::pair<TrajectoryStateOnSurface, double> applyGeometryEnergyLoss(
+        FreeTrajectoryState const& start,
+        std::pair<TrajectoryStateOnSurface, double> propagated,
+        TrajectoryStateOnSurface const& comparisonState) const {
+      auto const& state = propagated.first;
+      double const path = propagated.second;
+      if (!state.isValid() || !(integrationStepCm_ > 0.) || !std::isfinite(path) || path == 0.)
+        return propagated;
+
+      auto* navigator = G4TransportationManager::GetTransportationManager()->GetNavigatorForTracking();
+      if (!navigator || !navigator->GetWorldVolume())
+        return propagated;
+
+      GlobalPoint const startPosition = start.position();
+      GlobalPoint const endPosition = state.globalPosition();
+      GlobalVector const chord = endPosition - startPosition;
+      double const chordLength = chord.mag();
+      if (!(chordLength > 0.) || !std::isfinite(chordLength))
+        return propagated;
+
+      double const startMomentum = start.momentum().mag();
+      constexpr double muonMassGeV = 0.1056583755;
+      if (!(startMomentum > 0.) || !std::isfinite(startMomentum))
+        return propagated;
+      double energyGeV = std::sqrt(startMomentum * startMomentum + muonMassGeV * muonMassGeV);
+      // The sign returned by a Propagator denotes its configured solution,
+      // not necessarily the physical flight direction of a reversed SHIFT
+      // trajectory.  Infer energy loss/gain directly from whether the spatial
+      // displacement follows or opposes the state's momentum.
+      bool const along = chord.dot(start.momentum()) > 0.;
+      // Material is sampled on this chord, so its integration measure must be
+      // the chord length as well.  Weighting these samples by the propagated
+      // helix length can count the same material repeatedly for a curling or
+      // poorly constrained trial state.
+      unsigned int const steps =
+          std::max(1U, static_cast<unsigned int>(std::ceil(chordLength / integrationStepCm_)));
+      double const pathStepCm = chordLength / static_cast<double>(steps);
+      G4ThreeVector const g4Direction(chord.x() / chordLength, chord.y() / chordLength, chord.z() / chordLength);
+      G4ParticleDefinition const* particle = nullptr;
+      if (start.charge() > 0)
+        particle = G4MuonPlus::MuonPlusDefinition();
+      else
+        particle = G4MuonMinus::MuonMinusDefinition();
+      // Geant4e provides its own energy-loss tables for extrapolation.  The
+      // generic G4EmCalculator depends on the processes registered in the
+      // active physics list and returns zero dE/dx in the Geant4e setup used
+      // here, effectively turning this branch into vacuum propagation.
+      thread_local G4EnergyLossForExtrapolator energyLoss(0);
+
+      for (unsigned int index = 0; index < steps; ++index) {
+        double const fraction = (static_cast<double>(index) + 0.5) / static_cast<double>(steps);
+        GlobalPoint const point = startPosition + fraction * chord;
+        G4ThreeVector const g4Point(point.x() * cm, point.y() * cm, point.z() * cm);
+        auto* volume = navigator->LocateGlobalPointAndSetup(g4Point, &g4Direction, false, false);
+        if (!volume || !volume->GetLogicalVolume() || !volume->GetLogicalVolume()->GetMaterial())
+          continue;
+        double const kineticEnergy = (energyGeV - muonMassGeV) * GeV;
+        if (!(kineticEnergy > 0.))
+          return {TrajectoryStateOnSurface(), path};
+        auto const* material = volume->GetLogicalVolume()->GetMaterial();
+        double const updatedKineticEnergy = along
+                                                ? energyLoss.EnergyAfterStep(
+                                                      kineticEnergy, pathStepCm * cm, material, particle)
+                                                : energyLoss.EnergyBeforeStep(
+                                                      kineticEnergy, pathStepCm * cm, material, particle);
+        if (!(updatedKineticEnergy > 0.) || !std::isfinite(updatedKineticEnergy))
+          return {TrajectoryStateOnSurface(), path};
+        energyGeV = updatedKineticEnergy / GeV + muonMassGeV;
+        if (!(energyGeV > muonMassGeV) || !std::isfinite(energyGeV))
+          return {TrajectoryStateOnSurface(), path};
+      }
+
+      double const momentum = std::sqrt(energyGeV * energyGeV - muonMassGeV * muonMassGeV);
+      GlobalVector const direction = state.globalMomentum().unit();
+      GlobalTrajectoryParameters const parameters(
+          state.globalPosition(), momentum * direction, state.charge(), state.magneticField());
+      TrajectoryStateOnSurface corrected = state.hasError()
+                                               ? TrajectoryStateOnSurface(
+                                                     parameters, state.curvilinearError(), state.surface(), state.surfaceSide())
+                                               : TrajectoryStateOnSurface(parameters, state.surface(), state.surfaceSide());
+      if (logComparison_ && comparisonState.isValid()) {
+        edm::LogWarning("ShiftMuonGeometryMaterialComparison")
+            << "direction=" << (propagationDirection() == oppositeToMomentum ? "opposite" : "along")
+            << " startP=" << startMomentum << " approximateP=" << comparisonState.globalMomentum().mag()
+            << " geometryP=" << momentum << " approximateDeltaP="
+            << comparisonState.globalMomentum().mag() - startMomentum << " geometryDeltaP=" << momentum - startMomentum
+            << " path=" << path << " chord=" << chordLength;
+      }
+      return {corrected, path};
+    }
+
+    SteppingHelixPropagator covariancePropagator_;
+    SteppingHelixPropagator comparisonPropagator_;
+    double integrationStepCm_;
+    bool logComparison_;
+  };
+
   struct PropagatedState {
     bool valid = false;
     GlobalPoint position;
@@ -86,6 +292,9 @@ namespace {
     double directionalRefitChi2 = 0.;
     double directionalRefitNdof = 0.;
     double directionalRefitUpstreamPt = 0.;
+    double directionalRefitUpstreamP = 0.;
+    double directionalRefitDownstreamP = 0.;
+    double directionalRefitFractionalLossAcrossHits = 0.;
     double preRefitPt = 0.;
     double preRefitPz = 0.;
     bool directionalRefitFirstValid = false;
@@ -306,6 +515,8 @@ namespace {
     double chi2 = 0.;
     double ndof = 0.;
     double upstreamPt = 0.;
+    double upstreamP = 0.;
+    double downstreamP = 0.;
     double signedInverseMomentum = 0.;
     TrajectoryStateOnSurface upstreamState;
     PropagatedState materialTargetState;
@@ -384,8 +595,10 @@ namespace {
                                           TkCloner const& hitCloner,
                                           Propagator const& vacuumPropagator,
                                           Propagator const& fitMaterialPropagator,
+                                          Propagator const& smootherMaterialPropagator,
                                           Propagator const& targetMaterialPropagator,
                                           double seedCurvatureErrorRescale,
+                                          double seedMomentumScale,
                                           bool useFullSeedErrorRescale,
                                           double smootherErrorRescale,
                                           double initialMaxHitChi2,
@@ -419,7 +632,7 @@ namespace {
         inputStations.insert(station);
     }
     result.inputStations = inputStations.size();
-    if (orderedHits.size() < 3)
+    if (orderedHits.size() < 3 || !(seedMomentumScale > 0.) || !std::isfinite(seedMomentumScale))
       return result;
 
     bool const useOuter = sourceSide * track.outerPosition().z() > sourceSide * track.innerPosition().z();
@@ -429,7 +642,9 @@ namespace {
       return result;
     double const sign = directionSign == 0 ? 1. : directionSign;
     auto const rawMomentum = original.momentum();
-    GlobalVector const momentum(sign * rawMomentum.x(), sign * rawMomentum.y(), sign * rawMomentum.z());
+    GlobalVector const momentum(sign * seedMomentumScale * rawMomentum.x(),
+                                sign * seedMomentumScale * rawMomentum.y(),
+                                sign * seedMomentumScale * rawMomentum.z());
     GlobalTrajectoryParameters const parameters(
         original.position(), momentum, sign * original.charge(), &magneticField);
     FreeTrajectoryState const originalSeed(parameters, original.curvilinearError());
@@ -471,7 +686,7 @@ namespace {
       Chi2MeasurementEstimator estimator(iterationMaxHitChi2);
       KFTrajectoryFitter fitter(fitMaterialPropagator, updator, estimator, 3, nullptr, &hitCloner);
       KFTrajectorySmoother smoother(
-          fitMaterialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
+          smootherMaterialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
       smoother.setHitCloner(&hitCloner);
       auto const start = inflateSeedError(uninflatedSeed, seedCurvatureErrorRescale, useFullSeedErrorRescale);
       auto const firstPredicted = fitMaterialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
@@ -496,7 +711,11 @@ namespace {
       auto const& upstream = smoothed.lastMeasurement().updatedState();
       if (!upstream.isValid() || !upstream.freeState())
         return result;
+      auto const& downstream = smoothed.firstMeasurement().updatedState();
+      if (!downstream.isValid())
+        return result;
       auto const upstreamMomentum = upstream.globalMomentum();
+      auto const downstreamMomentum = downstream.globalMomentum();
       auto const upstreamFreeState = *upstream.freeState();
       auto const materialTargetState =
           propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, &targetMaterialPropagator, sourceSide);
@@ -510,6 +729,8 @@ namespace {
       result.chi2 = smoothed.chiSquared();
       result.ndof = std::max(1., 2. * static_cast<double>(refitHits) - 5.);
       result.upstreamPt = upstreamMomentum.perp();
+      result.upstreamP = upstreamMomentum.mag();
+      result.downstreamP = downstreamMomentum.mag();
       result.signedInverseMomentum = upstream.signedInverseMomentum();
       result.upstreamState = upstream;
       result.materialTargetState = materialTargetState;
@@ -808,11 +1029,29 @@ public:
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         directionalRefitUseMaterialEffects_(
             parameters.getParameter<bool>("directionalRefitUseMaterialEffects")),
+        directionalRefitUseFirstPrinciplesMaterialEffects_(
+            parameters.getParameter<bool>("directionalRefitUseFirstPrinciplesMaterialEffects")),
+        directionalRefitFirstPrinciplesStepCm_(
+            parameters.getParameter<double>("directionalRefitFirstPrinciplesStepCm")),
+        directionalRefitUseDetailedMaterialEffects_(
+            parameters.getParameter<bool>("directionalRefitUseDetailedMaterialEffects")),
+        directionalRefitUseGeometryMaterialEffects_(
+            parameters.getParameter<bool>("directionalRefitUseGeometryMaterialEffects")),
+        directionalRefitUseGeometryMaterialEffectsInFitter_(
+            parameters.getParameter<bool>("directionalRefitUseGeometryMaterialEffectsInFitter")),
+        directionalRefitUseGeometryMaterialEffectsInSmoother_(
+            parameters.getParameter<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother")),
+        directionalRefitGeometryMaterialStepCm_(
+            parameters.getParameter<double>("directionalRefitGeometryMaterialStepCm")),
+        directionalRefitLogGeometryMaterialComparison_(
+            parameters.getParameter<bool>("directionalRefitLogGeometryMaterialComparison")),
         usePropagatedPathOrdering_(parameters.getParameter<bool>("usePropagatedPathOrdering")),
         directionalRefitUseFullSeedErrorRescale_(
             parameters.getParameter<bool>("directionalRefitUseFullSeedErrorRescale")),
         directionalRefitSeedCurvatureErrorRescale_(
             parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
+        directionalRefitSeedMomentumScale_(parameters.getParameter<double>("directionalRefitSeedMomentumScale")),
+        directionalRefitEnergyLossScale_(parameters.getParameter<double>("directionalRefitEnergyLossScale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
         directionalRefitInitialMaxHitChi2_(
             parameters.getParameter<double>("directionalRefitInitialMaxHitChi2")),
@@ -840,6 +1079,28 @@ public:
         maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
+    bool const anyGeometryMaterialEffects = directionalRefitUseGeometryMaterialEffects_ ||
+                                            directionalRefitUseGeometryMaterialEffectsInFitter_ ||
+                                            directionalRefitUseGeometryMaterialEffectsInSmoother_;
+    if (directionalRefitUseFirstPrinciplesMaterialEffects_ &&
+        (useDetailedMaterialPropagation_ || directionalRefitUseDetailedMaterialEffects_ ||
+         anyGeometryMaterialEffects))
+      throw cms::Exception("Configuration")
+          << "directionalRefitUseFirstPrinciplesMaterialEffects is mutually exclusive with the legacy "
+             "Geant4e and geometry-material ablations";
+    if (directionalRefitUseDetailedMaterialEffects_ && anyGeometryMaterialEffects)
+      throw cms::Exception("Configuration")
+          << "directionalRefitUseDetailedMaterialEffects and directionalRefitUseGeometryMaterialEffects "
+             "are mutually exclusive";
+    if (anyGeometryMaterialEffects && !directionalRefitUseMaterialEffects_)
+      throw cms::Exception("Configuration")
+          << "directionalRefitUseGeometryMaterialEffects requires directionalRefitUseMaterialEffects";
+    if (anyGeometryMaterialEffects &&
+        (!(directionalRefitGeometryMaterialStepCm_ > 0.) || !std::isfinite(directionalRefitGeometryMaterialStepCm_)))
+      throw cms::Exception("Configuration") << "directionalRefitGeometryMaterialStepCm must be finite and positive";
+    if (directionalRefitUseFirstPrinciplesMaterialEffects_ &&
+        (!(directionalRefitFirstPrinciplesStepCm_ > 0.) || !std::isfinite(directionalRefitFirstPrinciplesStepCm_)))
+      throw cms::Exception("Configuration") << "directionalRefitFirstPrinciplesStepCm must be finite and positive";
     produces<nanoaod::FlatTable>();
     produces<nanoaod::FlatTable>("ShiftDimuonVertex");
   }
@@ -850,32 +1111,85 @@ public:
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
-    // Keep the established R-Z material propagator inside the Kalman
-    // fitter/smoother. Detailed Geant4e transport is tested only on the
-    // backward leg from the source-facing fitted state to the material
-    // boundary, independently from path ordering and precision-hit selection.
+    bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
+                                             directionalRefitUseGeometryMaterialEffectsInFitter_;
+    bool const useGeometryMaterialInSmoother = directionalRefitUseGeometryMaterialEffects_ ||
+                                               directionalRefitUseGeometryMaterialEffectsInSmoother_;
+    // Keep the established R-Z material propagator as the default Kalman
+    // transport.  A focused ablation can replace it with detailed Geant4e
+    // transport without changing hit selection, ordering, or fit thresholds.
     SteppingHelixPropagator approximateMaterialPropagator(&magneticField, anyDirection);
     approximateMaterialPropagator.setMaterialMode(false);
     approximateMaterialPropagator.setUseMagVolumes(true);
     approximateMaterialPropagator.setUseMatVolumes(true);
+    approximateMaterialPropagator.setEnergyLossScale(directionalRefitEnergyLossScale_);
     approximateMaterialPropagator.applyRadX0Correction(true);
+    auto firstPrinciplesProvider = std::make_shared<Geant4MaterialEffectsProvider>();
+    SteppingHelixPropagator firstPrinciplesMaterialPropagator(&magneticField, anyDirection);
+    firstPrinciplesMaterialPropagator.setMaterialMode(false);
+    firstPrinciplesMaterialPropagator.setUseMagVolumes(true);
+    firstPrinciplesMaterialPropagator.setUseMatVolumes(false);
+    firstPrinciplesMaterialPropagator.setMaterialEffectsProvider(
+        firstPrinciplesProvider, directionalRefitFirstPrinciplesStepCm_);
+    firstPrinciplesMaterialPropagator.applyRadX0Correction(true);
     std::unique_ptr<Geant4ePropagator> detailedMaterialPropagator;
+    std::unique_ptr<Geant4ePropagator> detailedRefitMaterialPropagator;
     Propagator const* targetMaterialPropagator = &approximateMaterialPropagator;
-    if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
+    if (useImprovedMomentumRefit_ && directionalRefitUseFirstPrinciplesMaterialEffects_)
+      targetMaterialPropagator = &firstPrinciplesMaterialPropagator;
+    if (useImprovedMomentumRefit_ &&
+        (useDetailedMaterialPropagation_ || useGeometryMaterialInFitter || useGeometryMaterialInSmoother)) {
       // The stock Geant4e limits (10 mm steps and 200 cm total path) are too
       // coarse/short for the source-facing state to material-boundary leg.
       // This leg is geometrically behind the incoming muon's momentum, so use
       // an explicit direction instead of Geant4e's ambiguous anyDirection.
       detailedMaterialPropagator =
           std::make_unique<Geant4ePropagator>(&magneticField, "mu", oppositeToMomentum, 0.05, 2.0, 2500.0);
+    }
+    if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
       targetMaterialPropagator = detailedMaterialPropagator.get();
     }
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
     vacuumPropagator.setUseMagVolumes(true);
-    Propagator const& directionalRefitPropagator =
-        directionalRefitUseMaterialEffects_ ? static_cast<Propagator const&>(approximateMaterialPropagator)
-                                            : static_cast<Propagator const&>(vacuumPropagator);
+    SteppingHelixPropagator geometryCovariancePropagator(&magneticField, anyDirection);
+    geometryCovariancePropagator.setMaterialMode(false);
+    geometryCovariancePropagator.setUseMagVolumes(true);
+    geometryCovariancePropagator.setUseMatVolumes(true);
+    geometryCovariancePropagator.setEnergyLossScale(0.);
+    geometryCovariancePropagator.applyRadX0Correction(true);
+    GeometryMaterialPropagator geometryMaterialPropagator(
+        geometryCovariancePropagator,
+        approximateMaterialPropagator,
+        directionalRefitGeometryMaterialStepCm_,
+        directionalRefitLogGeometryMaterialComparison_);
+    Propagator const* directionalRefitFitterPropagator = directionalRefitUseMaterialEffects_
+                                                             ? static_cast<Propagator const*>(&approximateMaterialPropagator)
+                                                             : static_cast<Propagator const*>(&vacuumPropagator);
+    Propagator const* directionalRefitSmootherPropagator = directionalRefitFitterPropagator;
+    if (useImprovedMomentumRefit_ && directionalRefitUseMaterialEffects_ &&
+        directionalRefitUseFirstPrinciplesMaterialEffects_) {
+      directionalRefitFitterPropagator = &firstPrinciplesMaterialPropagator;
+      directionalRefitSmootherPropagator = &firstPrinciplesMaterialPropagator;
+    } else if (useImprovedMomentumRefit_ && directionalRefitUseMaterialEffects_ &&
+        directionalRefitUseDetailedMaterialEffects_) {
+      // Hits are ordered from the source-facing side toward CMS.  The fitter
+      // therefore transports along the physical momentum.  KFTrajectoryFitter
+      // clones this prototype with the seed direction, while
+      // KFTrajectorySmoother creates its own alongMomentum and
+      // oppositeToMomentum clones and selects the latter for the backward
+      // smoothing pass.  Supplying an explicitly forward Geant4e prototype
+      // thus gives the two Kalman roles physically correct material signs.
+      detailedRefitMaterialPropagator =
+          std::make_unique<Geant4ePropagator>(&magneticField, "mu", alongMomentum, 0.05, 2.0, 2500.0);
+      directionalRefitFitterPropagator = detailedRefitMaterialPropagator.get();
+      directionalRefitSmootherPropagator = detailedRefitMaterialPropagator.get();
+    } else if (useImprovedMomentumRefit_ && directionalRefitUseMaterialEffects_) {
+      if (useGeometryMaterialInFitter)
+        directionalRefitFitterPropagator = &geometryMaterialPropagator;
+      if (useGeometryMaterialInSmoother)
+        directionalRefitSmootherPropagator = &geometryMaterialPropagator;
+    }
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
     auto const& muonRecHitBuilder = setup.getData(muonRecHitBuilderToken_);
     // KFTrajectoryFitter/Smoother use TkCloner as a generic rechit clone-or-
@@ -966,9 +1280,11 @@ public:
                                 muonRecHitBuilder,
                                 hitCloner,
                                 vacuumPropagator,
-                                directionalRefitPropagator,
+                                *directionalRefitFitterPropagator,
+                                *directionalRefitSmootherPropagator,
                                 *targetMaterialPropagator,
                                 directionalRefitSeedCurvatureErrorRescale_,
+                                directionalRefitSeedMomentumScale_,
                                 directionalRefitUseFullSeedErrorRescale_,
                                 useImprovedMomentumRefit_ ? directionalRefitErrorRescale_ : 100.,
                                 useImprovedMomentumRefit_ ? directionalRefitInitialMaxHitChi2_ : 100000.,
@@ -1087,6 +1403,11 @@ public:
       candidate.directionalRefitChi2 = refit.selected.chi2;
       candidate.directionalRefitNdof = refit.selected.ndof;
       candidate.directionalRefitUpstreamPt = refit.selected.upstreamPt;
+      candidate.directionalRefitUpstreamP = refit.selected.upstreamP;
+      candidate.directionalRefitDownstreamP = refit.selected.downstreamP;
+      if (refit.selected.upstreamP > 0.)
+        candidate.directionalRefitFractionalLossAcrossHits =
+            (refit.selected.upstreamP - refit.selected.downstreamP) / refit.selected.upstreamP;
       if (refit.valid) {
         candidate.targetLineState = refit.selected.materialTargetState;
         if (refit.selected.vacuumTargetState.valid) {
@@ -1184,6 +1505,19 @@ public:
     auto betterRepresentative = [&candidates, eventSourceSide](unsigned int first, unsigned int second) {
       auto const& a = candidates[first];
       auto const& b = candidates[second];
+      auto geometryPriority = [](int source) {
+        // A traversing fit constrains one curvature with measurements on both
+        // sides of CMS.  That information cannot be replaced by timing or by
+        // a successful refit of only one leg.  Prefer the longest physical
+        // hypothesis first, then use timing and fit quality to choose among
+        // hypotheses with the same topology.
+        // The non-traversing cosmic fit is retained only as a last-resort
+        // seed: in this forward topology it has no longer curvature lever arm
+        // than DSA and is less constrained by the SHIFT-specific seeding.
+        return source == 1 ? 0 : (source == 0 ? 1 : 2);
+      };
+      if (geometryPriority(a.source) != geometryPriority(b.source))
+        return geometryPriority(a.source) < geometryPriority(b.source);
       bool const aHasTiming = a.timingDirectionSign != 0;
       bool const bHasTiming = b.timingDirectionSign != 0;
       if (aHasTiming != bHasTiming)
@@ -1201,15 +1535,6 @@ public:
       // reconstruction-only decision and is evaluated before source labels.
       if (a.directionalRefitValid != b.directionalRefitValid)
         return a.directionalRefitValid;
-      auto geometryPriority = [](int source) {
-        // Traversing and cosmic fits use both detector legs and give much
-        // better direction/origin resolution.  DSA remains available when no
-        // such fit exists, but must not replace a better geometrical fit just
-        // because its momentum magnitude is less biased.
-        return source == 1 ? 0 : (source == 2 ? 1 : 2);
-      };
-      if (geometryPriority(a.source) != geometryPriority(b.source))
-        return geometryPriority(a.source) < geometryPriority(b.source);
       // For a far source, a standalone leg in the endcap on the same side as
       // its propagated target-line PCA is the upstream leg.  It has crossed
       // less field and material than a downstream leg and gives a markedly
@@ -1277,7 +1602,8 @@ public:
     }
 
     std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, preRefitPt,
-        preRefitPz, directionalRefitUpstreamPt, directionalRefitChi2, directionalRefitNdof,
+        preRefitPz, directionalRefitUpstreamPt, directionalRefitUpstreamP, directionalRefitDownstreamP,
+        directionalRefitFractionalLossAcrossHits, directionalRefitChi2, directionalRefitNdof,
         directionalRefitFirstChi2, directionalRefitFirstNdof, directionalRefitFirstUpstreamPt,
         directionalRefitFirstQoverP,
         directionalRefitFirstTargetPt, directionalRefitFirstTargetPz, directionalRefitSecondChi2,
@@ -1346,6 +1672,9 @@ public:
       preRefitPt.push_back(candidate->preRefitPt);
       preRefitPz.push_back(candidate->preRefitPz);
       directionalRefitUpstreamPt.push_back(candidate->directionalRefitUpstreamPt);
+      directionalRefitUpstreamP.push_back(candidate->directionalRefitUpstreamP);
+      directionalRefitDownstreamP.push_back(candidate->directionalRefitDownstreamP);
+      directionalRefitFractionalLossAcrossHits.push_back(candidate->directionalRefitFractionalLossAcrossHits);
       directionalRefitAttempted.push_back(candidate->directionalRefitAttempted);
       directionalRefitValid.push_back(candidate->directionalRefitValid);
       directionalRefitHits.push_back(candidate->directionalRefitHits);
@@ -1485,6 +1814,14 @@ public:
     table->addColumn<float>("preRefitPz", preRefitPz, "target-line pz before the timing-directed Kalman refit");
     table->addColumn<float>(
         "directionalRefitUpstreamPt", directionalRefitUpstreamPt, "pT at the source-facing refitted hit state");
+    table->addColumn<float>(
+        "directionalRefitUpstreamP", directionalRefitUpstreamP, "momentum at the source-facing refitted hit state");
+    table->addColumn<float>("directionalRefitDownstreamP",
+                            directionalRefitDownstreamP,
+                            "momentum at the downstream refitted hit state");
+    table->addColumn<float>("directionalRefitFractionalLossAcrossHits",
+                            directionalRefitFractionalLossAcrossHits,
+                            "fitted fractional momentum loss from the source-facing to downstream hit state");
     table->addColumn<int>("directionalRefitAttempted",
                           directionalRefitAttempted,
                           "1 when the timing/inferred-direction Kalman refit was attempted");
@@ -1938,9 +2275,19 @@ public:
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<bool>("directionalRefitUseMaterialEffects", false);
+    description.add<bool>("directionalRefitUseFirstPrinciplesMaterialEffects", false);
+    description.add<double>("directionalRefitFirstPrinciplesStepCm", 0.2);
+    description.add<bool>("directionalRefitUseDetailedMaterialEffects", false);
+    description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
+    description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
+    description.add<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother", false);
+    description.add<double>("directionalRefitGeometryMaterialStepCm", 1.0);
+    description.add<bool>("directionalRefitLogGeometryMaterialComparison", false);
     description.add<bool>("usePropagatedPathOrdering", false);
     description.add<bool>("directionalRefitUseFullSeedErrorRescale", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
+    description.add<double>("directionalRefitSeedMomentumScale", 1.0);
+    description.add<double>("directionalRefitEnergyLossScale", 1.0);
     description.add<double>("directionalRefitErrorRescale", 10.0);
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxHitChi2", 100000.0);
@@ -1978,9 +2325,19 @@ private:
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
   bool directionalRefitUseMaterialEffects_;
+  bool directionalRefitUseFirstPrinciplesMaterialEffects_;
+  double directionalRefitFirstPrinciplesStepCm_;
+  bool directionalRefitUseDetailedMaterialEffects_;
+  bool directionalRefitUseGeometryMaterialEffects_;
+  bool directionalRefitUseGeometryMaterialEffectsInFitter_;
+  bool directionalRefitUseGeometryMaterialEffectsInSmoother_;
+  double directionalRefitGeometryMaterialStepCm_;
+  bool directionalRefitLogGeometryMaterialComparison_;
   bool usePropagatedPathOrdering_;
   bool directionalRefitUseFullSeedErrorRescale_;
   double directionalRefitSeedCurvatureErrorRescale_;
+  double directionalRefitSeedMomentumScale_;
+  double directionalRefitEnergyLossScale_;
   double directionalRefitErrorRescale_;
   double directionalRefitInitialMaxHitChi2_;
   double directionalRefitMaxHitChi2_;

@@ -29,9 +29,26 @@
 
 #include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixStateInfo.h"
 
+#include <memory>
+
 class MagneticField;
 class VolumeBasedMagneticField;
 class MagVolume;
+
+class SteppingHelixMaterialEffects {
+public:
+  virtual ~SteppingHelixMaterialEffects() = default;
+
+  // Return dp/ds, its momentum derivative, and the radiation length at the
+  // current curved-trajectory integration point. Units are GeV/cm, 1/cm,
+  // and cm respectively.
+  virtual bool compute(GlobalPoint const& position,
+                       GlobalVector const& momentum,
+                       int charge,
+                       double& momentumLossPerCm,
+                       double& momentumLossDerivative,
+                       double& radiationLengthCm) const = 0;
+};
 
 class SteppingHelixPropagator final : public Propagator {
 public:
@@ -137,6 +154,21 @@ public:
 
   //!Switch to using Material Volumes .. internally defined for now
   void setUseMatVolumes(bool val) { useMatVolumes_ = val; }
+
+  //! Diagnostic scale for the continuous momentum-loss term. Radiation-length
+  //! effects are deliberately unchanged so energy loss can be isolated.
+  void setEnergyLossScale(double val) { energyLossScale_ = val; }
+
+  //! Use an externally supplied, geometry-aware material model at every
+  //! magnetic-field integration step. The provider is shared by fitter and
+  //! smoother clones; reducing the step prevents thin volumes from being
+  //! skipped by the otherwise coarse standalone-muon stepping defaults.
+  void setMaterialEffectsProvider(std::shared_ptr<SteppingHelixMaterialEffects const> provider,
+                                  double maximumStepCm = 0.2) {
+    materialEffectsProvider_ = std::move(provider);
+    if (materialEffectsProvider_ && maximumStepCm > 0.)
+      defaultStep_ = maximumStepCm;
+  }
 
   //! flag to return tangent plane for non-plane input
   void setReturnTangentPlane(bool val) { returnTangentPlane_ = val; }
@@ -278,6 +310,8 @@ private:
   bool useTuningForL2Speed_;
 
   double defaultStep_;
+  double energyLossScale_;
+  std::shared_ptr<SteppingHelixMaterialEffects const> materialEffectsProvider_;
 
   double ecShiftPos_;
   double ecShiftNeg_;

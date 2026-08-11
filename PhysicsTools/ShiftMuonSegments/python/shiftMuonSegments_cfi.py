@@ -20,11 +20,35 @@ shiftMuonTable = cms.EDProducer(
     useImprovedMomentumRefit=cms.bool(True),
     # Use explicitly backward Geant4e transport to recover material losses
     # between the source-facing fitted state and the CMS material boundary.
-    useDetailedMaterialPropagation=cms.bool(True),
-    # V9 experiment: isolate material updates inside the Kalman fitter and
-    # smoother. The material-aware SteppingHelix implementation remains
-    # available by enabling this switch; target-leg propagation is unchanged.
-    directionalRefitUseMaterialEffects=cms.bool(False),
+    useDetailedMaterialPropagation=cms.bool(False),
+    # Keep material updates in the canonical Kalman fit. The material-free
+    # v9 control remains available through this switch for focused ablations.
+    directionalRefitUseMaterialEffects=cms.bool(True),
+    # Canonical material transport: query the Geant4 detector material at
+    # every curved SteppingHelix integration point and use the same model in
+    # the filter, smoother, and backward target extrapolation.
+    # The exact Geant4-material provider is retained as a controlled closure
+    # option.  A paired reconstruction test found it neutral relative to the
+    # standard SteppingHelix material model, while costing substantially more
+    # CPU, so production keeps the standard model by default.
+    directionalRefitUseFirstPrinciplesMaterialEffects=cms.bool(False),
+    directionalRefitFirstPrinciplesStepCm=cms.double(0.2),
+    # Optional first-principles material ablation. When enabled, the Kalman
+    # filter uses detailed Geant4e transport along the incoming muon momentum;
+    # CMSSW's smoother constructs the matching opposite-to-momentum clone for
+    # its backward pass. Keep the approximate SteppingHelix model canonical
+    # until the detailed mode passes the small-sample closure test.
+    directionalRefitUseDetailedMaterialEffects=cms.bool(False),
+    # Geometry-sampled mean-loss experiment: retain SteppingHelix covariance
+    # and scattering, disable only its approximate continuous dE/dx, and use
+    # Geant4 material-specific stopping power sampled along each propagation.
+    directionalRefitUseGeometryMaterialEffects=cms.bool(False),
+    # Split-pass ablation switches. The umbrella option above still enables
+    # geometry mean loss in both passes for backwards compatibility.
+    directionalRefitUseGeometryMaterialEffectsInFitter=cms.bool(False),
+    directionalRefitUseGeometryMaterialEffectsInSmoother=cms.bool(False),
+    directionalRefitGeometryMaterialStepCm=cms.double(1.0),
+    directionalRefitLogGeometryMaterialComparison=cms.bool(False),
     # Isolate hit ordering from the other refit changes. Use the established
     # source-side signed-z ordering for this comparison while retaining the
     # precision refit, both iterations, and target-only Geant4e correction.
@@ -35,6 +59,12 @@ shiftMuonTable = cms.EDProducer(
     # Scale either the full seed covariance above or only q/p in the retained
     # curvature-only implementation.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
+    # Diagnostic nonlinear-convergence probe: change only the magnitude of
+    # the first-iteration momentum seed, retaining its direction and charge.
+    directionalRefitSeedMomentumScale=cms.double(1.0),
+    # Diagnostic only: scale the continuous SteppingHelix energy-loss term in
+    # the Kalman fit while leaving scattering and target propagation intact.
+    directionalRefitEnergyLossScale=cms.double(1.0),
     # Backward-start uncertainty used internally by KFTrajectorySmoother.
     directionalRefitErrorRescale=cms.double(10.0),
     # Match the established refit for both nonlinear iterations.  Hit
@@ -90,4 +120,6 @@ shiftMuonSegmentsCounter = cms.EDAnalyzer(
     rpcSimHits=cms.InputTag("g4SimHits", "MuonRPCHits"),
     gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
     printDetails=cms.bool(True),
+    # MC-only, read-only transport closure probe. Keep disabled in production.
+    printPropagationClosure=cms.bool(False),
 )
