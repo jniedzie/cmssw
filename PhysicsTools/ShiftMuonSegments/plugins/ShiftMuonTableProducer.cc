@@ -338,6 +338,14 @@ namespace {
     return FreeTrajectoryState(state.parameters(), CurvilinearTrajectoryError(covariance));
   }
 
+  FreeTrajectoryState inflateSeedError(FreeTrajectoryState const& state, double scale, bool rescaleFullError) {
+    if (!rescaleFullError)
+      return inflateCurvatureError(state, scale);
+    auto inflated = state;
+    inflated.rescaleError(scale);
+    return inflated;
+  }
+
   bool finiteTrajectoryState(TrajectoryStateOnSurface const& state) {
     if (!state.isValid())
       return false;
@@ -378,6 +386,7 @@ namespace {
                                           Propagator const& fitMaterialPropagator,
                                           Propagator const& targetMaterialPropagator,
                                           double seedCurvatureErrorRescale,
+                                          bool useFullSeedErrorRescale,
                                           double smootherErrorRescale,
                                           double initialMaxHitChi2,
                                           double maxHitChi2,
@@ -464,7 +473,7 @@ namespace {
       KFTrajectorySmoother smoother(
           fitMaterialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
       smoother.setHitCloner(&hitCloner);
-      auto const start = inflateCurvatureError(uninflatedSeed, seedCurvatureErrorRescale);
+      auto const start = inflateSeedError(uninflatedSeed, seedCurvatureErrorRescale, useFullSeedErrorRescale);
       auto const firstPredicted = fitMaterialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
       if (!firstPredicted.isValid())
         return result;
@@ -798,6 +807,8 @@ public:
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         usePropagatedPathOrdering_(parameters.getParameter<bool>("usePropagatedPathOrdering")),
+        directionalRefitUseFullSeedErrorRescale_(
+            parameters.getParameter<bool>("directionalRefitUseFullSeedErrorRescale")),
         directionalRefitSeedCurvatureErrorRescale_(
             parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
@@ -953,6 +964,7 @@ public:
                                 approximateMaterialPropagator,
                                 *targetMaterialPropagator,
                                 directionalRefitSeedCurvatureErrorRescale_,
+                                directionalRefitUseFullSeedErrorRescale_,
                                 useImprovedMomentumRefit_ ? directionalRefitErrorRescale_ : 100.,
                                 useImprovedMomentumRefit_ ? directionalRefitInitialMaxHitChi2_ : 100000.,
                                 useImprovedMomentumRefit_ ? directionalRefitMaxHitChi2_ : 100000.,
@@ -1921,6 +1933,7 @@ public:
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<bool>("usePropagatedPathOrdering", false);
+    description.add<bool>("directionalRefitUseFullSeedErrorRescale", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
     description.add<double>("directionalRefitErrorRescale", 10.0);
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
@@ -1959,6 +1972,7 @@ private:
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
   bool usePropagatedPathOrdering_;
+  bool directionalRefitUseFullSeedErrorRescale_;
   double directionalRefitSeedCurvatureErrorRescale_;
   double directionalRefitErrorRescale_;
   double directionalRefitInitialMaxHitChi2_;
