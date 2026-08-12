@@ -14,6 +14,11 @@ shiftMuonTable = cms.EDProducer(
     cosmicTracks=cms.InputTag("shiftCosmicMuons"),
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
+    simTracks=cms.InputTag("g4SimHits"),
+    simVertices=cms.InputTag("g4SimHits"),
+    dtSimHits=cms.InputTag("g4SimHits", "MuonDTHits"),
+    cscSimHits=cms.InputTag("g4SimHits", "MuonCSCHits"),
+    gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
     # Optional scale-improvement study: propagated-path hit ordering and the
     # guarded precision-only refit. Keep it enabled for the current iteration.
@@ -47,6 +52,11 @@ shiftMuonTable = cms.EDProducer(
     # geometry mean loss in both passes for backwards compatibility.
     directionalRefitUseGeometryMaterialEffectsInFitter=cms.bool(False),
     directionalRefitUseGeometryMaterialEffectsInSmoother=cms.bool(False),
+    # Focused closure test: sample the DD4hep/Geant4 material only between the
+    # source-facing precision state and the outer CMS material boundary. This
+    # replaces the standard R-Z map where it is known to return zero at the
+    # forward muon radius; it does not scale dE/dx or alter the hit fit.
+    directionalRefitUseGeometryTargetMaterialEffects=cms.bool(False),
     directionalRefitGeometryMaterialStepCm=cms.double(1.0),
     directionalRefitLogGeometryMaterialComparison=cms.bool(False),
     # Isolate hit ordering from the other refit changes. Use the established
@@ -59,6 +69,10 @@ shiftMuonTable = cms.EDProducer(
     # Scale either the full seed covariance above or only q/p in the retained
     # curvature-only implementation.
     directionalRefitSeedCurvatureErrorRescale=cms.double(100.0),
+    # Pass two starts from pass one's posterior state. Vary only this inflation
+    # to test whether reusing the same-hit posterior as a prior causes the
+    # observed downward q/p feedback; 100 preserves the established result.
+    directionalRefitSecondSeedErrorRescale=cms.double(100.0),
     # Diagnostic nonlinear-convergence probe: change only the magnitude of
     # the first-iteration momentum seed, retaining its direction and charge.
     directionalRefitSeedMomentumScale=cms.double(1.0),
@@ -67,18 +81,31 @@ shiftMuonTable = cms.EDProducer(
     directionalRefitEnergyLossScale=cms.double(1.0),
     # Backward-start uncertainty used internally by KFTrajectorySmoother.
     directionalRefitErrorRescale=cms.double(10.0),
-    # Match the established refit for both nonlinear iterations.  Hit
-    # rejection can be revisited independently after the transport comparison.
+    # These now drive a real remove-and-refit outlier loop. The conventional
+    # EstimateCut=20 probe worsened the 100-event closure, so production keeps
+    # rejection effectively disabled pending a larger, detector-aware study.
     directionalRefitInitialMaxHitChi2=cms.double(100000.0),
     directionalRefitMaxHitChi2=cms.double(100000.0),
     # Reject a second pass that moves too far from the first smoothed q/p.
     directionalRefitMaxRelativeQoverPChange=cms.double(0.5),
+    # Muon DT/CSC RecHits cannot improve with a track hypothesis, so a second
+    # pass does not relinearize them. Reusing pass one's same-hit posterior as
+    # a prior double-counts information and is retained only as a diagnostic.
+    directionalRefitUseSecondIteration=cms.bool(False),
     # Use the precision-only result canonically only when it spans at least
     # two independent DT, CSC, or GEM station layers.
     directionalRefitMinPrecisionStations=cms.uint32(2),
     # Reject a precision-only solution that is incompatible with the all-hit
     # curvature; its diagnostic branches are still retained.
     directionalRefitMaxPrecisionRelativeQoverPChange=cms.double(0.5),
+    # Simulation-only closure columns and source/opposite-side precision
+    # refits. Disabled in production because the extra fits cost CPU.
+    produceMomentumClosureDiagnostics=cms.bool(False),
+    produceSplitLegRefits=cms.bool(False),
+    # Backward target transport is now the canonical state contract.  This
+    # compatibility parameter is retained for older configurations; it no
+    # longer permits anyDirection on the source-facing-to-target leg.
+    directionalRefitUseExplicitBackwardTargetPropagation=cms.bool(False),
     # Preserve the detector-only result and additionally form a prompt-target
     # hypothesis by updating the independently smoothed detector state with an
     # x/y measurement on the configured target plane.  The 50 cm z width
