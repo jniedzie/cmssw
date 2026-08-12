@@ -9,6 +9,7 @@ def addShiftMuonSegments(
     directionalRefitUseGeometryMaterialEffects=None,
     directionalRefitUseGeometryMaterialEffectsInFitter=None,
     directionalRefitUseGeometryMaterialEffectsInSmoother=None,
+    directionalRefitUseGeometryTargetMaterialEffects=None,
 ):
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
@@ -29,6 +30,10 @@ def addShiftMuonSegments(
         process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInSmoother = cms.bool(
             directionalRefitUseGeometryMaterialEffectsInSmoother
         )
+    if directionalRefitUseGeometryTargetMaterialEffects is not None:
+        process.shiftMuonTable.directionalRefitUseGeometryTargetMaterialEffects = cms.bool(
+            directionalRefitUseGeometryTargetMaterialEffects
+        )
     # NanoAOD retains FlatTables with module labels matching ``*Table``.  Keep
     # that suffix here so the standard NanoAOD output commands write both
     # ShiftDT/CSC/GEM segment tables and ShiftRPC reconstructed-hit table.
@@ -45,6 +50,7 @@ def addShiftMuonSegments(
             or process.shiftMuonTable.directionalRefitUseGeometryMaterialEffects.value()
             or process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInFitter.value()
             or process.shiftMuonTable.directionalRefitUseGeometryMaterialEffectsInSmoother.value()
+            or process.shiftMuonTable.directionalRefitUseGeometryTargetMaterialEffects.value()
         )
     ):
         # Detailed material transport in either the target leg or the Kalman

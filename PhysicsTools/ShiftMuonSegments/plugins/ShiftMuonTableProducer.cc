@@ -43,6 +43,9 @@
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
 #include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
+#include "SimDataFormats/Vertex/interface/SimVertexContainer.h"
 
 #include "G4EnergyLossForExtrapolator.hh"
 #include "G4LogicalVolume.hh"
@@ -63,6 +66,7 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -296,6 +300,9 @@ namespace {
     double directionalRefitUpstreamP = 0.;
     double directionalRefitDownstreamP = 0.;
     double directionalRefitFractionalLossAcrossHits = 0.;
+    double directionalRefitSourceFacingSurfaceDistance = -1.;
+    double directionalRefitFilterDirectionCosine = -2.;
+    double directionalRefitTargetDirectionCosine = -2.;
     double preRefitPt = 0.;
     double preRefitPz = 0.;
     bool directionalRefitFirstValid = false;
@@ -366,6 +373,16 @@ namespace {
     double directionalRefitPrecisionSecondTargetPz = 0.;
     double directionalRefitPrecisionRelativeToAllQoverP = -1.;
     double directionalRefitPrecisionTargetDca = -1.;
+    bool directionalRefitSourceLegPrecisionValid = false;
+    unsigned int directionalRefitSourceLegPrecisionHits = 0;
+    double directionalRefitSourceLegPrecisionQoverP = 0.;
+    double directionalRefitSourceLegPrecisionTargetPt = 0.;
+    double directionalRefitSourceLegPrecisionTargetPz = 0.;
+    bool directionalRefitOppositeLegPrecisionValid = false;
+    unsigned int directionalRefitOppositeLegPrecisionHits = 0;
+    double directionalRefitOppositeLegPrecisionQoverP = 0.;
+    double directionalRefitOppositeLegPrecisionTargetPt = 0.;
+    double directionalRefitOppositeLegPrecisionTargetPz = 0.;
     bool constrainedValid = false;
     unsigned int constrainedHits = 0;
     double constrainedChi2 = 0.;
@@ -527,6 +544,12 @@ namespace {
     double upstreamP = 0.;
     double downstreamP = 0.;
     double signedInverseMomentum = 0.;
+    // The KF filter runs from the external source toward CMS.  Keep the
+    // smoother endpoint convention explicit instead of relying on the
+    // historical "last measurement" assumption when interpreting its state.
+    double sourceFacingSurfaceDistance = -1.;
+    double filterDirectionCosine = -2.;
+    double targetDirectionCosine = -2.;
     TrajectoryStateOnSurface upstreamState;
     PropagatedState materialTargetState;
     PropagatedState vacuumTargetState;
@@ -698,14 +721,17 @@ namespace {
                                           Propagator const& smootherMaterialPropagator,
                                           Propagator const& targetMaterialPropagator,
                                           double seedCurvatureErrorRescale,
+                                          double secondSeedErrorRescale,
                                           double seedMomentumScale,
                                           bool useFullSeedErrorRescale,
                                           double smootherErrorRescale,
                                           double initialMaxHitChi2,
                                           double maxHitChi2,
                                           double maxRelativeQoverPChange,
+                                          bool useSecondIteration,
                                           bool precisionHitsOnly = false,
-                                          bool usePathOrdering = true) {
+                                          bool usePathOrdering = true,
+                                          int hitSideSelection = 0) {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
       double path;
@@ -718,6 +744,12 @@ namespace {
         continue;
       auto transientHit = hitBuilder.build(&**hit);
       if (!transientHit || !transientHit->isValid() || !transientHit->det())
+        continue;
+      // Optional diagnostic split for full-lever-arm tracks. +1 keeps the
+      // source-facing detector half and -1 the opposite half. The canonical
+      // fit always uses zero and therefore remains unchanged.
+      if (hitSideSelection != 0 &&
+          hitSideSelection * sourceSide * transientHit->globalPosition().z() <= 0.)
         continue;
       orderedHits.push_back({transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
     }
@@ -784,50 +816,110 @@ namespace {
       fitHits.push_back(orderedHit.hit);
 
     KFUpdator updator;
-    auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed, double iterationMaxHitChi2) {
+    auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed,
+                            double iterationSeedErrorRescale,
+                            double iterationMaxHitChi2) {
       RefitIterationResult result;
       Chi2MeasurementEstimator estimator(iterationMaxHitChi2);
       KFTrajectoryFitter fitter(fitMaterialPropagator, updator, estimator, 3, nullptr, &hitCloner);
       KFTrajectorySmoother smoother(
           smootherMaterialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
       smoother.setHitCloner(&hitCloner);
-      auto const start = inflateSeedError(uninflatedSeed, seedCurvatureErrorRescale, useFullSeedErrorRescale);
-      auto const firstPredicted = fitMaterialPropagator.propagate(start, *orderedHits.front().hit->surface());
-      if (!firstPredicted.isValid()) {
-        result.status = 10;
-        return result;
-      }
+      auto const start = inflateSeedError(uninflatedSeed, iterationSeedErrorRescale, useFullSeedErrorRescale);
       TrajectorySeed const seed(
           PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
-      auto const filtered = fitter.fitOne(seed, fitHits, firstPredicted, TrajectoryFitter::standard);
-      // KFTrajectoryFitter deliberately has a no-fail policy: after a failed
-      // propagation/update it can return an otherwise valid Trajectory whose
-      // last measurement contains an invalid or NaN state.  Geant4e cannot
-      // safely smooth such a trajectory and may segfault in MakeOneStep, so
-      // reject the refit candidate before entering the smoother.
-      // Require the same three physical detector measurements as the
-      // unconstrained refit.  The target prior was applied to the seed above.
       int const minimumFoundHits = 3;
-      if (filtered.foundHits() < minimumFoundHits) {
-        result.status = 11;
+      auto fitAndSmooth = [&](Trajectory::RecHitContainer const& iterationHits, int& status) {
+        Trajectory invalid;
+        auto const firstPredicted = fitMaterialPropagator.propagate(start, *iterationHits.front()->surface());
+        if (!firstPredicted.isValid()) {
+          status = 10;
+          return invalid;
+        }
+        auto const filtered = fitter.fitOne(seed, iterationHits, firstPredicted, TrajectoryFitter::standard);
+        // KFTrajectoryFitter deliberately has a no-fail policy: after a failed
+        // propagation/update it can return a trajectory with a poisoned final
+        // state. Reject it before the smoother can enter Geant4e.
+        if (filtered.foundHits() < minimumFoundHits) {
+          status = 11;
+          return invalid;
+        }
+        if (!finiteTrajectory(filtered)) {
+          status = 12;
+          return invalid;
+        }
+        auto smoothedCandidate = smoother.trajectory(filtered);
+        if (smoothedCandidate.foundHits() < minimumFoundHits || smoothedCandidate.empty()) {
+          status = 13;
+          return invalid;
+        }
+        if (!finiteTrajectory(smoothedCandidate)) {
+          status = 14;
+          return invalid;
+        }
+        status = 1;
+        return smoothedCandidate;
+      };
+
+      // KFTrajectoryFitter's estimator records hit compatibility but does not
+      // reject incompatible measurements. Implement the same remove-and-refit
+      // principle as KFFittingSmoother: remove at most two hits and never more
+      // than 20% of the input, choosing the candidate with the smallest total
+      // smoothed chi2. The canonical EstimateCut=20 used by CMSSW material
+      // refitters is supplied through iterationMaxHitChi2.
+      Trajectory::RecHitContainer iterationHits = fitHits;
+      int fitStatus = 0;
+      auto smoothed = fitAndSmooth(iterationHits, fitStatus);
+      if (!smoothed.isValid()) {
+        result.status = fitStatus;
         return result;
       }
-      if (!finiteTrajectory(filtered)) {
-        result.status = 12;
-        return result;
-      }
-      auto const smoothed = smoother.trajectory(filtered);
-      if (smoothed.foundHits() < minimumFoundHits || smoothed.empty()) {
-        result.status = 13;
-        return result;
-      }
-      if (!finiteTrajectory(smoothed)) {
-        result.status = 14;
-        return result;
+      unsigned int const maximumOutliers =
+          std::min<unsigned int>(2, static_cast<unsigned int>(fitHits.size() / 5));
+      unsigned int removedOutliers = 0;
+      while (iterationMaxHitChi2 > 0. && removedOutliers < maximumOutliers &&
+             smoothed.measurements().size() == iterationHits.size()) {
+        std::vector<unsigned int> badMeasurements;
+        for (unsigned int index = 0; index < smoothed.measurements().size(); ++index) {
+          auto const& measurement = smoothed.measurements()[index];
+          if (measurement.recHitR().isValid() && measurement.recHitR().det() &&
+              measurement.estimate() > iterationMaxHitChi2)
+            badMeasurements.push_back(index);
+        }
+        if (badMeasurements.empty())
+          break;
+
+        bool foundCandidate = false;
+        double bestChi2 = std::numeric_limits<double>::infinity();
+        unsigned int bestHitIndex = 0;
+        Trajectory bestTrajectory;
+        for (auto const measurementIndex : badMeasurements) {
+          unsigned int const hitIndex = iterationHits.size() - measurementIndex - 1;
+          auto candidateHits = iterationHits;
+          candidateHits.erase(candidateHits.begin() + hitIndex);
+          if (candidateHits.size() < static_cast<unsigned int>(minimumFoundHits))
+            continue;
+          int candidateStatus = 0;
+          auto candidate = fitAndSmooth(candidateHits, candidateStatus);
+          if (candidate.isValid() && candidate.chiSquared() < bestChi2) {
+            foundCandidate = true;
+            bestChi2 = candidate.chiSquared();
+            bestHitIndex = hitIndex;
+            bestTrajectory = std::move(candidate);
+          }
+        }
+        if (!foundCandidate || !(bestChi2 < smoothed.chiSquared()))
+          break;
+        iterationHits.erase(iterationHits.begin() + bestHitIndex);
+        smoothed = std::move(bestTrajectory);
+        ++removedOutliers;
       }
 
-      // The smoother returns measurements in reverse filter order; its last
-      // state is the source-facing detector hit.
+      // KFTrajectorySmoother returns measurements in reverse filter order.
+      // Since this fit was seeded source -> CMS, lastMeasurement is therefore
+      // the source-facing state.  Record both surface and direction closure
+      // quantities here: they make a convention mismatch visible without
+      // hiding it with a momentum calibration.
       auto const* upstream = &smoothed.lastMeasurement().updatedState();
       if (!upstream->isValid() || !upstream->freeState()) {
         result.status = 15;
@@ -840,6 +932,35 @@ namespace {
       }
       auto const upstreamMomentum = upstream->globalMomentum();
       auto const downstreamMomentum = downstream.globalMomentum();
+      // A formally valid Kalman state with effectively zero momentum is not
+      // transportable over the CMS-to-target geometry. Reject it before the
+      // propagator; this is particularly important for diagnostic half-track
+      // fits with too little curvature lever arm.
+      if (!(upstreamMomentum.mag() > 0.1) || !(downstreamMomentum.mag() > 0.1) ||
+          !std::isfinite(upstreamMomentum.mag()) || !std::isfinite(downstreamMomentum.mag())) {
+        result.status = 17;
+        return result;
+      }
+      auto const sourceFacingPosition = upstream->globalPosition();
+      auto const downstreamPosition = downstream.globalPosition();
+      result.sourceFacingSurfaceDistance =
+          (sourceFacingPosition - iterationHits.front()->globalPosition()).mag();
+      auto const filterDisplacement = downstreamPosition - sourceFacingPosition;
+      if (filterDisplacement.mag2() > 0.)
+        result.filterDirectionCosine = filterDisplacement.dot(upstreamMomentum) /
+                                       (filterDisplacement.mag() * upstreamMomentum.mag());
+      // The source-facing state must point away from the external target.  A
+      // transport back to that target is consequently opposite-to-momentum.
+      // A non-negative value indicates that the state was selected with the
+      // wrong physical orientation, so do not publish it as a valid refit.
+      result.targetDirectionCosine = sourceSide == 0
+                                         ? -2.
+                                         : sourceSide * upstreamMomentum.z() / upstreamMomentum.mag();
+      if (sourceSide != 0 && (!std::isfinite(result.targetDirectionCosine) ||
+                              result.targetDirectionCosine >= 0.)) {
+        result.status = 18;
+        return result;
+      }
       auto const upstreamFreeState = *upstream->freeState();
       PropagatedState materialTargetState;
       PropagatedState vacuumTargetState;
@@ -866,13 +987,26 @@ namespace {
       return result;
     };
 
-    result.first = runIteration(iterationSeed, initialMaxHitChi2);
+    result.first = runIteration(iterationSeed, seedCurvatureErrorRescale, initialMaxHitChi2);
     if (!result.first.valid) {
       result.status = 100 + result.first.status;
       return result;
     }
 
-    result.second = runIteration(*result.first.upstreamState.freeState(), maxHitChi2);
+    if (!useSecondIteration) {
+      result.selectedIteration = 1;
+      result.selected = result.first;
+      result.valid = true;
+      result.status = 1;
+      return result;
+    }
+
+    // Pass two reuses pass one's posterior state as a nonlinear seed, but it
+    // must not silently reuse the information from the same hits as a strong
+    // prior. Keep its covariance inflation independently controllable so the
+    // repeated-measurement feedback can be tested without changing pass one.
+    result.second =
+        runIteration(*result.first.upstreamState.freeState(), secondSeedErrorRescale, maxHitChi2);
     if (result.second.valid) {
       double const denominator = std::max(std::abs(result.first.signedInverseMomentum), 1.e-12);
       result.relativeQoverPChange =
@@ -1152,6 +1286,11 @@ public:
         traversingToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("traversingTracks"))),
         genParticlesToken_(
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
+        simTracksToken_(consumes<edm::SimTrackContainer>(parameters.getParameter<edm::InputTag>("simTracks"))),
+        simVerticesToken_(consumes<edm::SimVertexContainer>(parameters.getParameter<edm::InputTag>("simVertices"))),
+        dtSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("dtSimHits"))),
+        cscSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("cscSimHits"))),
+        gemSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("gemSimHits"))),
         magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
@@ -1172,6 +1311,8 @@ public:
             parameters.getParameter<bool>("directionalRefitUseGeometryMaterialEffectsInFitter")),
         directionalRefitUseGeometryMaterialEffectsInSmoother_(
             parameters.getParameter<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother")),
+        directionalRefitUseGeometryTargetMaterialEffects_(
+            parameters.getParameter<bool>("directionalRefitUseGeometryTargetMaterialEffects")),
         directionalRefitGeometryMaterialStepCm_(
             parameters.getParameter<double>("directionalRefitGeometryMaterialStepCm")),
         directionalRefitLogGeometryMaterialComparison_(
@@ -1181,6 +1322,8 @@ public:
             parameters.getParameter<bool>("directionalRefitUseFullSeedErrorRescale")),
         directionalRefitSeedCurvatureErrorRescale_(
             parameters.getParameter<double>("directionalRefitSeedCurvatureErrorRescale")),
+        directionalRefitSecondSeedErrorRescale_(
+            parameters.getParameter<double>("directionalRefitSecondSeedErrorRescale")),
         directionalRefitSeedMomentumScale_(parameters.getParameter<double>("directionalRefitSeedMomentumScale")),
         directionalRefitEnergyLossScale_(parameters.getParameter<double>("directionalRefitEnergyLossScale")),
         directionalRefitErrorRescale_(parameters.getParameter<double>("directionalRefitErrorRescale")),
@@ -1189,10 +1332,15 @@ public:
         directionalRefitMaxHitChi2_(parameters.getParameter<double>("directionalRefitMaxHitChi2")),
         directionalRefitMaxRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxRelativeQoverPChange")),
+        directionalRefitUseSecondIteration_(parameters.getParameter<bool>("directionalRefitUseSecondIteration")),
         directionalRefitMinPrecisionStations_(
             parameters.getParameter<unsigned int>("directionalRefitMinPrecisionStations")),
         directionalRefitMaxPrecisionRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxPrecisionRelativeQoverPChange")),
+        produceMomentumClosureDiagnostics_(parameters.getParameter<bool>("produceMomentumClosureDiagnostics")),
+        produceSplitLegRefits_(parameters.getParameter<bool>("produceSplitLegRefits")),
+        directionalRefitUseExplicitBackwardTargetPropagation_(
+            parameters.getParameter<bool>("directionalRefitUseExplicitBackwardTargetPropagation")),
         produceTargetConstrainedMomentum_(parameters.getParameter<bool>("produceTargetConstrainedMomentum")),
         targetUseInferredSide_(parameters.getParameter<bool>("targetUseInferredSide")),
         targetX_(parameters.getParameter<double>("targetX")),
@@ -1218,28 +1366,38 @@ public:
         maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
-    bool const anyGeometryMaterialEffects = directionalRefitUseGeometryMaterialEffects_ ||
-                                            directionalRefitUseGeometryMaterialEffectsInFitter_ ||
-                                            directionalRefitUseGeometryMaterialEffectsInSmoother_;
+    bool const anyGeometryFitMaterialEffects = directionalRefitUseGeometryMaterialEffects_ ||
+                                               directionalRefitUseGeometryMaterialEffectsInFitter_ ||
+                                               directionalRefitUseGeometryMaterialEffectsInSmoother_;
+    bool const anyGeometryMaterialEffects =
+        anyGeometryFitMaterialEffects || directionalRefitUseGeometryTargetMaterialEffects_;
     if (directionalRefitUseFirstPrinciplesMaterialEffects_ &&
         (useDetailedMaterialPropagation_ || directionalRefitUseDetailedMaterialEffects_ ||
          anyGeometryMaterialEffects))
       throw cms::Exception("Configuration")
           << "directionalRefitUseFirstPrinciplesMaterialEffects is mutually exclusive with the legacy "
              "Geant4e and geometry-material ablations";
-    if (directionalRefitUseDetailedMaterialEffects_ && anyGeometryMaterialEffects)
+    if (directionalRefitUseDetailedMaterialEffects_ && anyGeometryFitMaterialEffects)
       throw cms::Exception("Configuration")
           << "directionalRefitUseDetailedMaterialEffects and directionalRefitUseGeometryMaterialEffects "
              "are mutually exclusive";
-    if (anyGeometryMaterialEffects && !directionalRefitUseMaterialEffects_)
+    if (anyGeometryFitMaterialEffects && !directionalRefitUseMaterialEffects_)
       throw cms::Exception("Configuration")
           << "directionalRefitUseGeometryMaterialEffects requires directionalRefitUseMaterialEffects";
+    if (directionalRefitUseGeometryTargetMaterialEffects_ && useDetailedMaterialPropagation_)
+      throw cms::Exception("Configuration")
+          << "directionalRefitUseGeometryTargetMaterialEffects and useDetailedMaterialPropagation are mutually "
+             "exclusive target-leg material models";
     if (anyGeometryMaterialEffects &&
         (!(directionalRefitGeometryMaterialStepCm_ > 0.) || !std::isfinite(directionalRefitGeometryMaterialStepCm_)))
       throw cms::Exception("Configuration") << "directionalRefitGeometryMaterialStepCm must be finite and positive";
     if (directionalRefitUseFirstPrinciplesMaterialEffects_ &&
         (!(directionalRefitFirstPrinciplesStepCm_ > 0.) || !std::isfinite(directionalRefitFirstPrinciplesStepCm_)))
       throw cms::Exception("Configuration") << "directionalRefitFirstPrinciplesStepCm must be finite and positive";
+    if (!(directionalRefitSecondSeedErrorRescale_ > 0.) ||
+        !std::isfinite(directionalRefitSecondSeedErrorRescale_))
+      throw cms::Exception("Configuration")
+          << "directionalRefitSecondSeedErrorRescale must be finite and positive";
     if (produceTargetConstrainedMomentum_ &&
         (!(targetSigmaX_ > 0.) || !(targetSigmaY_ > 0.) || !(targetSigmaZ_ >= 0.) ||
          !std::isfinite(targetX_) || !std::isfinite(targetY_) || !std::isfinite(targetZ_) ||
@@ -1255,6 +1413,11 @@ public:
     auto const cosmic = event.getHandle(cosmicToken_);
     auto const traversing = event.getHandle(traversingToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
+    auto const simTracks = event.getHandle(simTracksToken_);
+    auto const simVertices = event.getHandle(simVerticesToken_);
+    auto const dtSimHits = event.getHandle(dtSimHitsToken_);
+    auto const cscSimHits = event.getHandle(cscSimHitsToken_);
+    auto const gemSimHits = event.getHandle(gemSimHitsToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
     bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
                                              directionalRefitUseGeometryMaterialEffectsInFitter_;
@@ -1269,6 +1432,12 @@ public:
     approximateMaterialPropagator.setUseMatVolumes(true);
     approximateMaterialPropagator.setEnergyLossScale(directionalRefitEnergyLossScale_);
     approximateMaterialPropagator.applyRadX0Correction(true);
+    SteppingHelixPropagator explicitBackwardMaterialPropagator(&magneticField, oppositeToMomentum);
+    explicitBackwardMaterialPropagator.setMaterialMode(false);
+    explicitBackwardMaterialPropagator.setUseMagVolumes(true);
+    explicitBackwardMaterialPropagator.setUseMatVolumes(true);
+    explicitBackwardMaterialPropagator.setEnergyLossScale(directionalRefitEnergyLossScale_);
+    explicitBackwardMaterialPropagator.applyRadX0Correction(true);
     auto firstPrinciplesProvider = std::make_shared<Geant4MaterialEffectsProvider>();
     SteppingHelixPropagator firstPrinciplesMaterialPropagator(&magneticField, anyDirection);
     firstPrinciplesMaterialPropagator.setMaterialMode(false);
@@ -1277,11 +1446,27 @@ public:
     firstPrinciplesMaterialPropagator.setMaterialEffectsProvider(
         firstPrinciplesProvider, directionalRefitFirstPrinciplesStepCm_);
     firstPrinciplesMaterialPropagator.applyRadX0Correction(true);
+    SteppingHelixPropagator firstPrinciplesBackwardMaterialPropagator(&magneticField, oppositeToMomentum);
+    firstPrinciplesBackwardMaterialPropagator.setMaterialMode(false);
+    firstPrinciplesBackwardMaterialPropagator.setUseMagVolumes(true);
+    firstPrinciplesBackwardMaterialPropagator.setUseMatVolumes(false);
+    firstPrinciplesBackwardMaterialPropagator.setMaterialEffectsProvider(
+        firstPrinciplesProvider, directionalRefitFirstPrinciplesStepCm_);
+    firstPrinciplesBackwardMaterialPropagator.applyRadX0Correction(true);
     std::unique_ptr<Geant4ePropagator> detailedMaterialPropagator;
     std::unique_ptr<Geant4ePropagator> detailedRefitMaterialPropagator;
-    Propagator const* targetMaterialPropagator = &approximateMaterialPropagator;
-    if (useImprovedMomentumRefit_ && directionalRefitUseFirstPrinciplesMaterialEffects_)
-      targetMaterialPropagator = &firstPrinciplesMaterialPropagator;
+    // Candidate preselection starts from a track endpoint whose direction is
+    // canonicalised by propagateToTargetLine().  Preserve its established
+    // anyDirection transport.  In contrast, the source-facing smoothed refit
+    // state has a known physical orientation and its target leg must be
+    // opposite-to-momentum.  These are different state contracts; sharing a
+    // propagator silently applied the latter twice and removed all candidates.
+    Propagator const* preRefitMaterialPropagator = &approximateMaterialPropagator;
+    Propagator const* sourceFacingTargetMaterialPropagator = &explicitBackwardMaterialPropagator;
+    if (useImprovedMomentumRefit_ && directionalRefitUseFirstPrinciplesMaterialEffects_) {
+      preRefitMaterialPropagator = &firstPrinciplesMaterialPropagator;
+      sourceFacingTargetMaterialPropagator = &firstPrinciplesBackwardMaterialPropagator;
+    }
     if (useImprovedMomentumRefit_ &&
         (useDetailedMaterialPropagation_ || useGeometryMaterialInFitter || useGeometryMaterialInSmoother)) {
       // The stock Geant4e limits (10 mm steps and 200 cm total path) are too
@@ -1292,7 +1477,8 @@ public:
           std::make_unique<Geant4ePropagator>(&magneticField, "mu", oppositeToMomentum, 0.05, 2.0, 2500.0);
     }
     if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
-      targetMaterialPropagator = detailedMaterialPropagator.get();
+      preRefitMaterialPropagator = detailedMaterialPropagator.get();
+      sourceFacingTargetMaterialPropagator = detailedMaterialPropagator.get();
     }
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
@@ -1308,6 +1494,23 @@ public:
         approximateMaterialPropagator,
         directionalRefitGeometryMaterialStepCm_,
         directionalRefitLogGeometryMaterialComparison_);
+    std::unique_ptr<SteppingHelixPropagator> geometryBackwardCovariancePropagator;
+    std::unique_ptr<GeometryMaterialPropagator> geometryTargetMaterialPropagator;
+    if (useImprovedMomentumRefit_ && directionalRefitUseGeometryTargetMaterialEffects_) {
+      geometryBackwardCovariancePropagator =
+          std::make_unique<SteppingHelixPropagator>(&magneticField, oppositeToMomentum);
+      geometryBackwardCovariancePropagator->setMaterialMode(false);
+      geometryBackwardCovariancePropagator->setUseMagVolumes(true);
+      geometryBackwardCovariancePropagator->setUseMatVolumes(true);
+      geometryBackwardCovariancePropagator->setEnergyLossScale(0.);
+      geometryBackwardCovariancePropagator->applyRadX0Correction(true);
+      geometryTargetMaterialPropagator = std::make_unique<GeometryMaterialPropagator>(
+          *geometryBackwardCovariancePropagator,
+          explicitBackwardMaterialPropagator,
+          directionalRefitGeometryMaterialStepCm_,
+          directionalRefitLogGeometryMaterialComparison_);
+      sourceFacingTargetMaterialPropagator = geometryTargetMaterialPropagator.get();
+    }
     Propagator const* directionalRefitFitterPropagator = directionalRefitUseMaterialEffects_
                                                              ? static_cast<Propagator const*>(&approximateMaterialPropagator)
                                                              : static_cast<Propagator const*>(&vacuumPropagator);
@@ -1404,7 +1607,7 @@ public:
                                     : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
       candidate.physicalDirectionSign = directionSign;
       auto const preRefitState = propagateToTargetLine(
-          *candidate.track, vacuumPropagator, directionSign, targetMaterialPropagator, eventSourceSide);
+          *candidate.track, vacuumPropagator, directionSign, preRefitMaterialPropagator, eventSourceSide);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
       candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
@@ -1419,7 +1622,7 @@ public:
       // direction.  This changes the direction in which the Kalman filter
       // applies material updates; flipping a completed fit cannot do that.
       candidate.directionalRefitAttempted = true;
-      auto runDirectionalRefit = [&](bool precisionHitsOnly) {
+      auto runDirectionalRefit = [&](bool precisionHitsOnly, int hitSideSelection = 0) {
         return directionalRefit(*candidate.track,
                                 directionSign,
                                 eventSourceSide,
@@ -1429,19 +1632,28 @@ public:
                                 vacuumPropagator,
                                 *directionalRefitFitterPropagator,
                                 *directionalRefitSmootherPropagator,
-                                *targetMaterialPropagator,
+                                *sourceFacingTargetMaterialPropagator,
                                 directionalRefitSeedCurvatureErrorRescale_,
+                                directionalRefitSecondSeedErrorRescale_,
                                 directionalRefitSeedMomentumScale_,
                                 directionalRefitUseFullSeedErrorRescale_,
                                 useImprovedMomentumRefit_ ? directionalRefitErrorRescale_ : 100.,
                                 useImprovedMomentumRefit_ ? directionalRefitInitialMaxHitChi2_ : 100000.,
                                 useImprovedMomentumRefit_ ? directionalRefitMaxHitChi2_ : 100000.,
                                 useImprovedMomentumRefit_ ? directionalRefitMaxRelativeQoverPChange_ : 0.5,
+                                directionalRefitUseSecondIteration_,
                                 precisionHitsOnly,
-                                useImprovedMomentumRefit_ && usePropagatedPathOrdering_);
+                                useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
+                                hitSideSelection);
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
+      auto const sourceLegPrecisionRefit = produceSplitLegRefits_ && useImprovedMomentumRefit_
+                                               ? runDirectionalRefit(true, 1)
+                                               : DirectionalRefitResult{};
+      auto const oppositeLegPrecisionRefit = produceSplitLegRefits_ && useImprovedMomentumRefit_
+                                                 ? runDirectionalRefit(true, -1)
+                                                 : DirectionalRefitResult{};
       double precisionRelativeToAllQoverP = -1.;
       bool precisionAgreesWithAllHits = true;
       if (precisionRefit.valid && allHitsRefit.valid) {
@@ -1483,7 +1695,7 @@ public:
         auto const constrained = applyTargetConstraint(refit.selected.upstreamState,
                                                        eventSourceSide,
                                                        vacuumPropagator,
-                                                       *targetMaterialPropagator,
+                                                       *sourceFacingTargetMaterialPropagator,
                                                        constraint);
         candidate.constrainedStatus = constrained.status;
         if (constrained.valid) {
@@ -1515,7 +1727,9 @@ public:
       candidate.directionalRefitAllHitsFirstRejected =
           allHitsRefit.inputHits > allHitsRefit.first.hits ? allHitsRefit.inputHits - allHitsRefit.first.hits : 0;
       candidate.directionalRefitAllHitsSecondRejected =
-          allHitsRefit.inputHits > allHitsRefit.second.hits ? allHitsRefit.inputHits - allHitsRefit.second.hits : 0;
+          allHitsRefit.second.valid && allHitsRefit.inputHits > allHitsRefit.second.hits
+              ? allHitsRefit.inputHits - allHitsRefit.second.hits
+              : 0;
       candidate.directionalRefitPrecisionValid = precisionRefit.valid;
       candidate.directionalRefitPrecisionHits = precisionRefit.selected.hits;
       candidate.directionalRefitPrecisionChi2 = precisionRefit.selected.chi2;
@@ -1540,13 +1754,29 @@ public:
           precisionRefit.second.valid ? precisionRefit.second.materialTargetState.momentum.z() : 0.;
       candidate.directionalRefitPrecisionRelativeToAllQoverP = precisionRelativeToAllQoverP;
       candidate.directionalRefitPrecisionTargetDca = precisionTargetDca;
+      candidate.directionalRefitSourceLegPrecisionValid = sourceLegPrecisionRefit.valid;
+      candidate.directionalRefitSourceLegPrecisionHits = sourceLegPrecisionRefit.selected.hits;
+      candidate.directionalRefitSourceLegPrecisionQoverP = sourceLegPrecisionRefit.selected.signedInverseMomentum;
+      candidate.directionalRefitSourceLegPrecisionTargetPt =
+          sourceLegPrecisionRefit.valid ? sourceLegPrecisionRefit.selected.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitSourceLegPrecisionTargetPz =
+          sourceLegPrecisionRefit.valid ? sourceLegPrecisionRefit.selected.materialTargetState.momentum.z() : 0.;
+      candidate.directionalRefitOppositeLegPrecisionValid = oppositeLegPrecisionRefit.valid;
+      candidate.directionalRefitOppositeLegPrecisionHits = oppositeLegPrecisionRefit.selected.hits;
+      candidate.directionalRefitOppositeLegPrecisionQoverP = oppositeLegPrecisionRefit.selected.signedInverseMomentum;
+      candidate.directionalRefitOppositeLegPrecisionTargetPt =
+          oppositeLegPrecisionRefit.valid ? oppositeLegPrecisionRefit.selected.materialTargetState.momentum.perp() : 0.;
+      candidate.directionalRefitOppositeLegPrecisionTargetPz =
+          oppositeLegPrecisionRefit.valid ? oppositeLegPrecisionRefit.selected.materialTargetState.momentum.z() : 0.;
       candidate.directionalRefitPrecisionInput = precisionRefit.inputHits;
       candidate.directionalRefitPrecisionOrderingFallback = precisionRefit.pathOrderingFallbackHits;
       candidate.directionalRefitPrecisionOrderingSpan = precisionRefit.pathOrderingSpan;
       candidate.directionalRefitPrecisionFirstRejected =
           precisionRefit.inputHits > precisionRefit.first.hits ? precisionRefit.inputHits - precisionRefit.first.hits : 0;
       candidate.directionalRefitPrecisionSecondRejected =
-          precisionRefit.inputHits > precisionRefit.second.hits ? precisionRefit.inputHits - precisionRefit.second.hits : 0;
+          precisionRefit.second.valid && precisionRefit.inputHits > precisionRefit.second.hits
+              ? precisionRefit.inputHits - precisionRefit.second.hits
+              : 0;
 
       // Keep the established first/second diagnostic branches tied to the
       // all-hit control fit so this production can compare it directly with
@@ -1581,6 +1811,9 @@ public:
       candidate.directionalRefitUpstreamPt = refit.selected.upstreamPt;
       candidate.directionalRefitUpstreamP = refit.selected.upstreamP;
       candidate.directionalRefitDownstreamP = refit.selected.downstreamP;
+      candidate.directionalRefitSourceFacingSurfaceDistance = refit.selected.sourceFacingSurfaceDistance;
+      candidate.directionalRefitFilterDirectionCosine = refit.selected.filterDirectionCosine;
+      candidate.directionalRefitTargetDirectionCosine = refit.selected.targetDirectionCosine;
       if (refit.selected.upstreamP > 0.)
         candidate.directionalRefitFractionalLossAcrossHits =
             (refit.selected.upstreamP - refit.selected.downstreamP) / refit.selected.upstreamP;
@@ -1777,12 +2010,100 @@ public:
         }
     }
 
+    // MC-only, reconstruction-neutral truth closure diagnostics. Associate a
+    // selected reconstructed row to the primary SimTrack through its already
+    // established GenPart match, then retain the first/last precision SimHit
+    // momenta and propagate the true first-hit state with both target
+    // direction contracts. Missing simulation products leave sentinels and
+    // therefore keep this producer usable on data.
+    std::vector<int> simTruthMatched(selected.size(), 0), simTrackId(selected.size(), -1);
+    std::vector<float> simTrackP(selected.size(), -1.f), simFirstPrecisionHitP(selected.size(), -1.f),
+        simLastPrecisionHitP(selected.size(), -1.f), simLossToFirstPrecisionHit(selected.size(), -1.f),
+        simLossAcrossPrecisionHits(selected.size(), -1.f), simFirstPrecisionPath(selected.size(), -1.f);
+    if (produceMomentumClosureDiagnostics_ && genParticles.isValid() && simTracks.isValid() &&
+        simVertices.isValid()) {
+      std::unordered_map<unsigned int, std::vector<PSimHit const*>> precisionHitsByTrack;
+      auto collectPrecisionHits = [&precisionHitsByTrack](auto const& handle) {
+        if (!handle.isValid())
+          return;
+        for (auto const& hit : *handle)
+          if (std::abs(hit.particleType()) == 13)
+            precisionHitsByTrack[hit.trackId()].push_back(&hit);
+      };
+      collectPrecisionHits(dtSimHits);
+      collectPrecisionHits(cscSimHits);
+      collectPrecisionHits(gemSimHits);
+
+      for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
+        int const genIndex = genPartIdx[selectedIndex];
+        if (genIndex < 0)
+          continue;
+        auto const& gen = (*genParticles)[genIndex];
+        SimTrack const* matchedSimTrack = nullptr;
+        double bestScore = std::numeric_limits<double>::infinity();
+        for (auto const& simTrack : *simTracks) {
+          if (simTrack.type() != gen.pdgId() || simTrack.vertIndex() < 0 ||
+              static_cast<std::size_t>(simTrack.vertIndex()) >= simVertices->size() ||
+              !(simTrack.momentum().P() > 0.) || !(gen.p() > 0.))
+            continue;
+          GlobalVector const simDirection(
+              simTrack.momentum().px(), simTrack.momentum().py(), simTrack.momentum().pz());
+          GlobalVector const genDirection(gen.px(), gen.py(), gen.pz());
+          double const directionDot = simDirection.unit().dot(genDirection.unit());
+          double const angle = std::acos(std::clamp(directionDot, -1., 1.));
+          double const relativeMomentum = std::abs(std::log(simTrack.momentum().P() / gen.p()));
+          double const score = angle + relativeMomentum;
+          if (score < bestScore) {
+            bestScore = score;
+            matchedSimTrack = &simTrack;
+          }
+        }
+        if (!matchedSimTrack || bestScore > 0.1)
+          continue;
+        auto hitIt = precisionHitsByTrack.find(matchedSimTrack->trackId());
+        if (hitIt == precisionHitsByTrack.end() || hitIt->second.empty())
+          continue;
+        auto const& simVertex = (*simVertices)[matchedSimTrack->vertIndex()];
+        GlobalPoint const vertexPosition(simVertex.position().x(), simVertex.position().y(), simVertex.position().z());
+        GlobalVector const truthMomentum(matchedSimTrack->momentum().px(),
+                                         matchedSimTrack->momentum().py(),
+                                         matchedSimTrack->momentum().pz());
+        auto pathFromVertex = [&trackingGeometry, &vertexPosition, &truthMomentum](PSimHit const* hit) {
+          auto const* det = trackingGeometry.idToDetUnit(DetId(hit->detUnitId()));
+          if (!det)
+            return std::numeric_limits<double>::infinity();
+          return static_cast<double>(
+              (det->surface().toGlobal(hit->entryPoint()) - vertexPosition).dot(truthMomentum.unit()));
+        };
+        auto& hits = hitIt->second;
+        std::sort(hits.begin(), hits.end(), [&pathFromVertex](PSimHit const* first, PSimHit const* second) {
+          return pathFromVertex(first) < pathFromVertex(second);
+        });
+        auto const* firstHit = hits.front();
+        auto const* lastHit = hits.back();
+        auto const* firstDet = trackingGeometry.idToDetUnit(DetId(firstHit->detUnitId()));
+        if (!firstDet || !(firstHit->pabs() > 0.) || !(lastHit->pabs() > 0.))
+          continue;
+        simTruthMatched[selectedIndex] = 1;
+        simTrackId[selectedIndex] = matchedSimTrack->trackId();
+        simTrackP[selectedIndex] = matchedSimTrack->momentum().P();
+        simFirstPrecisionHitP[selectedIndex] = firstHit->pabs();
+        simLastPrecisionHitP[selectedIndex] = lastHit->pabs();
+        simLossToFirstPrecisionHit[selectedIndex] =
+            (matchedSimTrack->momentum().P() - firstHit->pabs()) / matchedSimTrack->momentum().P();
+        simLossAcrossPrecisionHits[selectedIndex] = (firstHit->pabs() - lastHit->pabs()) / firstHit->pabs();
+        simFirstPrecisionPath[selectedIndex] = pathFromVertex(firstHit);
+      }
+    }
+
     std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, preRefitPt,
         constrainedPt, constrainedEta, constrainedPhi, constrainedMass, constrainedP, constrainedPx,
         constrainedPy, constrainedPz, constrainedVx, constrainedVy, constrainedVz, constrainedChi2,
         constrainedNdof, constrainedTargetChi2,
         preRefitPz, directionalRefitUpstreamPt, directionalRefitUpstreamP, directionalRefitDownstreamP,
-        directionalRefitFractionalLossAcrossHits, directionalRefitChi2, directionalRefitNdof,
+        directionalRefitFractionalLossAcrossHits, directionalRefitSourceFacingSurfaceDistance,
+        directionalRefitFilterDirectionCosine, directionalRefitTargetDirectionCosine,
+        directionalRefitChi2, directionalRefitNdof,
         directionalRefitFirstChi2, directionalRefitFirstNdof, directionalRefitFirstUpstreamPt,
         directionalRefitFirstQoverP,
         directionalRefitFirstTargetPt, directionalRefitFirstTargetPz, directionalRefitSecondChi2,
@@ -1799,6 +2120,9 @@ public:
         directionalRefitPrecisionFirstTargetPt, directionalRefitPrecisionFirstTargetPz,
         directionalRefitPrecisionSecondTargetPt, directionalRefitPrecisionSecondTargetPz,
         directionalRefitPrecisionRelativeToAllQoverP, directionalRefitPrecisionTargetDca,
+        directionalRefitSourceLegPrecisionQoverP, directionalRefitSourceLegPrecisionTargetPt,
+        directionalRefitSourceLegPrecisionTargetPz, directionalRefitOppositeLegPrecisionQoverP,
+        directionalRefitOppositeLegPrecisionTargetPt, directionalRefitOppositeLegPrecisionTargetPz,
         ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
@@ -1816,7 +2140,9 @@ public:
         directionalRefitAllHitsOrderingFallback, directionalRefitAllHitsFirstRejected,
         directionalRefitAllHitsSecondRejected, directionalRefitPrecisionInput,
         directionalRefitPrecisionOrderingFallback, directionalRefitPrecisionFirstRejected,
-        directionalRefitPrecisionSecondRejected;
+        directionalRefitPrecisionSecondRejected, directionalRefitSourceLegPrecisionValid,
+        directionalRefitSourceLegPrecisionHits, directionalRefitOppositeLegPrecisionValid,
+        directionalRefitOppositeLegPrecisionHits;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -1881,6 +2207,9 @@ public:
       directionalRefitUpstreamP.push_back(candidate->directionalRefitUpstreamP);
       directionalRefitDownstreamP.push_back(candidate->directionalRefitDownstreamP);
       directionalRefitFractionalLossAcrossHits.push_back(candidate->directionalRefitFractionalLossAcrossHits);
+      directionalRefitSourceFacingSurfaceDistance.push_back(candidate->directionalRefitSourceFacingSurfaceDistance);
+      directionalRefitFilterDirectionCosine.push_back(candidate->directionalRefitFilterDirectionCosine);
+      directionalRefitTargetDirectionCosine.push_back(candidate->directionalRefitTargetDirectionCosine);
       directionalRefitAttempted.push_back(candidate->directionalRefitAttempted);
       directionalRefitValid.push_back(candidate->directionalRefitValid);
       directionalRefitHits.push_back(candidate->directionalRefitHits);
@@ -1956,6 +2285,18 @@ public:
       directionalRefitPrecisionRelativeToAllQoverP.push_back(
           candidate->directionalRefitPrecisionRelativeToAllQoverP);
       directionalRefitPrecisionTargetDca.push_back(candidate->directionalRefitPrecisionTargetDca);
+      directionalRefitSourceLegPrecisionValid.push_back(candidate->directionalRefitSourceLegPrecisionValid);
+      directionalRefitSourceLegPrecisionHits.push_back(candidate->directionalRefitSourceLegPrecisionHits);
+      directionalRefitSourceLegPrecisionQoverP.push_back(candidate->directionalRefitSourceLegPrecisionQoverP);
+      directionalRefitSourceLegPrecisionTargetPt.push_back(candidate->directionalRefitSourceLegPrecisionTargetPt);
+      directionalRefitSourceLegPrecisionTargetPz.push_back(candidate->directionalRefitSourceLegPrecisionTargetPz);
+      directionalRefitOppositeLegPrecisionValid.push_back(candidate->directionalRefitOppositeLegPrecisionValid);
+      directionalRefitOppositeLegPrecisionHits.push_back(candidate->directionalRefitOppositeLegPrecisionHits);
+      directionalRefitOppositeLegPrecisionQoverP.push_back(candidate->directionalRefitOppositeLegPrecisionQoverP);
+      directionalRefitOppositeLegPrecisionTargetPt.push_back(
+          candidate->directionalRefitOppositeLegPrecisionTargetPt);
+      directionalRefitOppositeLegPrecisionTargetPz.push_back(
+          candidate->directionalRefitOppositeLegPrecisionTargetPz);
       ptError.push_back(track.ptError());
       etaError.push_back(track.etaError());
       phiError.push_back(track.phiError());
@@ -2052,6 +2393,15 @@ public:
     table->addColumn<float>("directionalRefitFractionalLossAcrossHits",
                             directionalRefitFractionalLossAcrossHits,
                             "fitted fractional momentum loss from the source-facing to downstream hit state");
+    table->addColumn<float>("directionalRefitSourceFacingSurfaceDistance",
+                            directionalRefitSourceFacingSurfaceDistance,
+                            "distance in cm between the selected source-facing smoother state and first fit-hit surface");
+    table->addColumn<float>("directionalRefitFilterDirectionCosine",
+                            directionalRefitFilterDirectionCosine,
+                            "cosine between source-to-downstream state displacement and source-facing momentum");
+    table->addColumn<float>("directionalRefitTargetDirectionCosine",
+                            directionalRefitTargetDirectionCosine,
+                            "cosine of source-facing momentum along the target-side z direction; valid refits are negative");
     table->addColumn<int>("directionalRefitAttempted",
                           directionalRefitAttempted,
                           "1 when the timing/inferred-direction Kalman refit was attempted");
@@ -2242,6 +2592,36 @@ public:
     table->addColumn<float>("directionalRefitPrecisionTargetDca",
                             directionalRefitPrecisionTargetDca,
                             "precision-only selected-state transverse DCA to the target line in cm");
+    table->addColumn<int>("directionalRefitSourceLegPrecisionValid",
+                          directionalRefitSourceLegPrecisionValid,
+                          "diagnostic source-side-only precision refit validity");
+    table->addColumn<int>("directionalRefitSourceLegPrecisionHits",
+                          directionalRefitSourceLegPrecisionHits,
+                          "hits in the diagnostic source-side-only precision refit");
+    table->addColumn<float>("directionalRefitSourceLegPrecisionQoverP",
+                            directionalRefitSourceLegPrecisionQoverP,
+                            "source-facing signed inverse momentum from the source-side-only precision refit");
+    table->addColumn<float>("directionalRefitSourceLegPrecisionTargetPt",
+                            directionalRefitSourceLegPrecisionTargetPt,
+                            "target-line pT from the source-side-only precision refit");
+    table->addColumn<float>("directionalRefitSourceLegPrecisionTargetPz",
+                            directionalRefitSourceLegPrecisionTargetPz,
+                            "target-line pz from the source-side-only precision refit");
+    table->addColumn<int>("directionalRefitOppositeLegPrecisionValid",
+                          directionalRefitOppositeLegPrecisionValid,
+                          "diagnostic opposite-side-only precision refit validity");
+    table->addColumn<int>("directionalRefitOppositeLegPrecisionHits",
+                          directionalRefitOppositeLegPrecisionHits,
+                          "hits in the diagnostic opposite-side-only precision refit");
+    table->addColumn<float>("directionalRefitOppositeLegPrecisionQoverP",
+                            directionalRefitOppositeLegPrecisionQoverP,
+                            "source-facing signed inverse momentum from the opposite-side-only precision refit");
+    table->addColumn<float>("directionalRefitOppositeLegPrecisionTargetPt",
+                            directionalRefitOppositeLegPrecisionTargetPt,
+                            "target-line pT from the opposite-side-only precision refit");
+    table->addColumn<float>("directionalRefitOppositeLegPrecisionTargetPz",
+                            directionalRefitOppositeLegPrecisionTargetPz,
+                            "target-line pz from the opposite-side-only precision refit");
     table->addColumn<int>("directionalRefitPrecisionInput",
                           directionalRefitPrecisionInput,
                           "valid DT, CSC, and GEM hits supplied to the precision refit");
@@ -2310,6 +2690,23 @@ public:
     table->addColumn<int>("genPartIdx", genPartIdx, "index in GenPart, or -1 when unmatched or on data");
     table->addColumn<float>(
         "genPartDeltaR", genPartDeltaR, "direction-ambiguous deltaR to matched GenPart, or -1 when unmatched/on data");
+    table->addColumn<int>("simTruthMatched",
+                          simTruthMatched,
+                          "MC closure diagnostic: selected row matched to a primary SimTrack with precision SimHits");
+    table->addColumn<int>("simTrackId", simTrackId, "matched Geant4 SimTrack id, or -1");
+    table->addColumn<float>("simTrackP", simTrackP, "matched SimTrack momentum at the production vertex");
+    table->addColumn<float>(
+        "simFirstPrecisionHitP", simFirstPrecisionHitP, "true momentum at the first source-facing precision SimHit");
+    table->addColumn<float>(
+        "simLastPrecisionHitP", simLastPrecisionHitP, "true momentum at the last precision SimHit");
+    table->addColumn<float>("simLossToFirstPrecisionHit",
+                            simLossToFirstPrecisionHit,
+                            "true fractional momentum loss from production to the first precision SimHit");
+    table->addColumn<float>("simLossAcrossPrecisionHits",
+                            simLossAcrossPrecisionHits,
+                            "true fractional momentum loss between first and last precision SimHits");
+    table->addColumn<float>(
+        "simFirstPrecisionPath", simFirstPrecisionPath, "projected path from SimVertex to first precision SimHit in cm");
     event.put(std::move(table));
 
     // Fit every cleaned pair directly from its retained source tracks.  The
@@ -2317,11 +2714,19 @@ public:
     // depend on keeping any of the input collections in NanoAOD.
     std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
     std::vector<int> vertexDcaStatus, vertexKalmanAttempted, vertexKalmanValid, vertexUsesLineFallback,
-        vertexSameGenMuon, vertexGenIsOS;
+        vertexSameGenMuon, vertexGenIsOS, vertexConstrainedValid, vertexConstrainedDcaStatus,
+        vertexConstrainedUsesLineFallback, vertexIsCosmicCosmic, vertexIsCosmicDSA, vertexIsCosmicTraversing,
+        vertexIsCosmicDoubleTraversing, vertexIsDSADSA, vertexIsDSATraversing, vertexIsDSADoubleTraversing,
+        vertexIsTraversingTraversing, vertexIsTraversingDoubleTraversing, vertexIsDoubleTraversingDoubleTraversing;
     std::vector<float> vertexVx, vertexVy, vertexVz, vertexVxError, vertexVyError, vertexVzError, vertexChi2,
         vertexNdof, vertexNormalizedChi2, vertexProbability, vertexMass, vertexPt, vertexEta, vertexPhi, vertexPz,
         vertexDca, vertexDcaX, vertexDcaY, vertexDcaZ, vertexOriginCompatibilityChi2,
-        vertexOriginCompatibilityNormalizedChi2;
+        vertexOriginCompatibilityNormalizedChi2, vertexConstrainedVx, vertexConstrainedVy, vertexConstrainedVz,
+        vertexConstrainedVxError, vertexConstrainedVyError, vertexConstrainedVzError, vertexConstrainedChi2,
+        vertexConstrainedNdof, vertexConstrainedNormalizedChi2, vertexConstrainedProbability,
+        vertexConstrainedMass, vertexConstrainedPt, vertexConstrainedEta, vertexConstrainedPhi, vertexConstrainedPz,
+        vertexConstrainedDca, vertexConstrainedDcaX, vertexConstrainedDcaY, vertexConstrainedDcaZ,
+        vertexConstrainedOriginCompatibilityChi2, vertexConstrainedOriginCompatibilityNormalizedChi2;
     constexpr double muonMass = 0.105658;
 
     struct PairChoice {
@@ -2448,12 +2853,122 @@ public:
       vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
                                       : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
       vertexPhi.push_back(std::atan2(pairPy, pairPx));
+
+      // The pair identity is fixed by the unconstrained reconstruction above.
+      // Build exactly one alternative from the two constrained muon states;
+      // deliberately do not create constrained-unconstrained combinations.
+      bool const bothConstrained = selected[first]->constrainedValid && selected[second]->constrainedValid;
+      StraightLineApproach constrainedApproach{};
+      CommonLineVertex constrainedFit{};
+      if (bothConstrained) {
+        constrainedApproach =
+            straightLineApproach(selected[first]->constrainedState, selected[second]->constrainedState);
+        constrainedFit = commonLineVertex(selected[first]->constrainedState,
+                                          selected[second]->constrainedState,
+                                          commonVertexLineResolution_,
+                                          commonVertexBeamLineResolution_);
+      }
+      bool const constrainedValid = bothConstrained && constrainedApproach.valid && constrainedFit.valid;
+      vertexConstrainedValid.push_back(constrainedValid);
+      vertexConstrainedUsesLineFallback.push_back(constrainedValid);
+      vertexConstrainedDcaStatus.push_back(constrainedApproach.valid);
+      vertexConstrainedVx.push_back(constrainedValid ? constrainedFit.position.x() : 0.);
+      vertexConstrainedVy.push_back(constrainedValid ? constrainedFit.position.y() : 0.);
+      vertexConstrainedVz.push_back(constrainedValid ? constrainedFit.position.z() : 0.);
+      vertexConstrainedVxError.push_back(constrainedValid ? constrainedFit.error[0] : 0.);
+      vertexConstrainedVyError.push_back(constrainedValid ? constrainedFit.error[1] : 0.);
+      vertexConstrainedVzError.push_back(constrainedValid ? constrainedFit.error[2] : 0.);
+      vertexConstrainedChi2.push_back(constrainedValid ? constrainedFit.chi2 : 0.);
+      vertexConstrainedNdof.push_back(constrainedValid ? constrainedFit.ndof : 0.);
+      vertexConstrainedNormalizedChi2.push_back(constrainedValid ? constrainedFit.chi2 / constrainedFit.ndof : 0.);
+      vertexConstrainedProbability.push_back(
+          constrainedValid ? ChiSquaredProbability(constrainedFit.chi2, constrainedFit.ndof) : 0.);
+      vertexConstrainedDca.push_back(constrainedApproach.valid ? constrainedApproach.distance : 0.);
+      vertexConstrainedDcaX.push_back(constrainedApproach.valid ? constrainedApproach.midpoint.x() : 0.);
+      vertexConstrainedDcaY.push_back(constrainedApproach.valid ? constrainedApproach.midpoint.y() : 0.);
+      vertexConstrainedDcaZ.push_back(constrainedApproach.valid ? constrainedApproach.midpoint.z() : 0.);
+
+      double constrainedOriginChi2 = 0.;
+      if (bothConstrained) {
+        auto const& constrainedFirstOrigin = selected[first]->constrainedState.position;
+        auto const& constrainedSecondOrigin = selected[second]->constrainedState.position;
+        double const constrainedDeltaX = constrainedFirstOrigin.x() - constrainedSecondOrigin.x();
+        double const constrainedDeltaY = constrainedFirstOrigin.y() - constrainedSecondOrigin.y();
+        double const constrainedDeltaZ = constrainedFirstOrigin.z() - constrainedSecondOrigin.z();
+        constrainedOriginChi2 =
+            (constrainedDeltaX * constrainedDeltaX + constrainedDeltaY * constrainedDeltaY) /
+                (2. * originTransverseResolution_ * originTransverseResolution_) +
+            constrainedDeltaZ * constrainedDeltaZ / (2. * originZResolution_ * originZResolution_);
+      }
+      vertexConstrainedOriginCompatibilityChi2.push_back(constrainedOriginChi2);
+      vertexConstrainedOriginCompatibilityNormalizedChi2.push_back(constrainedOriginChi2 / 3.);
+
+      if (bothConstrained) {
+        auto const& constrainedFirstMomentum = selected[first]->constrainedState.momentum;
+        auto const& constrainedSecondMomentum = selected[second]->constrainedState.momentum;
+        double const constrainedPairPx = constrainedFirstMomentum.x() + constrainedSecondMomentum.x();
+        double const constrainedPairPy = constrainedFirstMomentum.y() + constrainedSecondMomentum.y();
+        double const constrainedPairPz = constrainedFirstMomentum.z() + constrainedSecondMomentum.z();
+        double const constrainedPairPt = std::hypot(constrainedPairPx, constrainedPairPy);
+        double const constrainedFirstEnergy = std::sqrt(constrainedFirstMomentum.mag2() + muonMass * muonMass);
+        double const constrainedSecondEnergy = std::sqrt(constrainedSecondMomentum.mag2() + muonMass * muonMass);
+        double const constrainedMass2 = std::pow(constrainedFirstEnergy + constrainedSecondEnergy, 2) -
+                                        constrainedPairPx * constrainedPairPx -
+                                        constrainedPairPy * constrainedPairPy -
+                                        constrainedPairPz * constrainedPairPz;
+        vertexConstrainedMass.push_back(std::sqrt(std::max(0., constrainedMass2)));
+        vertexConstrainedPt.push_back(constrainedPairPt);
+        vertexConstrainedPz.push_back(constrainedPairPz);
+        vertexConstrainedEta.push_back(
+            constrainedPairPt > 0. ? std::asinh(constrainedPairPz / constrainedPairPt)
+                                   : std::copysign(std::numeric_limits<float>::infinity(), constrainedPairPz));
+        vertexConstrainedPhi.push_back(std::atan2(constrainedPairPy, constrainedPairPx));
+      } else {
+        vertexConstrainedMass.push_back(0.);
+        vertexConstrainedPt.push_back(0.);
+        vertexConstrainedPz.push_back(0.);
+        vertexConstrainedEta.push_back(0.);
+        vertexConstrainedPhi.push_back(0.);
+      }
+
+      int const lowQuality = std::min(quality[first], quality[second]);
+      int const highQuality = std::max(quality[first], quality[second]);
+      vertexIsCosmicCosmic.push_back(lowQuality == 0 && highQuality == 0);
+      vertexIsCosmicDSA.push_back(lowQuality == 0 && highQuality == 1);
+      vertexIsCosmicTraversing.push_back(lowQuality == 0 && highQuality == 2);
+      vertexIsCosmicDoubleTraversing.push_back(lowQuality == 0 && highQuality == 3);
+      vertexIsDSADSA.push_back(lowQuality == 1 && highQuality == 1);
+      vertexIsDSATraversing.push_back(lowQuality == 1 && highQuality == 2);
+      vertexIsDSADoubleTraversing.push_back(lowQuality == 1 && highQuality == 3);
+      vertexIsTraversingTraversing.push_back(lowQuality == 2 && highQuality == 2);
+      vertexIsTraversingDoubleTraversing.push_back(lowQuality == 2 && highQuality == 3);
+      vertexIsDoubleTraversingDoubleTraversing.push_back(lowQuality == 3 && highQuality == 3);
     }
 
     auto vertexTable = std::make_unique<nanoaod::FlatTable>(vertexMuonIdx1.size(), "ShiftDimuonVertex", false, false);
     vertexTable->addColumn<int>("muonIdx1", vertexMuonIdx1, "index of first muon in ShiftMuon");
     vertexTable->addColumn<int>("muonIdx2", vertexMuonIdx2, "index of second muon in ShiftMuon");
     vertexTable->addColumn<int>("isOS", vertexIsOS, "1 for an opposite-sign pair");
+    vertexTable->addColumn<int>("isCosmicCosmic", vertexIsCosmicCosmic, "both muons have quality 0 (cosmic)");
+    vertexTable->addColumn<int>("isCosmicDSA", vertexIsCosmicDSA, "one cosmic and one DSA muon");
+    vertexTable->addColumn<int>("isCosmicTraversing", vertexIsCosmicTraversing, "one cosmic and one traversing muon");
+    vertexTable->addColumn<int>("isCosmicDoubleTraversing",
+                                vertexIsCosmicDoubleTraversing,
+                                "one cosmic and one full-lever-arm traversing muon");
+    vertexTable->addColumn<int>("isDSADSA", vertexIsDSADSA, "both muons have quality 1 (DSA)");
+    vertexTable->addColumn<int>("isDSATraversing", vertexIsDSATraversing, "one DSA and one traversing muon");
+    vertexTable->addColumn<int>("isDSADoubleTraversing",
+                                vertexIsDSADoubleTraversing,
+                                "one DSA and one full-lever-arm traversing muon");
+    vertexTable->addColumn<int>("isTraversingTraversing",
+                                vertexIsTraversingTraversing,
+                                "both muons have quality 2 (traversing)");
+    vertexTable->addColumn<int>("isTraversingDoubleTraversing",
+                                vertexIsTraversingDoubleTraversing,
+                                "one traversing and one full-lever-arm traversing muon");
+    vertexTable->addColumn<int>("isDoubleTraversingDoubleTraversing",
+                                vertexIsDoubleTraversingDoubleTraversing,
+                                "both muons have quality 3 (full-lever-arm traversing)");
     vertexTable->addColumn<int>(
         "kalmanAttempted", vertexKalmanAttempted, "1 when the pair lies inside safe transient-track propagation range");
     vertexTable->addColumn<int>("sameGenMuon",
@@ -2493,6 +3008,44 @@ public:
     vertexTable->addColumn<float>("pz", vertexPz, "dimuon longitudinal momentum");
     vertexTable->addColumn<float>("eta", vertexEta, "dimuon pseudorapidity");
     vertexTable->addColumn<float>("phi", vertexPhi, "dimuon azimuthal angle");
+    vertexTable->addColumn<int>("constrainedValid",
+                                vertexConstrainedValid,
+                                "1 when both constrained muon fits and the constrained common-line fit are valid");
+    vertexTable->addColumn<int>("constrainedUsesLineFallback",
+                                vertexConstrainedUsesLineFallback,
+                                "1 when constrained position comes from the common-line fit");
+    vertexTable->addColumn<float>("constrainedVx", vertexConstrainedVx, "constrained common-line vertex x");
+    vertexTable->addColumn<float>("constrainedVy", vertexConstrainedVy, "constrained common-line vertex y");
+    vertexTable->addColumn<float>("constrainedVz", vertexConstrainedVz, "constrained common-line vertex z");
+    vertexTable->addColumn<float>("constrainedVxErr", vertexConstrainedVxError, "constrained vertex x uncertainty");
+    vertexTable->addColumn<float>("constrainedVyErr", vertexConstrainedVyError, "constrained vertex y uncertainty");
+    vertexTable->addColumn<float>("constrainedVzErr", vertexConstrainedVzError, "constrained vertex z uncertainty");
+    vertexTable->addColumn<float>("constrainedChi2", vertexConstrainedChi2, "constrained common-line fit chi2");
+    vertexTable->addColumn<float>("constrainedNdof", vertexConstrainedNdof, "constrained common-line fit degrees of freedom");
+    vertexTable->addColumn<float>("constrainedNormalizedChi2",
+                                  vertexConstrainedNormalizedChi2,
+                                  "constrained common-line chi2 divided by ndof");
+    vertexTable->addColumn<float>("constrainedProbability",
+                                  vertexConstrainedProbability,
+                                  "constrained common-line fit probability");
+    vertexTable->addColumn<float>("constrainedOriginCompatibilityChi2",
+                                  vertexConstrainedOriginCompatibilityChi2,
+                                  "compatibility chi2 of the two constrained ShiftMuon origins");
+    vertexTable->addColumn<float>("constrainedOriginCompatibilityNormalizedChi2",
+                                  vertexConstrainedOriginCompatibilityNormalizedChi2,
+                                  "constrained-origin compatibility chi2 divided by three");
+    vertexTable->addColumn<int>("constrainedDcaValid",
+                                vertexConstrainedDcaStatus,
+                                "1 when the constrained two-track DCA calculation succeeded");
+    vertexTable->addColumn<float>("constrainedDca", vertexConstrainedDca, "constrained three-dimensional DCA");
+    vertexTable->addColumn<float>("constrainedDcaX", vertexConstrainedDcaX, "constrained DCA midpoint x");
+    vertexTable->addColumn<float>("constrainedDcaY", vertexConstrainedDcaY, "constrained DCA midpoint y");
+    vertexTable->addColumn<float>("constrainedDcaZ", vertexConstrainedDcaZ, "constrained DCA midpoint z");
+    vertexTable->addColumn<float>("constrainedMass", vertexConstrainedMass, "dimuon mass from two constrained muons");
+    vertexTable->addColumn<float>("constrainedPt", vertexConstrainedPt, "dimuon pT from two constrained muons");
+    vertexTable->addColumn<float>("constrainedPz", vertexConstrainedPz, "dimuon pz from two constrained muons");
+    vertexTable->addColumn<float>("constrainedEta", vertexConstrainedEta, "dimuon eta from two constrained muons");
+    vertexTable->addColumn<float>("constrainedPhi", vertexConstrainedPhi, "dimuon phi from two constrained muons");
     event.put(std::move(vertexTable), "ShiftDimuonVertex");
   }
 
@@ -2502,6 +3055,11 @@ public:
     description.add<edm::InputTag>("cosmicTracks", edm::InputTag("shiftCosmicMuons"));
     description.add<edm::InputTag>("traversingTracks", edm::InputTag("shiftTraversingMuons"));
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
+    description.add<edm::InputTag>("simTracks", edm::InputTag("g4SimHits"));
+    description.add<edm::InputTag>("simVertices", edm::InputTag("g4SimHits"));
+    description.add<edm::InputTag>("dtSimHits", edm::InputTag("g4SimHits", "MuonDTHits"));
+    description.add<edm::InputTag>("cscSimHits", edm::InputTag("g4SimHits", "MuonCSCHits"));
+    description.add<edm::InputTag>("gemSimHits", edm::InputTag("g4SimHits", "MuonGEMHits"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
@@ -2512,19 +3070,25 @@ public:
     description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother", false);
+    description.add<bool>("directionalRefitUseGeometryTargetMaterialEffects", false);
     description.add<double>("directionalRefitGeometryMaterialStepCm", 1.0);
     description.add<bool>("directionalRefitLogGeometryMaterialComparison", false);
     description.add<bool>("usePropagatedPathOrdering", false);
     description.add<bool>("directionalRefitUseFullSeedErrorRescale", false);
     description.add<double>("directionalRefitSeedCurvatureErrorRescale", 100.0);
+    description.add<double>("directionalRefitSecondSeedErrorRescale", 100.0);
     description.add<double>("directionalRefitSeedMomentumScale", 1.0);
     description.add<double>("directionalRefitEnergyLossScale", 1.0);
     description.add<double>("directionalRefitErrorRescale", 10.0);
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
+    description.add<bool>("directionalRefitUseSecondIteration", false);
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
     description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.5);
+    description.add<bool>("produceMomentumClosureDiagnostics", false);
+    description.add<bool>("produceSplitLegRefits", false);
+    description.add<bool>("directionalRefitUseExplicitBackwardTargetPropagation", false);
     description.add<bool>("produceTargetConstrainedMomentum", true);
     description.add<bool>("targetUseInferredSide", true);
     description.add<double>("targetX", 0.0);
@@ -2558,6 +3122,11 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> cosmicToken_;
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
+  edm::EDGetTokenT<edm::SimTrackContainer> simTracksToken_;
+  edm::EDGetTokenT<edm::SimVertexContainer> simVerticesToken_;
+  edm::EDGetTokenT<edm::PSimHitContainer> dtSimHitsToken_;
+  edm::EDGetTokenT<edm::PSimHitContainer> cscSimHitsToken_;
+  edm::EDGetTokenT<edm::PSimHitContainer> gemSimHitsToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
@@ -2570,19 +3139,25 @@ private:
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;
   bool directionalRefitUseGeometryMaterialEffectsInSmoother_;
+  bool directionalRefitUseGeometryTargetMaterialEffects_;
   double directionalRefitGeometryMaterialStepCm_;
   bool directionalRefitLogGeometryMaterialComparison_;
   bool usePropagatedPathOrdering_;
   bool directionalRefitUseFullSeedErrorRescale_;
   double directionalRefitSeedCurvatureErrorRescale_;
+  double directionalRefitSecondSeedErrorRescale_;
   double directionalRefitSeedMomentumScale_;
   double directionalRefitEnergyLossScale_;
   double directionalRefitErrorRescale_;
   double directionalRefitInitialMaxHitChi2_;
   double directionalRefitMaxHitChi2_;
   double directionalRefitMaxRelativeQoverPChange_;
+  bool directionalRefitUseSecondIteration_;
   unsigned int directionalRefitMinPrecisionStations_;
   double directionalRefitMaxPrecisionRelativeQoverPChange_;
+  bool produceMomentumClosureDiagnostics_;
+  bool produceSplitLegRefits_;
+  bool directionalRefitUseExplicitBackwardTargetPropagation_;
   bool produceTargetConstrainedMomentum_;
   bool targetUseInferredSide_;
   double targetX_;

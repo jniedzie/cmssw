@@ -10,6 +10,7 @@ def customise(
     directionalRefitUseGeometryMaterialEffects=None,
     directionalRefitUseGeometryMaterialEffectsInFitter=None,
     directionalRefitUseGeometryMaterialEffectsInSmoother=None,
+    directionalRefitUseGeometryTargetMaterialEffects=None,
 ):
     process = addShiftMuonSegments(
         process,
@@ -17,6 +18,7 @@ def customise(
         directionalRefitUseGeometryMaterialEffects=directionalRefitUseGeometryMaterialEffects,
         directionalRefitUseGeometryMaterialEffectsInFitter=directionalRefitUseGeometryMaterialEffectsInFitter,
         directionalRefitUseGeometryMaterialEffectsInSmoother=directionalRefitUseGeometryMaterialEffectsInSmoother,
+        directionalRefitUseGeometryTargetMaterialEffects=directionalRefitUseGeometryTargetMaterialEffects,
     )
     # Standard NanoAOD already provides every generator quantity used by the
     # SHIFT TEA analysis except pz and the production vertex.  Add only those
