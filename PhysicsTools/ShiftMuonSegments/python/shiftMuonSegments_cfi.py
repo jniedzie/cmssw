@@ -79,6 +79,19 @@ shiftMuonTable = cms.EDProducer(
     # Reject a precision-only solution that is incompatible with the all-hit
     # curvature; its diagnostic branches are still retained.
     directionalRefitMaxPrecisionRelativeQoverPChange=cms.double(0.5),
+    # Preserve the detector-only result and additionally form a prompt-target
+    # hypothesis by updating the independently smoothed detector state with an
+    # x/y measurement on the configured target plane.  The 50 cm z width
+    # matches Beams:sigmaVertexZ in the current production and is projected
+    # into x/y by the fitted track slopes.
+    produceTargetConstrainedMomentum=cms.bool(True),
+    targetUseInferredSide=cms.bool(True),
+    targetX=cms.double(0.0),
+    targetY=cms.double(0.0),
+    targetZ=cms.double(14800.0),
+    targetSigmaX=cms.double(0.1),
+    targetSigmaY=cms.double(0.1),
+    targetSigmaZ=cms.double(50.0),
     minSharedHitFraction=cms.double(0.5),
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),
