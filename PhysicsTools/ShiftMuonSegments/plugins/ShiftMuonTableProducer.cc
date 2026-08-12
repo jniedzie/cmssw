@@ -23,6 +23,7 @@
 #include "FWCore/Utilities/interface/ESInputTag.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "RecoTracker/TransientTrackingRecHit/interface/TkClonerImpl.h"
+#include "RecoTracker/TransientTrackingRecHit/interface/TRecHit2DPosConstraint.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
 #include "TrackingTools/KalmanUpdators/interface/Chi2MeasurementEstimator.h"
 #include "TrackingTools/KalmanUpdators/interface/KFUpdator.h"
@@ -365,6 +366,13 @@ namespace {
     double directionalRefitPrecisionSecondTargetPz = 0.;
     double directionalRefitPrecisionRelativeToAllQoverP = -1.;
     double directionalRefitPrecisionTargetDca = -1.;
+    bool constrainedValid = false;
+    unsigned int constrainedHits = 0;
+    double constrainedChi2 = 0.;
+    double constrainedNdof = 0.;
+    double constrainedTargetChi2 = -1.;
+    int constrainedStatus = 0;
+    PropagatedState constrainedState;
   };
 
   struct MuonHitTopology {
@@ -511,6 +519,7 @@ namespace {
 
   struct RefitIterationResult {
     bool valid = false;
+    int status = 0;
     unsigned int hits = 0;
     double chi2 = 0.;
     double ndof = 0.;
@@ -523,8 +532,99 @@ namespace {
     PropagatedState vacuumTargetState;
   };
 
+  struct TargetConstraint {
+    GlobalPoint position;
+    double sigmaX = 0.;
+    double sigmaY = 0.;
+    double sigmaZ = 0.;
+  };
+
+  struct TargetConstraintResult {
+    bool valid = false;
+    int status = 0;
+    double chi2 = -1.;
+    PropagatedState state;
+  };
+
+  TargetConstraintResult applyTargetConstraint(TrajectoryStateOnSurface const& upstream,
+                                               int sourceSide,
+                                               Propagator const& vacuumPropagator,
+                                               Propagator const& materialPropagator,
+                                               TargetConstraint const& constraint) {
+    TargetConstraintResult result;
+    if (!upstream.isValid() || !upstream.freeState()) {
+      result.status = -1;
+      return result;
+    }
+
+    FreeTrajectoryState transported = *upstream.freeState();
+    constexpr double materialBoundaryZ = 1100.;
+    if (sourceSide != 0 && sourceSide * transported.position().z() < materialBoundaryZ) {
+      auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryZ), Surface::RotationType());
+      auto const toBoundary = materialPropagator.propagate(transported, *boundary);
+      if (!toBoundary.isValid() || !toBoundary.freeState()) {
+        result.status = -2;
+        return result;
+      }
+      transported = *toBoundary.freeState();
+    }
+
+    auto const targetPlane = Plane::build(constraint.position, Surface::RotationType());
+    auto const predicted = vacuumPropagator.propagate(transported, *targetPlane);
+    if (!predicted.isValid() || !predicted.freeState()) {
+      result.status = -3;
+      return result;
+    }
+    auto const momentum = predicted.globalMomentum();
+    if (!(constraint.sigmaX > 0.) || !(constraint.sigmaY > 0.) || !(constraint.sigmaZ >= 0.) ||
+        std::abs(momentum.z()) < 1.e-9) {
+      result.status = -4;
+      return result;
+    }
+    double const slopeX = momentum.x() / momentum.z();
+    double const slopeY = momentum.y() / momentum.z();
+    double const sigmaZ2 = constraint.sigmaZ * constraint.sigmaZ;
+    double const hitXX = constraint.sigmaX * constraint.sigmaX + slopeX * slopeX * sigmaZ2;
+    double const hitYY = constraint.sigmaY * constraint.sigmaY + slopeY * slopeY * sigmaZ2;
+    double const hitXY = slopeX * slopeY * sigmaZ2;
+    if (!(hitXX > 0.) || !(hitYY > 0.) || !std::isfinite(hitXX) || !std::isfinite(hitYY) ||
+        !std::isfinite(hitXY)) {
+      result.status = -4;
+      return result;
+    }
+
+    auto const targetHit =
+        TRecHit2DPosConstraint::build(LocalPoint(0., 0., 0.), LocalError(hitXX, hitXY, hitYY), targetPlane.get());
+    auto const residual = predicted.localPosition() - targetHit->localPosition();
+    auto const predictedError = predicted.localError().positionError();
+    double const xx = predictedError.xx() + hitXX;
+    double const xy = predictedError.xy() + hitXY;
+    double const yy = predictedError.yy() + hitYY;
+    double const determinant = xx * yy - xy * xy;
+    if (!(determinant > 0.) || !std::isfinite(determinant)) {
+      result.status = -5;
+      return result;
+    }
+    result.chi2 = (yy * residual.x() * residual.x() - 2. * xy * residual.x() * residual.y() +
+                   xx * residual.y() * residual.y()) /
+                  determinant;
+    KFUpdator updator;
+    auto const constrained = updator.update(predicted, *targetHit);
+    if (!constrained.isValid() || !constrained.freeState() || !std::isfinite(result.chi2)) {
+      result.status = -6;
+      return result;
+    }
+    result.valid = true;
+    result.status = 1;
+    result.state.valid = true;
+    result.state.position = constrained.globalPosition();
+    result.state.momentum = constrained.globalMomentum();
+    return result;
+  }
+
   struct DirectionalRefitResult {
     bool valid = false;
+    int status = 0;
     RefitIterationResult first;
     RefitIterationResult second;
     bool secondConverged = false;
@@ -619,8 +719,7 @@ namespace {
       auto transientHit = hitBuilder.build(&**hit);
       if (!transientHit || !transientHit->isValid() || !transientHit->det())
         continue;
-      orderedHits.push_back(
-          {transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
+      orderedHits.push_back({transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
     }
 
     DirectionalRefitResult result;
@@ -632,14 +731,18 @@ namespace {
         inputStations.insert(station);
     }
     result.inputStations = inputStations.size();
-    if (orderedHits.size() < 3 || !(seedMomentumScale > 0.) || !std::isfinite(seedMomentumScale))
+    if (orderedHits.size() < 3 || !(seedMomentumScale > 0.) || !std::isfinite(seedMomentumScale)) {
+      result.status = -1;
       return result;
+    }
 
     bool const useOuter = sourceSide * track.outerPosition().z() > sourceSide * track.innerPosition().z();
     auto const original = useOuter ? trajectoryStateTransform::outerFreeState(track, &magneticField)
                                    : trajectoryStateTransform::innerFreeState(track, &magneticField);
-    if (!original.hasError())
+    if (!original.hasError()) {
+      result.status = -2;
       return result;
+    }
     double const sign = directionSign == 0 ? 1. : directionSign;
     auto const rawMomentum = original.momentum();
     GlobalVector const momentum(sign * seedMomentumScale * rawMomentum.x(),
@@ -648,7 +751,7 @@ namespace {
     GlobalTrajectoryParameters const parameters(
         original.position(), momentum, sign * original.charge(), &magneticField);
     FreeTrajectoryState const originalSeed(parameters, original.curvilinearError());
-
+    FreeTrajectoryState iterationSeed = originalSeed;
     if (usePathOrdering) {
       // Order measurements by actual propagated path from the source-facing
       // endpoint.  Global z is not a valid trajectory coordinate for barrel,
@@ -657,7 +760,7 @@ namespace {
       // seed direction and expose the fallback count as a diagnostic.
       auto const seedDirection = momentum.unit();
       for (auto& orderedHit : orderedHits) {
-        auto const propagated = vacuumPropagator.propagateWithPath(originalSeed, orderedHit.hit->det()->surface());
+        auto const propagated = vacuumPropagator.propagateWithPath(originalSeed, *orderedHit.hit->surface());
         if (propagated.first.isValid() && std::isfinite(propagated.second)) {
           orderedHit.path = propagated.second;
         } else {
@@ -689,9 +792,11 @@ namespace {
           smootherMaterialPropagator, updator, estimator, static_cast<float>(smootherErrorRescale), 3);
       smoother.setHitCloner(&hitCloner);
       auto const start = inflateSeedError(uninflatedSeed, seedCurvatureErrorRescale, useFullSeedErrorRescale);
-      auto const firstPredicted = fitMaterialPropagator.propagate(start, orderedHits.front().hit->det()->surface());
-      if (!firstPredicted.isValid())
+      auto const firstPredicted = fitMaterialPropagator.propagate(start, *orderedHits.front().hit->surface());
+      if (!firstPredicted.isValid()) {
+        result.status = 10;
         return result;
+      }
       TrajectorySeed const seed(
           PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
       auto const filtered = fitter.fitOne(seed, fitHits, firstPredicted, TrajectoryFitter::standard);
@@ -700,47 +805,72 @@ namespace {
       // last measurement contains an invalid or NaN state.  Geant4e cannot
       // safely smooth such a trajectory and may segfault in MakeOneStep, so
       // reject the refit candidate before entering the smoother.
-      if (filtered.foundHits() < 3 || !finiteTrajectory(filtered))
+      // Require the same three physical detector measurements as the
+      // unconstrained refit.  The target prior was applied to the seed above.
+      int const minimumFoundHits = 3;
+      if (filtered.foundHits() < minimumFoundHits) {
+        result.status = 11;
         return result;
+      }
+      if (!finiteTrajectory(filtered)) {
+        result.status = 12;
+        return result;
+      }
       auto const smoothed = smoother.trajectory(filtered);
-      if (smoothed.foundHits() < 3 || smoothed.empty() || !finiteTrajectory(smoothed))
+      if (smoothed.foundHits() < minimumFoundHits || smoothed.empty()) {
+        result.status = 13;
         return result;
+      }
+      if (!finiteTrajectory(smoothed)) {
+        result.status = 14;
+        return result;
+      }
 
-      // The smoother returns measurements in the reverse order of the
-      // source-to-CMS filter. Its last state is therefore source-facing.
-      auto const& upstream = smoothed.lastMeasurement().updatedState();
-      if (!upstream.isValid() || !upstream.freeState())
+      // The smoother returns measurements in reverse filter order; its last
+      // state is the source-facing detector hit.
+      auto const* upstream = &smoothed.lastMeasurement().updatedState();
+      if (!upstream->isValid() || !upstream->freeState()) {
+        result.status = 15;
         return result;
+      }
       auto const& downstream = smoothed.firstMeasurement().updatedState();
-      if (!downstream.isValid())
+      if (!downstream.isValid()) {
+        result.status = 16;
         return result;
-      auto const upstreamMomentum = upstream.globalMomentum();
+      }
+      auto const upstreamMomentum = upstream->globalMomentum();
       auto const downstreamMomentum = downstream.globalMomentum();
-      auto const upstreamFreeState = *upstream.freeState();
-      auto const materialTargetState =
+      auto const upstreamFreeState = *upstream->freeState();
+      PropagatedState materialTargetState;
+      PropagatedState vacuumTargetState;
+      materialTargetState =
           propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, &targetMaterialPropagator, sourceSide);
-      auto const vacuumTargetState =
-          propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, nullptr, sourceSide);
-      if (!materialTargetState.valid)
+      vacuumTargetState = propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, nullptr, sourceSide);
+      if (!materialTargetState.valid) {
+        result.status = 17;
         return result;
+      }
       auto const refitHits = static_cast<unsigned int>(smoothed.foundHits());
       result.valid = true;
+      result.status = 1;
       result.hits = refitHits;
       result.chi2 = smoothed.chiSquared();
       result.ndof = std::max(1., 2. * static_cast<double>(refitHits) - 5.);
       result.upstreamPt = upstreamMomentum.perp();
       result.upstreamP = upstreamMomentum.mag();
       result.downstreamP = downstreamMomentum.mag();
-      result.signedInverseMomentum = upstream.signedInverseMomentum();
-      result.upstreamState = upstream;
+      result.signedInverseMomentum = upstream->signedInverseMomentum();
+      result.upstreamState = *upstream;
       result.materialTargetState = materialTargetState;
       result.vacuumTargetState = vacuumTargetState;
       return result;
     };
 
-    result.first = runIteration(originalSeed, initialMaxHitChi2);
-    if (!result.first.valid)
+    result.first = runIteration(iterationSeed, initialMaxHitChi2);
+    if (!result.first.valid) {
+      result.status = 100 + result.first.status;
       return result;
+    }
 
     result.second = runIteration(*result.first.upstreamState.freeState(), maxHitChi2);
     if (result.second.valid) {
@@ -753,6 +883,7 @@ namespace {
     result.selectedIteration = result.secondConverged ? 2 : 1;
     result.selected = result.secondConverged ? result.second : result.first;
     result.valid = result.selected.valid;
+    result.status = result.valid ? 1 : 200 + result.second.status;
     return result;
   }
 
@@ -1062,6 +1193,14 @@ public:
             parameters.getParameter<unsigned int>("directionalRefitMinPrecisionStations")),
         directionalRefitMaxPrecisionRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxPrecisionRelativeQoverPChange")),
+        produceTargetConstrainedMomentum_(parameters.getParameter<bool>("produceTargetConstrainedMomentum")),
+        targetUseInferredSide_(parameters.getParameter<bool>("targetUseInferredSide")),
+        targetX_(parameters.getParameter<double>("targetX")),
+        targetY_(parameters.getParameter<double>("targetY")),
+        targetZ_(parameters.getParameter<double>("targetZ")),
+        targetSigmaX_(parameters.getParameter<double>("targetSigmaX")),
+        targetSigmaY_(parameters.getParameter<double>("targetSigmaY")),
+        targetSigmaZ_(parameters.getParameter<double>("targetSigmaZ")),
         minSharedHitFraction_(parameters.getParameter<double>("minSharedHitFraction")),
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
@@ -1101,6 +1240,12 @@ public:
     if (directionalRefitUseFirstPrinciplesMaterialEffects_ &&
         (!(directionalRefitFirstPrinciplesStepCm_ > 0.) || !std::isfinite(directionalRefitFirstPrinciplesStepCm_)))
       throw cms::Exception("Configuration") << "directionalRefitFirstPrinciplesStepCm must be finite and positive";
+    if (produceTargetConstrainedMomentum_ &&
+        (!(targetSigmaX_ > 0.) || !(targetSigmaY_ > 0.) || !(targetSigmaZ_ >= 0.) ||
+         !std::isfinite(targetX_) || !std::isfinite(targetY_) || !std::isfinite(targetZ_) ||
+         !std::isfinite(targetSigmaX_) || !std::isfinite(targetSigmaY_) || !std::isfinite(targetSigmaZ_)))
+      throw cms::Exception("Configuration")
+          << "target position must be finite, targetSigmaX/Y positive, and targetSigmaZ non-negative";
     produces<nanoaod::FlatTable>();
     produces<nanoaod::FlatTable>("ShiftDimuonVertex");
   }
@@ -1204,11 +1349,13 @@ public:
         return;
       unsigned int index = 0;
       for (auto const& track : *handle) {
-        candidates.push_back({&track,
-                              source,
-                              index++,
-                              hitFingerprints(track),
-                              propagateToTargetLine(track, vacuumPropagator)});
+        Candidate candidate{};
+        candidate.track = &track;
+        candidate.source = source;
+        candidate.sourceIndex = index++;
+        candidate.hitFingerprints = hitFingerprints(track);
+        candidate.targetLineState = propagateToTargetLine(track, vacuumPropagator);
+        candidates.push_back(std::move(candidate));
       }
     };
     // Preserve the public source numbering; representative precedence is
@@ -1321,6 +1468,35 @@ public:
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+
+      // Produce a second, explicitly prompt-target hypothesis without ever
+      // replacing the unconstrained result above.  A smoothed state is the
+      // detector-hit likelihood expressed at one surface; transport it to the
+      // target and make one Kalman update with the production measurement.
+      // This is the linear-Gaussian equivalent of adding the constraint to the
+      // full fit, without asking KFTrajectoryFitter to treat a detId=0 prior as
+      // an ordinary detector hit.
+      if (produceTargetConstrainedMomentum_ && refit.valid) {
+        double const configuredTargetZ = targetUseInferredSide_ ? eventSourceSide * std::abs(targetZ_) : targetZ_;
+        TargetConstraint const constraint{
+            GlobalPoint(targetX_, targetY_, configuredTargetZ), targetSigmaX_, targetSigmaY_, targetSigmaZ_};
+        auto const constrained = applyTargetConstraint(refit.selected.upstreamState,
+                                                       eventSourceSide,
+                                                       vacuumPropagator,
+                                                       *targetMaterialPropagator,
+                                                       constraint);
+        candidate.constrainedStatus = constrained.status;
+        if (constrained.valid) {
+          candidate.constrainedValid = true;
+          candidate.constrainedHits = refit.selected.hits;
+          candidate.constrainedChi2 = refit.selected.chi2 + constrained.chi2;
+          candidate.constrainedNdof = refit.selected.ndof + 2.;
+          candidate.constrainedTargetChi2 = constrained.chi2;
+          candidate.constrainedState = constrained.state;
+        }
+      } else if (produceTargetConstrainedMomentum_) {
+        candidate.constrainedStatus = -10;
+      }
 
       candidate.precisionRefitLeverArm = precisionRefit.inputLeverArm;
       candidate.directionalRefitUsedPrecisionHits = usePrecisionRefit;
@@ -1602,6 +1778,9 @@ public:
     }
 
     std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, preRefitPt,
+        constrainedPt, constrainedEta, constrainedPhi, constrainedMass, constrainedP, constrainedPx,
+        constrainedPy, constrainedPz, constrainedVx, constrainedVy, constrainedVz, constrainedChi2,
+        constrainedNdof, constrainedTargetChi2,
         preRefitPz, directionalRefitUpstreamPt, directionalRefitUpstreamP, directionalRefitDownstreamP,
         directionalRefitFractionalLossAcrossHits, directionalRefitChi2, directionalRefitNdof,
         directionalRefitFirstChi2, directionalRefitFirstNdof, directionalRefitFirstUpstreamPt,
@@ -1623,7 +1802,8 @@ public:
         ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
-    std::vector<int> charge, source, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
+    std::vector<int> charge, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
+        quality, constrainedValid, constrainedHits, constrainedStatus,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
         directionalRefitValid, directionalRefitHits, directionalRefitFirstValid, directionalRefitFirstHits,
         directionalRefitSecondValid, directionalRefitSecondHits, directionalRefitSecondConverged,
@@ -1663,6 +1843,32 @@ public:
       px.push_back(storedPx);
       py.push_back(storedPy);
       pz.push_back(storedPz);
+      auto const& constrained = candidate->constrainedState;
+      double const constrainedPxValue = candidate->constrainedValid ? constrained.momentum.x() : 0.;
+      double const constrainedPyValue = candidate->constrainedValid ? constrained.momentum.y() : 0.;
+      double const constrainedPzValue = candidate->constrainedValid ? constrained.momentum.z() : 0.;
+      double const constrainedPtValue = std::hypot(constrainedPxValue, constrainedPyValue);
+      constrainedValid.push_back(candidate->constrainedValid);
+      constrainedHits.push_back(candidate->constrainedHits);
+      constrainedStatus.push_back(candidate->constrainedStatus);
+      constrainedPt.push_back(constrainedPtValue);
+      constrainedEta.push_back(candidate->constrainedValid && constrainedPtValue > 0.
+                                   ? std::asinh(constrainedPzValue / constrainedPtValue)
+                                   : 0.);
+      constrainedPhi.push_back(candidate->constrainedValid
+                                   ? std::atan2(constrainedPyValue, constrainedPxValue)
+                                   : 0.);
+      constrainedMass.push_back(0.105658f);
+      constrainedP.push_back(candidate->constrainedValid ? constrained.momentum.mag() : 0.);
+      constrainedPx.push_back(constrainedPxValue);
+      constrainedPy.push_back(constrainedPyValue);
+      constrainedPz.push_back(constrainedPzValue);
+      constrainedVx.push_back(candidate->constrainedValid ? constrained.position.x() : 0.);
+      constrainedVy.push_back(candidate->constrainedValid ? constrained.position.y() : 0.);
+      constrainedVz.push_back(candidate->constrainedValid ? constrained.position.z() : 0.);
+      constrainedChi2.push_back(candidate->constrainedChi2);
+      constrainedNdof.push_back(candidate->constrainedNdof);
+      constrainedTargetChi2.push_back(candidate->constrainedTargetChi2);
       trackPt.push_back(track.pt());
       innerPt.push_back(track.innerMomentum().rho());
       outerPt.push_back(track.outerMomentum().rho());
@@ -1793,8 +1999,11 @@ public:
       validMuonHits.push_back(track.hitPattern().numberOfValidMuonHits());
       muonStations.push_back(track.hitPattern().muonStationsWithValidHits());
       lostHits.push_back(track.numberOfLostHits());
-      source.push_back(candidate->source);
       sourceIndex.push_back(candidate->sourceIndex);
+      bool const traversingCategory = candidate->source == 1;
+      bool const dsaCategory = candidate->source == 0;
+      bool const fullLeverArm = traversingCategory && std::abs(track.outerPosition().z() - track.innerPosition().z()) > 500.;
+      quality.push_back(fullLeverArm ? 3 : (traversingCategory ? 2 : (dsaCategory ? 1 : 0)));
     }
 
     auto table = std::make_unique<nanoaod::FlatTable>(selected.size(), "ShiftMuon", false, false);
@@ -1806,6 +2015,27 @@ public:
     table->addColumn<float>("px", px, "momentum x component");
     table->addColumn<float>("py", py, "momentum y component");
     table->addColumn<float>("pz", pz, "momentum z component");
+    // The historical unqualified branches are the unconstrained hypothesis.
+    // Only the target-restricted alternative receives a prefix.
+    table->addColumn<int>("constrainedValid", constrainedValid, "1 when the prompt-target Kalman fit is valid");
+    table->addColumn<int>("constrainedHits", constrainedHits, "detector hits retained by the prompt-target fit");
+    table->addColumn<int>("constrainedStatus",
+                          constrainedStatus,
+                          "prompt-target status: 1=valid, -10=no valid unconstrained refit, other negative=constraint failure");
+    table->addColumn<float>("constrainedPt", constrainedPt, "prompt-target-constrained transverse momentum");
+    table->addColumn<float>("constrainedEta", constrainedEta, "prompt-target-constrained pseudorapidity");
+    table->addColumn<float>("constrainedPhi", constrainedPhi, "prompt-target-constrained azimuth");
+    table->addColumn<float>("constrainedMass", constrainedMass, "muon mass for the constrained hypothesis");
+    table->addColumn<float>("constrainedP", constrainedP, "prompt-target-constrained momentum magnitude");
+    table->addColumn<float>("constrainedPx", constrainedPx, "prompt-target-constrained momentum x component");
+    table->addColumn<float>("constrainedPy", constrainedPy, "prompt-target-constrained momentum y component");
+    table->addColumn<float>("constrainedPz", constrainedPz, "prompt-target-constrained momentum z component");
+    table->addColumn<float>("constrainedVx", constrainedVx, "fitted x on the configured target plane");
+    table->addColumn<float>("constrainedVy", constrainedVy, "fitted y on the configured target plane");
+    table->addColumn<float>("constrainedVz", constrainedVz, "configured target-plane z");
+    table->addColumn<float>("constrainedChi2", constrainedChi2, "total prompt-target trajectory chi2");
+    table->addColumn<float>("constrainedNdof", constrainedNdof, "prompt-target trajectory degrees of freedom");
+    table->addColumn<float>("constrainedTargetChi2", constrainedTargetChi2, "chi2 contribution of the target hit");
     table->addColumn<float>("trackPt", trackPt, "pT at the original CMSSW track reference state");
     table->addColumn<float>("innerPt", innerPt, "pT at the geometrically inner detector state");
     table->addColumn<float>("outerPt", outerPt, "pT at the geometrically outer detector state");
@@ -2071,8 +2301,9 @@ public:
     table->addColumn<int>("nValidMuonHits", validMuonHits, "number of valid muon-system hits");
     table->addColumn<int>("nMuonStations", muonStations, "muon stations with valid hits");
     table->addColumn<int>("nLostHits", lostHits, "number of lost track hits");
-    table->addColumn<int>("source", source, "0=DSA, 1=traversing, 2=cosmic");
-    table->addColumn<int>("sourceIndex", sourceIndex, "index in the source track collection");
+    table->addColumn<int>(
+        "quality", quality, "exclusive reconstruction category: 0=cosmic, 1=DSA, 2=traversing, 3=full-lever-arm traversing");
+    table->addColumn<int>("sourceIndex", sourceIndex, "index in the collection identified by quality");
     table->addColumn<unsigned int>("duplicateGroupSize",
                                    duplicateGroupSize,
                                    "number of transitive input-track duplicates represented by this row");
@@ -2294,6 +2525,14 @@ public:
     description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
     description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.5);
+    description.add<bool>("produceTargetConstrainedMomentum", true);
+    description.add<bool>("targetUseInferredSide", true);
+    description.add<double>("targetX", 0.0);
+    description.add<double>("targetY", 0.0);
+    description.add<double>("targetZ", 14800.0);
+    description.add<double>("targetSigmaX", 0.1);
+    description.add<double>("targetSigmaY", 0.1);
+    description.add<double>("targetSigmaZ", 50.0);
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -2344,6 +2583,14 @@ private:
   double directionalRefitMaxRelativeQoverPChange_;
   unsigned int directionalRefitMinPrecisionStations_;
   double directionalRefitMaxPrecisionRelativeQoverPChange_;
+  bool produceTargetConstrainedMomentum_;
+  bool targetUseInferredSide_;
+  double targetX_;
+  double targetY_;
+  double targetZ_;
+  double targetSigmaX_;
+  double targetSigmaY_;
+  double targetSigmaZ_;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
