@@ -13,6 +13,27 @@ There are two reconstruction-category fields:
   `3=full-lever-arm traversing`;
 - `sourceIndex`: index in the corresponding CMSSW source collection.
 
+The category can be compared with reconstruction-neutral detector geometry:
+
+- `nDTHits`, `nCSCHits`, `nRPCHits`, `nGEMHits`, and `nME0Hits` count valid
+  track measurements, while `detectorMask` records which systems occur;
+- `nHitsPlusEndcap`, `nHitsBarrel`, and `nHitsMinusEndcap` retain the raw
+  detector-side counts;
+- `nHitsNearEndcap`, `nHitsFarEndcap`, and the corresponding `nStations*`
+  fields orient those counts using `inferredSourceSide`;
+- `entry*` and `exit*` describe the first and last recorded valid muon hit in
+  the inferred flight direction. Region codes are `0=near endcap`, `1=barrel`,
+  `2=far endcap`, and `-1=unknown`. These are measurement endpoints, not proof
+  that a particle physically entered or stopped at those positions;
+- `hitSpan` is the straight-line separation between those recorded endpoints.
+
+To print quality-versus-topology, detector, eta, momentum, and hit-span
+summaries from a current NanoAOD, run:
+
+```bash
+python3 analyze_shift_muon_topology.py input.root
+```
+
 `ShiftDimuonVertex` follows the same fit naming convention. Its unqualified
 kinematics and vertex quantities use the two unconstrained muons, while the
 `constrained*` alternatives exist only for the same pair with both constrained

@@ -8,6 +8,7 @@
 #include "DataFormats/MuonDetId/interface/CSCDetId.h"
 #include "DataFormats/MuonDetId/interface/DTChamberId.h"
 #include "DataFormats/MuonDetId/interface/GEMDetId.h"
+#include "DataFormats/MuonDetId/interface/ME0DetId.h"
 #include "DataFormats/MuonDetId/interface/MuonSubdetId.h"
 #include "DataFormats/MuonDetId/interface/RPCDetId.h"
 #include "DataFormats/GeometrySurface/interface/Plane.h"
@@ -399,6 +400,162 @@ namespace {
     unsigned int gem = 0;
     unsigned int precisionStations = 0;
   };
+
+  // Geometry-only description of the valid muon-system measurements on the
+  // selected track. Region codes are oriented with the reconstructed source
+  // side: 0=near endcap, 1=barrel, 2=far endcap, -1=unknown. This deliberately
+  // does not use generator information or decide which reconstruction is best.
+  struct MuonGeometryDiagnostics {
+    unsigned int dt = 0;
+    unsigned int csc = 0;
+    unsigned int rpc = 0;
+    unsigned int gem = 0;
+    unsigned int me0 = 0;
+    unsigned int plusEndcap = 0;
+    unsigned int barrel = 0;
+    unsigned int minusEndcap = 0;
+    unsigned int nearEndcap = 0;
+    unsigned int farEndcap = 0;
+    unsigned int nearEndcapStations = 0;
+    unsigned int barrelStations = 0;
+    unsigned int farEndcapStations = 0;
+    unsigned int detectorMask = 0;
+    bool endpointsValid = false;
+    int entryRegion = -1;
+    int exitRegion = -1;
+    int entrySubdetector = 0;
+    int exitSubdetector = 0;
+    GlobalPoint entryPosition;
+    GlobalPoint exitPosition;
+    double hitSpan = 0.;
+  };
+
+  int muonHitSide(DetId const& id) {
+    switch (id.subdetId()) {
+      case MuonSubdetId::DT:
+        return 0;
+      case MuonSubdetId::CSC:
+        return CSCDetId(id).endcap() == 1 ? 1 : -1;
+      case MuonSubdetId::RPC:
+        return RPCDetId(id).region();
+      case MuonSubdetId::GEM:
+        return GEMDetId(id).region();
+      case MuonSubdetId::ME0:
+        return ME0DetId(id).region();
+      default:
+        return 2;
+    }
+  }
+
+  int muonHitStation(DetId const& id) {
+    switch (id.subdetId()) {
+      case MuonSubdetId::DT:
+        return DTChamberId(id).station();
+      case MuonSubdetId::CSC:
+        return CSCDetId(id).station();
+      case MuonSubdetId::RPC:
+        return RPCDetId(id).station();
+      case MuonSubdetId::GEM:
+        return GEMDetId(id).station();
+      case MuonSubdetId::ME0:
+        return ME0DetId(id).station();
+      default:
+        return -1;
+    }
+  }
+
+  int orientedMuonRegion(DetId const& id, int sourceSide) {
+    int const side = muonHitSide(id);
+    if (side == 0)
+      return 1;
+    if (side == sourceSide)
+      return 0;
+    if (side == -sourceSide)
+      return 2;
+    return -1;
+  }
+
+  MuonGeometryDiagnostics muonGeometryDiagnostics(reco::Track const& track,
+                                                  GlobalTrackingGeometry const& geometry,
+                                                  int sourceSide,
+                                                  double directionSign) {
+    MuonGeometryDiagnostics result;
+    std::array<std::set<unsigned int>, 3> stations;
+    auto const endpointDelta = track.outerPosition() - track.innerPosition();
+    bool const entryIsOuter = directionSign * track.innerMomentum().Dot(endpointDelta) < 0.;
+    auto const entryTrackPosition = entryIsOuter ? track.outerPosition() : track.innerPosition();
+    auto const exitTrackPosition = entryIsOuter ? track.innerPosition() : track.outerPosition();
+    GlobalPoint const entryReference(entryTrackPosition.x(), entryTrackPosition.y(), entryTrackPosition.z());
+    GlobalPoint const exitReference(exitTrackPosition.x(), exitTrackPosition.y(), exitTrackPosition.z());
+    GlobalVector measurementDirection = exitReference - entryReference;
+    if (!(measurementDirection.mag2() > 0.))
+      measurementDirection = GlobalVector(0., 0., -sourceSide);
+    measurementDirection = measurementDirection.unit();
+    double minimumProjection = std::numeric_limits<double>::infinity();
+    double maximumProjection = -std::numeric_limits<double>::infinity();
+
+    for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
+      if (!(*hit)->isValid() || (*hit)->geographicalId().det() != DetId::Muon)
+        continue;
+      DetId const id = (*hit)->geographicalId();
+      switch (id.subdetId()) {
+        case MuonSubdetId::DT:
+          ++result.dt;
+          break;
+        case MuonSubdetId::CSC:
+          ++result.csc;
+          break;
+        case MuonSubdetId::RPC:
+          ++result.rpc;
+          break;
+        case MuonSubdetId::GEM:
+          ++result.gem;
+          break;
+        case MuonSubdetId::ME0:
+          ++result.me0;
+          break;
+        default:
+          continue;
+      }
+      result.detectorMask |= 1u << (id.subdetId() - 1);
+
+      int const side = muonHitSide(id);
+      result.plusEndcap += side == 1;
+      result.barrel += side == 0;
+      result.minusEndcap += side == -1;
+      result.nearEndcap += side == sourceSide;
+      result.farEndcap += side == -sourceSide;
+      int const region = orientedMuonRegion(id, sourceSide);
+      int const station = muonHitStation(id);
+      if (region >= 0 && station >= 0)
+        stations[region].insert(1000u * id.subdetId() + 100u * (side + 1) + station);
+
+      auto const* detector = geometry.idToDet(id);
+      if (!detector)
+        continue;
+      GlobalPoint const position = detector->surface().toGlobal((*hit)->localPosition());
+      double const projection = (position - entryReference).dot(measurementDirection);
+      if (projection < minimumProjection) {
+        minimumProjection = projection;
+        result.entryPosition = position;
+        result.entryRegion = region;
+        result.entrySubdetector = id.subdetId();
+      }
+      if (projection > maximumProjection) {
+        maximumProjection = projection;
+        result.exitPosition = position;
+        result.exitRegion = region;
+        result.exitSubdetector = id.subdetId();
+      }
+    }
+    result.nearEndcapStations = stations[0].size();
+    result.barrelStations = stations[1].size();
+    result.farEndcapStations = stations[2].size();
+    result.endpointsValid = std::isfinite(minimumProjection) && std::isfinite(maximumProjection);
+    if (result.endpointsValid)
+      result.hitSpan = (result.exitPosition - result.entryPosition).mag();
+    return result;
+  }
 
   bool isPrecisionMuonSubdetector(int subdetector) {
     return subdetector == MuonSubdetId::DT || subdetector == MuonSubdetId::CSC ||
@@ -2125,7 +2282,8 @@ public:
         directionalRefitOppositeLegPrecisionTargetPt, directionalRefitOppositeLegPrecisionTargetPz,
         ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
-        chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2;
+        chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2,
+        entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan;
     std::vector<int> charge, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
         quality, constrainedValid, constrainedHits, constrainedStatus,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
@@ -2142,7 +2300,10 @@ public:
         directionalRefitPrecisionOrderingFallback, directionalRefitPrecisionFirstRejected,
         directionalRefitPrecisionSecondRejected, directionalRefitSourceLegPrecisionValid,
         directionalRefitSourceLegPrecisionHits, directionalRefitOppositeLegPrecisionValid,
-        directionalRefitOppositeLegPrecisionHits;
+        directionalRefitOppositeLegPrecisionHits, nDTHits, nCSCHits, nRPCHits, nGEMHits, nME0Hits,
+        nHitsPlusEndcap, nHitsBarrel, nHitsMinusEndcap, nHitsNearEndcap, nHitsFarEndcap,
+        nStationsNearEndcap, nStationsBarrel, nStationsFarEndcap, detectorMask,
+        entryExitValid, entryRegion, exitRegion, entrySubdetector, exitSubdetector;
     for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
       auto const* candidate = selected[selectedIndex];
       auto const& track = *candidate->track;
@@ -2154,6 +2315,8 @@ public:
       // toward CMS, supporting both +z and -z SHIFT locations without truth.
       double const sign = candidateDirectionSign(*candidate);
       bool const flip = sign < 0.;
+      auto const geometryDiagnostics =
+          muonGeometryDiagnostics(track, trackingGeometry, eventSourceSide, sign);
       // The propagated state was already canonicalised before transport.
       double const storedPx = propagated.momentum.x();
       double const storedPy = propagated.momentum.y();
@@ -2328,6 +2491,34 @@ public:
       innerZ.push_back(track.innerPosition().z());
       outerR.push_back(track.outerPosition().rho());
       outerZ.push_back(track.outerPosition().z());
+      nDTHits.push_back(geometryDiagnostics.dt);
+      nCSCHits.push_back(geometryDiagnostics.csc);
+      nRPCHits.push_back(geometryDiagnostics.rpc);
+      nGEMHits.push_back(geometryDiagnostics.gem);
+      nME0Hits.push_back(geometryDiagnostics.me0);
+      nHitsPlusEndcap.push_back(geometryDiagnostics.plusEndcap);
+      nHitsBarrel.push_back(geometryDiagnostics.barrel);
+      nHitsMinusEndcap.push_back(geometryDiagnostics.minusEndcap);
+      nHitsNearEndcap.push_back(geometryDiagnostics.nearEndcap);
+      nHitsFarEndcap.push_back(geometryDiagnostics.farEndcap);
+      nStationsNearEndcap.push_back(geometryDiagnostics.nearEndcapStations);
+      nStationsBarrel.push_back(geometryDiagnostics.barrelStations);
+      nStationsFarEndcap.push_back(geometryDiagnostics.farEndcapStations);
+      detectorMask.push_back(geometryDiagnostics.detectorMask);
+      entryExitValid.push_back(geometryDiagnostics.endpointsValid);
+      entryRegion.push_back(geometryDiagnostics.entryRegion);
+      exitRegion.push_back(geometryDiagnostics.exitRegion);
+      entrySubdetector.push_back(geometryDiagnostics.entrySubdetector);
+      exitSubdetector.push_back(geometryDiagnostics.exitSubdetector);
+      entryX.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.entryPosition.x() : 0.);
+      entryY.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.entryPosition.y() : 0.);
+      entryZ.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.entryPosition.z() : 0.);
+      entryR.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.entryPosition.perp() : 0.);
+      exitX.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.exitPosition.x() : 0.);
+      exitY.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.exitPosition.y() : 0.);
+      exitZ.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.exitPosition.z() : 0.);
+      exitR.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.exitPosition.perp() : 0.);
+      hitSpan.push_back(geometryDiagnostics.hitSpan);
       linePcaR.push_back(pcaR);
       linePcaZ.push_back(pcaZ);
       chordLinePcaR.push_back(chordPcaR);
@@ -2668,6 +2859,54 @@ public:
     table->addColumn<float>("innerZ", innerZ, "inner-state z");
     table->addColumn<float>("outerR", outerR, "outer-state cylindrical radius");
     table->addColumn<float>("outerZ", outerZ, "outer-state z");
+    table->addColumn<int>("nDTHits", nDTHits, "valid DT track measurements");
+    table->addColumn<int>("nCSCHits", nCSCHits, "valid CSC track measurements");
+    table->addColumn<int>("nRPCHits", nRPCHits, "valid RPC track measurements");
+    table->addColumn<int>("nGEMHits", nGEMHits, "valid GEM track measurements");
+    table->addColumn<int>("nME0Hits", nME0Hits, "valid ME0 track measurements");
+    table->addColumn<int>("nHitsPlusEndcap", nHitsPlusEndcap, "valid track measurements in the +z muon endcap");
+    table->addColumn<int>("nHitsBarrel", nHitsBarrel, "valid track measurements in the muon barrel");
+    table->addColumn<int>("nHitsMinusEndcap", nHitsMinusEndcap, "valid track measurements in the -z muon endcap");
+    table->addColumn<int>("nHitsNearEndcap",
+                          nHitsNearEndcap,
+                          "valid endcap measurements on the inferred source side");
+    table->addColumn<int>("nHitsFarEndcap",
+                          nHitsFarEndcap,
+                          "valid endcap measurements opposite the inferred source side");
+    table->addColumn<int>("nStationsNearEndcap",
+                          nStationsNearEndcap,
+                          "distinct detector-system stations with valid measurements in the source-side endcap");
+    table->addColumn<int>("nStationsBarrel",
+                          nStationsBarrel,
+                          "distinct detector-system stations with valid measurements in the barrel");
+    table->addColumn<int>("nStationsFarEndcap",
+                          nStationsFarEndcap,
+                          "distinct detector-system stations with valid measurements in the opposite endcap");
+    table->addColumn<int>("detectorMask",
+                          detectorMask,
+                          "muon subdetector bit mask: bit0=DT, bit1=CSC, bit2=RPC, bit3=GEM, bit4=ME0");
+    table->addColumn<int>("entryExitValid", entryExitValid, "1 when valid muon-hit entry and exit positions exist");
+    table->addColumn<int>("entryRegion",
+                          entryRegion,
+                          "first recorded muon-hit region along inferred flight: -1=unknown, 0=near endcap, 1=barrel, 2=far endcap");
+    table->addColumn<int>("exitRegion",
+                          exitRegion,
+                          "last recorded muon-hit region along inferred flight: -1=unknown, 0=near endcap, 1=barrel, 2=far endcap; not a stopping-point claim");
+    table->addColumn<int>("entrySubdetector",
+                          entrySubdetector,
+                          "subdetector of first recorded muon hit: 1=DT, 2=CSC, 3=RPC, 4=GEM, 5=ME0");
+    table->addColumn<int>("exitSubdetector",
+                          exitSubdetector,
+                          "subdetector of last recorded muon hit: 1=DT, 2=CSC, 3=RPC, 4=GEM, 5=ME0");
+    table->addColumn<float>("entryX", entryX, "x of first recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("entryY", entryY, "y of first recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("entryZ", entryZ, "z of first recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("entryR", entryR, "radius of first recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("exitX", exitX, "x of last recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("exitY", exitY, "y of last recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("exitZ", exitZ, "z of last recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("exitR", exitR, "radius of last recorded valid muon hit along inferred flight in cm");
+    table->addColumn<float>("hitSpan", hitSpan, "straight-line distance between first and last recorded muon hits in cm");
     table->addColumn<float>("linePcaR", linePcaR, "straight-line transverse PCA radius");
     table->addColumn<float>("linePcaZ", linePcaZ, "z at straight-line transverse PCA");
     table->addColumn<float>("chordLinePcaR", chordLinePcaR, "transverse PCA radius from the inner-to-outer chord");
