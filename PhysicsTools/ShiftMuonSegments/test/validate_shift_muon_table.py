@@ -26,6 +26,17 @@ def main():
         "ShiftMuon_constrainedVy", "ShiftMuon_constrainedVz",
         "ShiftMuon_constrainedValid", "ShiftMuon_constrainedStatus",
         "ShiftMuon_constrainedTargetChi2", "ShiftMuon_quality", "ShiftMuon_sourceIndex",
+        "ShiftMuon_nDTHits", "ShiftMuon_nCSCHits", "ShiftMuon_nRPCHits",
+        "ShiftMuon_nGEMHits", "ShiftMuon_nME0Hits", "ShiftMuon_detectorMask",
+        "ShiftMuon_nHitsPlusEndcap", "ShiftMuon_nHitsBarrel", "ShiftMuon_nHitsMinusEndcap",
+        "ShiftMuon_nHitsNearEndcap", "ShiftMuon_nHitsFarEndcap",
+        "ShiftMuon_nStationsNearEndcap", "ShiftMuon_nStationsBarrel",
+        "ShiftMuon_nStationsFarEndcap", "ShiftMuon_entryExitValid",
+        "ShiftMuon_entryRegion", "ShiftMuon_exitRegion",
+        "ShiftMuon_entrySubdetector", "ShiftMuon_exitSubdetector",
+        "ShiftMuon_entryX", "ShiftMuon_entryY", "ShiftMuon_entryZ", "ShiftMuon_entryR",
+        "ShiftMuon_exitX", "ShiftMuon_exitY", "ShiftMuon_exitZ", "ShiftMuon_exitR",
+        "ShiftMuon_hitSpan",
         "nShiftDimuonVertex", "ShiftDimuonVertex_constrainedValid",
         "ShiftDimuonVertex_constrainedMass", "ShiftDimuonVertex_constrainedPt",
         "ShiftDimuonVertex_constrainedPz", "ShiftDimuonVertex_constrainedEta",
@@ -67,6 +78,33 @@ def main():
                 raise RuntimeError(f"invalid quality value {quality}")
             quality_counts[quality] += 1
             constrained_valid += bool(event.ShiftMuon_constrainedValid[index])
+            subdetector_counts = (
+                int(event.ShiftMuon_nDTHits[index]), int(event.ShiftMuon_nCSCHits[index]),
+                int(event.ShiftMuon_nRPCHits[index]), int(event.ShiftMuon_nGEMHits[index]),
+                int(event.ShiftMuon_nME0Hits[index]),
+            )
+            region_count = (
+                int(event.ShiftMuon_nHitsPlusEndcap[index]) +
+                int(event.ShiftMuon_nHitsBarrel[index]) +
+                int(event.ShiftMuon_nHitsMinusEndcap[index])
+            )
+            if region_count != sum(subdetector_counts):
+                raise RuntimeError(
+                    f"muon {muons - 1} has inconsistent detector/region hit counts: "
+                    f"{subdetector_counts} versus {region_count}"
+                )
+            expected_mask = sum((1 << bit) for bit, count in enumerate(subdetector_counts) if count)
+            if int(event.ShiftMuon_detectorMask[index]) != expected_mask:
+                raise RuntimeError(f"muon {muons - 1} has inconsistent detectorMask")
+            endpoints_valid = bool(event.ShiftMuon_entryExitValid[index])
+            entry_region = int(event.ShiftMuon_entryRegion[index])
+            exit_region = int(event.ShiftMuon_exitRegion[index])
+            if endpoints_valid and (entry_region not in range(3) or exit_region not in range(3)):
+                raise RuntimeError(
+                    f"muon {muons - 1} has invalid entry/exit regions {entry_region}/{exit_region}"
+                )
+            if float(event.ShiftMuon_hitSpan[index]) < 0.0:
+                raise RuntimeError(f"muon {muons - 1} has negative hit span")
         for index in range(int(event.nShiftDimuonVertex)):
             dimuons += 1
             constrained_dimuons += bool(event.ShiftDimuonVertex_constrainedValid[index])
