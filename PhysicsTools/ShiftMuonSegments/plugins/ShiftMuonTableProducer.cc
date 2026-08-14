@@ -430,6 +430,33 @@ namespace {
     double hitSpan = 0.;
   };
 
+  // Public topology values describe recorded muon-system coverage only.  They
+  // deliberately do not encode which reconstruction produced the track.
+  enum class MuonTopology : int {
+    nearEndcapOnly = 0,
+    nearEndcapAndBarrel = 1,
+    bothEndcaps = 2,
+    farEndcapOnly = 3,
+    unclassified = 4,
+  };
+
+  int measuredMuonTopology(MuonGeometryDiagnostics const& diagnostics, bool orientationValid) {
+    if (!orientationValid)
+      return static_cast<int>(MuonTopology::unclassified);
+    bool const near = diagnostics.nearEndcap > 0;
+    bool const barrel = diagnostics.barrel > 0;
+    bool const far = diagnostics.farEndcap > 0;
+    if (near && far)
+      return static_cast<int>(MuonTopology::bothEndcaps);
+    if (near && barrel)
+      return static_cast<int>(MuonTopology::nearEndcapAndBarrel);
+    if (near)
+      return static_cast<int>(MuonTopology::nearEndcapOnly);
+    if (far && !barrel)
+      return static_cast<int>(MuonTopology::farEndcapOnly);
+    return static_cast<int>(MuonTopology::unclassified);
+  }
+
   int muonHitSide(DetId const& id) {
     switch (id.subdetId()) {
       case MuonSubdetId::DT:
@@ -1739,11 +1766,13 @@ public:
     // Its magnitude is never used as a selection, while the event-level sign
     // resolves the no-timing ambiguity consistently for both detector sides.
     int eventSourceSide = 1;
+    bool eventSourceSideValid = false;
     double largestAbsOriginZ = 0.;
     unsigned int positiveOrigins = 0, negativeOrigins = 0;
     for (auto const& candidate : candidates) {
       if (!candidate.targetLineState.valid)
         continue;
+      eventSourceSideValid = true;
       double const originZ = candidate.targetLineState.position.z();
       positiveOrigins += originZ > 0.;
       negativeOrigins += originZ < 0.;
@@ -2119,7 +2148,8 @@ public:
       return a.track->normalizedChi2() < b.track->normalizedChi2();
     };
     std::vector<Candidate const*> selected;
-    std::vector<unsigned int> duplicateGroupSize;
+    std::vector<unsigned int> duplicateGroupSize, duplicateSourceMask, duplicateDSACount,
+        duplicateTraversingCount, duplicateCosmicCount;
     for (auto const& group : groups) {
       if (group.empty())
         continue;
@@ -2129,6 +2159,19 @@ public:
           representative = member;
       selected.push_back(&candidates[representative]);
       duplicateGroupSize.push_back(group.size());
+      unsigned int sourceMask = 0, dsaCount = 0, traversingCount = 0, cosmicCount = 0;
+      for (auto const member : group) {
+        int const source = candidates[member].source;
+        if (source >= 0 && source < 3)
+          sourceMask |= 1u << source;
+        dsaCount += source == 0;
+        traversingCount += source == 1;
+        cosmicCount += source == 2;
+      }
+      duplicateSourceMask.push_back(sourceMask);
+      duplicateDSACount.push_back(dsaCount);
+      duplicateTraversingCount.push_back(traversingCount);
+      duplicateCosmicCount.push_back(cosmicCount);
     }
     auto candidateDirectionSign = [eventSourceSide](Candidate const& candidate) {
       return candidate.physicalDirectionSign != 0
@@ -2283,9 +2326,9 @@ public:
         ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2,
-        entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan;
-    std::vector<int> charge, sourceIndex, validHits, validMuonHits, muonStations, lostHits, directionFlipped,
-        quality, constrainedValid, constrainedHits, constrainedStatus,
+        entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan, hitDeltaZ;
+    std::vector<int> charge, sourceIndex, recoAlgorithm, topology, orientationValid, validHits, validMuonHits,
+        muonStations, lostHits, directionFlipped, quality, constrainedValid, constrainedHits, constrainedStatus,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
         directionalRefitValid, directionalRefitHits, directionalRefitFirstValid, directionalRefitFirstHits,
         directionalRefitSecondValid, directionalRefitSecondHits, directionalRefitSecondConverged,
@@ -2519,6 +2562,9 @@ public:
       exitZ.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.exitPosition.z() : 0.);
       exitR.push_back(geometryDiagnostics.endpointsValid ? geometryDiagnostics.exitPosition.perp() : 0.);
       hitSpan.push_back(geometryDiagnostics.hitSpan);
+      hitDeltaZ.push_back(geometryDiagnostics.endpointsValid
+                              ? std::abs(geometryDiagnostics.exitPosition.z() - geometryDiagnostics.entryPosition.z())
+                              : 0.);
       linePcaR.push_back(pcaR);
       linePcaZ.push_back(pcaZ);
       chordLinePcaR.push_back(chordPcaR);
@@ -2532,6 +2578,9 @@ public:
       muonStations.push_back(track.hitPattern().muonStationsWithValidHits());
       lostHits.push_back(track.numberOfLostHits());
       sourceIndex.push_back(candidate->sourceIndex);
+      recoAlgorithm.push_back(candidate->source);
+      orientationValid.push_back(eventSourceSideValid);
+      topology.push_back(measuredMuonTopology(geometryDiagnostics, eventSourceSideValid));
       bool const traversingCategory = candidate->source == 1;
       bool const dsaCategory = candidate->source == 0;
       bool const fullLeverArm = traversingCategory && std::abs(track.outerPosition().z() - track.innerPosition().z()) > 500.;
@@ -2907,6 +2956,7 @@ public:
     table->addColumn<float>("exitZ", exitZ, "z of last recorded valid muon hit along inferred flight in cm");
     table->addColumn<float>("exitR", exitR, "radius of last recorded valid muon hit along inferred flight in cm");
     table->addColumn<float>("hitSpan", hitSpan, "straight-line distance between first and last recorded muon hits in cm");
+    table->addColumn<float>("hitDeltaZ", hitDeltaZ, "absolute z separation between first and last recorded muon hits in cm");
     table->addColumn<float>("linePcaR", linePcaR, "straight-line transverse PCA radius");
     table->addColumn<float>("linePcaZ", linePcaZ, "z at straight-line transverse PCA");
     table->addColumn<float>("chordLinePcaR", chordLinePcaR, "transverse PCA radius from the inner-to-outer chord");
@@ -2920,12 +2970,36 @@ public:
     table->addColumn<int>("nValidMuonHits", validMuonHits, "number of valid muon-system hits");
     table->addColumn<int>("nMuonStations", muonStations, "muon stations with valid hits");
     table->addColumn<int>("nLostHits", lostHits, "number of lost track hits");
-    table->addColumn<int>(
-        "quality", quality, "exclusive reconstruction category: 0=cosmic, 1=DSA, 2=traversing, 3=full-lever-arm traversing");
-    table->addColumn<int>("sourceIndex", sourceIndex, "index in the collection identified by quality");
+    table->addColumn<int>("topology",
+                          topology,
+                          "recorded-hit topology relative to inferred source side: 0=near-endcap-only, "
+                          "1=near-endcap-and-barrel, 2=both-endcaps, 3=far-endcap-only, 4=unclassified");
+    table->addColumn<int>("orientationValid",
+                          orientationValid,
+                          "1 when the event source side was inferred from at least one valid target-line state");
+    table->addColumn<int>("recoAlgorithm",
+                          recoAlgorithm,
+                          "reconstruction provenance: 0=DSA, 1=strict traversing, 2=ordinary cosmic");
+    table->addColumn<int>("quality",
+                          quality,
+                          "deprecated compatibility category: 0=cosmic, 1=DSA, 2=traversing, "
+                          "3=traversing with abs(outerZ-innerZ)>500 cm");
+    table->addColumn<int>("sourceIndex", sourceIndex, "index in the source collection identified by recoAlgorithm");
     table->addColumn<unsigned int>("duplicateGroupSize",
                                    duplicateGroupSize,
                                    "number of transitive input-track duplicates represented by this row");
+    table->addColumn<unsigned int>("duplicateSourceMask",
+                                   duplicateSourceMask,
+                                   "algorithms present in the duplicate component: bit0=DSA, bit1=strict traversing, bit2=cosmic");
+    table->addColumn<unsigned int>("duplicateDSACount",
+                                   duplicateDSACount,
+                                   "number of DSA candidates in the duplicate component");
+    table->addColumn<unsigned int>("duplicateTraversingCount",
+                                   duplicateTraversingCount,
+                                   "number of strict-traversing candidates in the duplicate component");
+    table->addColumn<unsigned int>("duplicateCosmicCount",
+                                   duplicateCosmicCount,
+                                   "number of ordinary-cosmic candidates in the duplicate component");
     table->addColumn<int>("genPartIdx", genPartIdx, "index in GenPart, or -1 when unmatched or on data");
     table->addColumn<float>(
         "genPartDeltaR", genPartDeltaR, "direction-ambiguous deltaR to matched GenPart, or -1 when unmatched/on data");
@@ -2951,7 +3025,7 @@ public:
     // Fit every cleaned pair directly from its retained source tracks.  The
     // resulting indices always refer to ShiftMuon rows and therefore do not
     // depend on keeping any of the input collections in NanoAOD.
-    std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS;
+    std::vector<int> vertexMuonIdx1, vertexMuonIdx2, vertexIsOS, vertexTopologyMin, vertexTopologyMax;
     std::vector<int> vertexDcaStatus, vertexKalmanAttempted, vertexKalmanValid, vertexUsesLineFallback,
         vertexSameGenMuon, vertexGenIsOS, vertexConstrainedValid, vertexConstrainedDcaStatus,
         vertexConstrainedUsesLineFallback, vertexIsCosmicCosmic, vertexIsCosmicDSA, vertexIsCosmicTraversing,
@@ -3172,6 +3246,8 @@ public:
 
       int const lowQuality = std::min(quality[first], quality[second]);
       int const highQuality = std::max(quality[first], quality[second]);
+      vertexTopologyMin.push_back(std::min(topology[first], topology[second]));
+      vertexTopologyMax.push_back(std::max(topology[first], topology[second]));
       vertexIsCosmicCosmic.push_back(lowQuality == 0 && highQuality == 0);
       vertexIsCosmicDSA.push_back(lowQuality == 0 && highQuality == 1);
       vertexIsCosmicTraversing.push_back(lowQuality == 0 && highQuality == 2);
@@ -3188,6 +3264,12 @@ public:
     vertexTable->addColumn<int>("muonIdx1", vertexMuonIdx1, "index of first muon in ShiftMuon");
     vertexTable->addColumn<int>("muonIdx2", vertexMuonIdx2, "index of second muon in ShiftMuon");
     vertexTable->addColumn<int>("isOS", vertexIsOS, "1 for an opposite-sign pair");
+    vertexTable->addColumn<int>("topologyMin",
+                                vertexTopologyMin,
+                                "lower of the two unordered ShiftMuon topology values");
+    vertexTable->addColumn<int>("topologyMax",
+                                vertexTopologyMax,
+                                "higher of the two unordered ShiftMuon topology values");
     vertexTable->addColumn<int>("isCosmicCosmic", vertexIsCosmicCosmic, "both muons have quality 0 (cosmic)");
     vertexTable->addColumn<int>("isCosmicDSA", vertexIsCosmicDSA, "one cosmic and one DSA muon");
     vertexTable->addColumn<int>("isCosmicTraversing", vertexIsCosmicTraversing, "one cosmic and one traversing muon");

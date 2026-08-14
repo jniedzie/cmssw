@@ -7,11 +7,20 @@ uses the `ShiftMuon_constrained*` prefix. Use it only when
 `ShiftMuon_constrainedValid == 1`; `constrainedTargetChi2` records compatibility
 with the configured production target.
 
-There are two reconstruction-category fields:
+Measured topology and reconstruction provenance are separate:
 
-- `quality`: exclusive category `0=cosmic`, `1=DSA`, `2=traversing`,
-  `3=full-lever-arm traversing`;
-- `sourceIndex`: index in the corresponding CMSSW source collection.
+- `topology`: `0=near-endcap-only`, `1=near-endcap-and-barrel`,
+  `2=both-endcaps`, `3=far-endcap-only`, `4=unclassified`, relative to the
+  inferred source side;
+- `orientationValid`: whether that source-side orientation could be inferred;
+- `recoAlgorithm`: `0=DSA`, `1=strict traversing`, `2=ordinary cosmic`;
+- `sourceIndex`: index in the corresponding reconstruction collection;
+- `duplicateSourceMask` and the three `duplicate*Count` fields describe which
+  reconstruction algorithms were present before duplicate cleaning.
+
+`quality` remains temporarily for compatibility. It is deprecated because it
+mixes reconstruction provenance with the historical 500 cm `outerZ-innerZ`
+split and must not be used for new categories.
 
 The category can be compared with reconstruction-neutral detector geometry:
 
@@ -25,9 +34,10 @@ The category can be compared with reconstruction-neutral detector geometry:
   the inferred flight direction. Region codes are `0=near endcap`, `1=barrel`,
   `2=far endcap`, and `-1=unknown`. These are measurement endpoints, not proof
   that a particle physically entered or stopped at those positions;
-- `hitSpan` is the straight-line separation between those recorded endpoints.
+- `hitSpan` is the straight-line separation between those recorded endpoints;
+  `hitDeltaZ` is their absolute z separation.
 
-To print quality-versus-topology, detector, eta, momentum, and hit-span
+To print reconstruction-algorithm-versus-topology, detector, eta, momentum, and hit-span
 summaries from a current NanoAOD, run:
 
 ```bash
@@ -40,7 +50,9 @@ kinematics and vertex quantities use the two unconstrained muons, while the
 muon fits; `constrainedValid` must be required. Mixed constrained-unconstrained
 pairs are not produced.
 
-Exactly one unordered quality-pair flag is true for every dimuon:
+`topologyMin` and `topologyMax` give the compact unordered topology pair for
+each dimuon. During the compatibility period, exactly one legacy unordered
+quality-pair flag is also true:
 `isCosmicCosmic`, `isCosmicDSA`, `isCosmicTraversing`,
 `isCosmicDoubleTraversing`, `isDSADSA`, `isDSATraversing`,
 `isDSADoubleTraversing`, `isTraversingTraversing`,

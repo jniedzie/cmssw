@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Relate ShiftMuon reconstruction quality to detector geometry diagnostics."""
+"""Relate ShiftMuon measured topology to reconstruction provenance."""
 
 import argparse
 from collections import Counter, defaultdict
@@ -7,33 +7,37 @@ from collections import Counter, defaultdict
 import ROOT
 
 
-QUALITY_NAMES = {
-    0: "cosmic",
-    1: "DSA",
-    2: "traversing",
-    3: "double_traversing",
+ALGORITHM_NAMES = {
+    0: "DSA",
+    1: "strict_traversing",
+    2: "cosmic",
+}
+TOPOLOGY_NAMES = {
+    0: "near_endcap_only",
+    1: "near_endcap_and_barrel",
+    2: "both_endcaps",
+    3: "far_endcap_only",
+    4: "unclassified",
 }
 REGION_NAMES = {-1: "unknown", 0: "near_endcap", 1: "barrel", 2: "far_endcap"}
 SUBDETECTORS = ("DT", "CSC", "RPC", "GEM", "ME0")
 
 
-def topology(event, index):
+def derived_topology(event, index):
+    if not bool(event.ShiftMuon_orientationValid[index]):
+        return 4
     near = int(event.ShiftMuon_nHitsNearEndcap[index])
     barrel = int(event.ShiftMuon_nHitsBarrel[index])
     far = int(event.ShiftMuon_nHitsFarEndcap[index])
     if near and far:
-        return "both_endcaps"
+        return 2
     if near and barrel:
-        return "near_plus_barrel"
+        return 1
     if near:
-        return "near_only"
-    if barrel and far:
-        return "barrel_plus_far"
-    if barrel:
-        return "barrel_only"
-    if far:
-        return "far_only"
-    return "unclassified"
+        return 0
+    if far and not barrel:
+        return 3
+    return 4
 
 
 def detector_pattern(mask):
@@ -74,9 +78,9 @@ def median(values):
 
 def print_matrix(title, counts, columns):
     print(f"\n{title}")
-    print(f"{'quality':20s}" + "".join(f"{column:>20s}" for column in columns))
-    for quality, name in QUALITY_NAMES.items():
-        print(f"{name:20s}" + "".join(f"{counts[(quality, column)]:20d}" for column in columns))
+    print(f"{'reco algorithm':20s}" + "".join(f"{column:>28s}" for column in columns))
+    for algorithm, name in ALGORITHM_NAMES.items():
+        print(f"{name:20s}" + "".join(f"{counts[(algorithm, column)]:28d}" for column in columns))
 
 
 def main():
@@ -100,22 +104,28 @@ def main():
 
     for event in events:
         for index in range(int(event.nShiftMuon)):
-            quality = int(event.ShiftMuon_quality[index])
-            topology_name = topology(event, index)
+            algorithm = int(event.ShiftMuon_recoAlgorithm[index])
+            topology_value = int(event.ShiftMuon_topology[index])
+            expected_topology = derived_topology(event, index)
+            if topology_value != expected_topology:
+                raise RuntimeError(
+                    f"stored topology {topology_value} differs from derived value {expected_topology}"
+                )
+            topology_name = TOPOLOGY_NAMES[topology_value]
             exit_name = REGION_NAMES.get(int(event.ShiftMuon_exitRegion[index]), "invalid")
             detectors = detector_pattern(int(event.ShiftMuon_detectorMask[index]))
-            topology_counts[(quality, topology_name)] += 1
-            exit_counts[(quality, exit_name)] += 1
-            detector_counts[(quality, detectors)] += 1
-            eta_counts[(quality, eta_bin(float(event.ShiftMuon_eta[index])))] += 1
-            momentum_counts[(quality, momentum_bin(float(event.ShiftMuon_p[index])))] += 1
-            values[quality]["absEta"].append(abs(float(event.ShiftMuon_eta[index])))
-            values[quality]["p"].append(float(event.ShiftMuon_p[index]))
-            values[quality]["hitSpan"].append(float(event.ShiftMuon_hitSpan[index]))
+            topology_counts[(algorithm, topology_name)] += 1
+            exit_counts[(algorithm, exit_name)] += 1
+            detector_counts[(algorithm, detectors)] += 1
+            eta_counts[(algorithm, eta_bin(float(event.ShiftMuon_eta[index])))] += 1
+            momentum_counts[(algorithm, momentum_bin(float(event.ShiftMuon_p[index])))] += 1
+            values[algorithm]["absEta"].append(abs(float(event.ShiftMuon_eta[index])))
+            values[algorithm]["p"].append(float(event.ShiftMuon_p[index]))
+            values[algorithm]["hitSpan"].append(float(event.ShiftMuon_hitSpan[index]))
 
     topology_columns = (
-        "near_only", "near_plus_barrel", "both_endcaps", "barrel_only",
-        "barrel_plus_far", "far_only", "unclassified",
+        "near_endcap_only", "near_endcap_and_barrel", "both_endcaps",
+        "far_endcap_only", "unclassified",
     )
     print(f"events={events.GetEntries()}")
     print_matrix("Recorded-hit topology", topology_counts, topology_columns)
@@ -125,12 +135,12 @@ def main():
     print_matrix("Absolute eta bins", eta_counts, ("<2.4", "2.4-3", "3-4", ">=4"))
     print_matrix("Momentum bins [GeV]", momentum_counts, ("<20", "20-50", "50-100", ">=100"))
 
-    print("\nMedians by reconstruction quality")
-    print(f"{'quality':20s}{'|eta|':>12s}{'p [GeV]':>12s}{'hit span [cm]':>18s}")
-    for quality, name in QUALITY_NAMES.items():
+    print("\nMedians by reconstruction algorithm")
+    print(f"{'reco algorithm':20s}{'|eta|':>12s}{'p [GeV]':>12s}{'hit span [cm]':>18s}")
+    for algorithm, name in ALGORITHM_NAMES.items():
         print(
-            f"{name:20s}{median(values[quality]['absEta']):12.3f}"
-            f"{median(values[quality]['p']):12.3f}{median(values[quality]['hitSpan']):18.1f}"
+            f"{name:20s}{median(values[algorithm]['absEta']):12.3f}"
+            f"{median(values[algorithm]['p']):12.3f}{median(values[algorithm]['hitSpan']):18.1f}"
         )
 
 
