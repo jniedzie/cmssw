@@ -11,6 +11,8 @@ def customise(
     directionalRefitUseGeometryMaterialEffectsInFitter=None,
     directionalRefitUseGeometryMaterialEffectsInSmoother=None,
     directionalRefitUseGeometryTargetMaterialEffects=None,
+    enableHcalDiagnostics=False,
+    enableZDCDiagnostics=False,
 ):
     process = addShiftMuonSegments(
         process,
@@ -19,6 +21,8 @@ def customise(
         directionalRefitUseGeometryMaterialEffectsInFitter=directionalRefitUseGeometryMaterialEffectsInFitter,
         directionalRefitUseGeometryMaterialEffectsInSmoother=directionalRefitUseGeometryMaterialEffectsInSmoother,
         directionalRefitUseGeometryTargetMaterialEffects=directionalRefitUseGeometryTargetMaterialEffects,
+        enableHcalDiagnostics=enableHcalDiagnostics,
+        enableZDCDiagnostics=enableZDCDiagnostics,
     )
     # Standard NanoAOD already provides every generator quantity used by the
     # SHIFT TEA analysis except pz and the production vertex.  Add only those
@@ -46,9 +50,13 @@ def customise(
     return process
 
 
-def customiseKeepShiftTruth(process):
+def customiseKeepShiftTruth(
+    process,
+    keepHcalSimHits=False,
+    keepZDCSimHits=False,
+):
     """Retain generator and simulation truth needed for SHIFT hit attribution."""
-    truth_commands = (
+    truth_commands = [
         "keep edmHepMCProduct_generator_*_*",
         "keep SimTracks_g4SimHits_*_*",
         "keep SimVertexs_g4SimHits_*_*",
@@ -56,7 +64,11 @@ def customiseKeepShiftTruth(process):
         "keep *_mix_MergedTrackTruth_*",
         "keep TrackingParticles_mix_MergedTrackTruth_*",
         "keep TrackingVertexs_mix_MergedTrackTruth_*",
-    )
+    ]
+    if keepHcalSimHits:
+        truth_commands.append("keep PCaloHits_g4SimHits_HcalHits_*")
+    if keepZDCSimHits:
+        truth_commands.append("keep PCaloHits_g4SimHits_ZDCHITS_*")
     for output in process.outputModules_().values():
         if not hasattr(output, "outputCommands"):
             continue
@@ -67,14 +79,38 @@ def customiseKeepShiftTruth(process):
     return process
 
 
-def customiseRecoDebug(process):
+def customiseRecoDebug(
+    process,
+    enableDTMeasurement=True,
+    enableGEMMeasurement=True,
+    trackerMode="general",
+    enableHcalDiagnostics=False,
+    enableZDCDiagnostics=False,
+    dtNavigationMode=1,
+    recoVariantCode=0,
+):
     """Run the reconstruction-funnel diagnostic on a dedicated end path."""
     from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import (
         shiftMuonRecoDiagnostics,
         shiftMuonSegmentsCounter,
     )
 
-    process.shiftMuonRecoDiagnostics = shiftMuonRecoDiagnostics.clone()
+    tracker_mode_codes = {"none": 0, "general": 1, "p5": 2}
+    if trackerMode not in tracker_mode_codes:
+        raise ValueError(f"Unsupported SHIFT tracker mode: {trackerMode}")
+    process.shiftMuonRecoDiagnostics = shiftMuonRecoDiagnostics.clone(
+        enableDTMeasurement=enableDTMeasurement,
+        enableGEMMeasurement=enableGEMMeasurement,
+        trackerMode=tracker_mode_codes[trackerMode],
+        enableHcalDiagnostics=enableHcalDiagnostics,
+        enableZDCDiagnostics=enableZDCDiagnostics,
+        dtNavigationMode=dtNavigationMode,
+        recoVariantCode=recoVariantCode,
+    )
+    if trackerMode == "p5":
+        process.shiftMuonRecoDiagnostics.generalTracks = cms.InputTag(
+            "ctfWithMaterialTracksP5"
+        )
     process.shiftMuonRecoDebug = shiftMuonSegmentsCounter.clone(printDetails=True)
     process.shiftMuonRecoDebug_step = cms.EndPath(
         process.shiftMuonRecoDiagnostics + process.shiftMuonRecoDebug
@@ -103,7 +139,11 @@ def customiseRecoDebug(process):
     return process
 
 
-def customiseTraversingShiftMuonReco(process):
+def customiseTraversingShiftMuonReco(
+    process,
+    trackerMode="general",
+    enableDTMeasurement=True,
+):
     """Add parallel cosmic-style through-going muon and tracker reconstruction."""
     from RecoMuon.MuonSeedGenerator.CosmicMuonSeedProducer_cfi import CosmicMuonSeed
     from RecoMuon.CosmicMuonProducer.cosmicMuons_cfi import cosmicMuons
@@ -141,17 +181,28 @@ def customiseTraversingShiftMuonReco(process):
             Strict1Leg=True,
         ),
     )
+    for module in (process.shiftCosmicMuons, process.shiftTraversingMuons):
+        module.TrajectoryBuilderParameters.EnableDTMeasurement = cms.bool(
+            enableDTMeasurement
+        )
 
     # Keep the detector-only collections canonical, and form independent
     # tracker+muon test hypotheses with CMSSW's established cosmic global fit.
     # The stock collision thresholds reject the very small transverse momenta
     # expected for SHIFT, so relax only those preselection thresholds; retain
     # the covariance-aware spatial matcher and all of its quality cuts.
-    def make_global(muon_collection):
+    tracker_collections = {
+        "general": "generalTracks",
+        "p5": "ctfWithMaterialTracksP5",
+    }
+    if trackerMode not in ("none", *tracker_collections):
+        raise ValueError(f"Unsupported SHIFT tracker mode: {trackerMode}")
+
+    def make_global(muon_collection, tracker_collection):
         module = globalCosmicMuons.clone(
             MuonCollectionLabel=muon_collection,
             TrajectoryBuilderParameters=dict(
-                TkTrackCollectionLabel="generalTracks",
+                TkTrackCollectionLabel=tracker_collection,
             ),
         )
         matcher = module.TrajectoryBuilderParameters.GlobalMuonTrackMatcher
@@ -159,31 +210,74 @@ def customiseTraversingShiftMuonReco(process):
         matcher.MinPt = 0.0
         return module
 
-    process.shiftGlobalDSAMuons = make_global("displacedStandAloneMuons")
-    process.shiftGlobalCosmicMuons = make_global("shiftCosmicMuons")
-    process.shiftGlobalTraversingMuons = make_global("shiftTraversingMuons")
-    process.shiftTraversingMuon_step = cms.Path(
+    shift_reco_sequence = (
         process.shiftCosmicMuonSeed
         + process.shiftCosmicMuons
         + process.shiftTraversingMuons
-        + process.shiftGlobalDSAMuons
-        + process.shiftGlobalCosmicMuons
-        + process.shiftGlobalTraversingMuons
     )
+    if trackerMode != "none":
+        tracker_collection = tracker_collections[trackerMode]
+        process.shiftGlobalDSAMuons = make_global(
+            "displacedStandAloneMuons", tracker_collection
+        )
+        process.shiftGlobalCosmicMuons = make_global(
+            "shiftCosmicMuons", tracker_collection
+        )
+        process.shiftGlobalTraversingMuons = make_global(
+            "shiftTraversingMuons", tracker_collection
+        )
+        shift_reco_sequence += (
+            process.shiftGlobalDSAMuons
+            + process.shiftGlobalCosmicMuons
+            + process.shiftGlobalTraversingMuons
+        )
+
+    if trackerMode == "p5":
+        process.load("RecoTracker.Configuration.RecoTrackerP5_cff")
+        # The stock P5 seeder assumes field-off cosmics in the outer TEC.
+        # SHIFT is field-on and the observed signal crossing uses TID plus
+        # inner TEC rings, so retain the bounded forward prototype explicitly.
+        process.combinatorialcosmicseedfinderP5.requireBOFF = cms.bool(False)
+        for layers in (
+            process.combinatorialcosmicseedingpairsTECposP5,
+            process.combinatorialcosmicseedingpairsTECnegP5,
+        ):
+            layers.TEC.minRing = cms.int32(1)
+            layers.TEC.maxRing = cms.int32(7)
+        process.shiftP5Tracker_step = cms.Path(process.ctftracksP5)
+        if hasattr(process, "schedule"):
+            process.schedule.append(process.shiftP5Tracker_step)
+        else:
+            raise RuntimeError("Cannot attach Shift P5 tracker reconstruction: no process schedule")
+
+    process.shiftTraversingMuon_step = cms.Path(shift_reco_sequence)
     if hasattr(process, "schedule"):
         process.schedule.append(process.shiftTraversingMuon_step)
     else:
         raise RuntimeError("Cannot attach traversing Shift muon reconstruction: no process schedule")
 
-    keep_commands = (
+    keep_commands = [
         "keep *_shiftCosmicMuonSeed_*_*",
         "keep *_shiftCosmicMuons_*_*",
         "keep *_shiftTraversingMuons_*_*",
-        "keep *_shiftGlobalDSAMuons_*_*",
-        "keep *_shiftGlobalCosmicMuons_*_*",
-        "keep *_shiftGlobalTraversingMuons_*_*",
-        "keep *_generalTracks_*_*",
-    )
+    ]
+    if trackerMode != "none":
+        keep_commands.extend(
+            (
+                "keep *_shiftGlobalDSAMuons_*_*",
+                "keep *_shiftGlobalCosmicMuons_*_*",
+                "keep *_shiftGlobalTraversingMuons_*_*",
+            )
+        )
+    if trackerMode == "general":
+        keep_commands.append("keep *_generalTracks_*_*")
+    elif trackerMode == "p5":
+        keep_commands.extend(
+            (
+                "keep *_ctfWithMaterialTracksP5_*_*",
+                "keep *_ctfWithMaterialTracksCosmics_*_*",
+            )
+        )
     for output in process.outputModules_().values():
         if hasattr(output, "outputCommands"):
             output.outputCommands.extend(keep_commands)
@@ -199,6 +293,8 @@ def customiseRecoForShiftMuons(
     keepAllSeedSegments=True,
     navigationType="Standard",
     pcaPropagator="SteppingHelixPropagatorAny",
+    enableDTMeasurement=True,
+    enableGEMMeasurement=True,
 ):
     """Tune explicitly selected DSA cuts, keeping each trial reproducible."""
     if not hasattr(process, "displacedStandAloneMuons"):
@@ -208,8 +304,10 @@ def customiseRecoForShiftMuons(
     builder.BWFilterParameters.NumberOfSigma = numberOfSigma
     builder.FilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
     builder.BWFilterParameters.MuonTrajectoryUpdatorParameters.MaxChi2 = maxHitChi2
-    builder.FilterParameters.EnableGEMMeasurement = True
-    builder.BWFilterParameters.EnableGEMMeasurement = True
+    builder.FilterParameters.EnableDTMeasurement = enableDTMeasurement
+    builder.BWFilterParameters.EnableDTMeasurement = enableDTMeasurement
+    builder.FilterParameters.EnableGEMMeasurement = enableGEMMeasurement
+    builder.BWFilterParameters.EnableGEMMeasurement = enableGEMMeasurement
     builder.SeedPosition = seedPosition
     builder.DoBackwardFilter = doBackwardFilter
     builder.NavigationType = navigationType

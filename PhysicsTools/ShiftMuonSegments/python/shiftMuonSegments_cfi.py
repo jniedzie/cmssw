@@ -23,6 +23,8 @@ shiftMuonTable = cms.EDProducer(
     cscSimHits=cms.InputTag("g4SimHits", "MuonCSCHits"),
     rpcSimHits=cms.InputTag("g4SimHits", "MuonRPCHits"),
     gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
+    hcalSimHits=cms.InputTag("g4SimHits", "HcalHits"),
+    zdcSimHits=cms.InputTag("g4SimHits", "ZDCHITS"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
     # Optional scale-improvement study: propagated-path hit ordering and the
     # guarded precision-only refit. Keep it enabled for the current iteration.
@@ -105,6 +107,10 @@ shiftMuonTable = cms.EDProducer(
     # Simulation-only closure columns and source/opposite-side precision
     # refits. Disabled in production because the extra fits cost CPU.
     produceMomentumClosureDiagnostics=cms.bool(True),
+    # HCAL/ZDC are diagnostic truth associations in this iteration. They are
+    # deliberately not treated as precision Kalman measurements.
+    enableHcalDiagnostics=cms.bool(False),
+    enableZDCDiagnostics=cms.bool(False),
     produceSplitLegRefits=cms.bool(False),
     # Backward target transport is now the canonical state contract.  This
     # compatibility parameter is retained for older configurations; it no
@@ -189,8 +195,18 @@ shiftMuonRecoDiagnostics = cms.EDProducer(
     cscSimHits=cms.InputTag("g4SimHits", "MuonCSCHits"),
     rpcSimHits=cms.InputTag("g4SimHits", "MuonRPCHits"),
     gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
+    hcalSimHits=cms.InputTag("g4SimHits", "HcalHits"),
+    zdcSimHits=cms.InputTag("g4SimHits", "ZDCHITS"),
+    simTracks=cms.InputTag("g4SimHits"),
     generalTracks=cms.InputTag("generalTracks"),
     dsaGlobalLinks=cms.InputTag("shiftGlobalDSAMuons"),
     cosmicGlobalLinks=cms.InputTag("shiftGlobalCosmicMuons"),
     traversingGlobalLinks=cms.InputTag("shiftGlobalTraversingMuons"),
+    enableDTMeasurement=cms.bool(True),
+    enableGEMMeasurement=cms.bool(True),
+    trackerMode=cms.int32(1),
+    enableHcalDiagnostics=cms.bool(False),
+    enableZDCDiagnostics=cms.bool(False),
+    dtNavigationMode=cms.int32(1),
+    recoVariantCode=cms.int32(0),
 )

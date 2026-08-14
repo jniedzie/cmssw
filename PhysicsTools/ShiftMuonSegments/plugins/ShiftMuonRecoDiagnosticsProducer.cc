@@ -22,11 +22,16 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
+#include "SimDataFormats/CaloHit/interface/PCaloHitContainer.h"
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -53,6 +58,40 @@ namespace {
       result += std::abs(hit.particleType()) == 13;
     return result;
   }
+
+  struct CaloSummary {
+    int allHits = -1;
+    int signalMuonHits = -1;
+    float signalMuonEnergy = -1.f;
+    float signalMuonFirstTime = 0.f;
+    float signalMuonLastTime = 0.f;
+  };
+
+  CaloSummary caloSummary(edm::Handle<edm::PCaloHitContainer> const& hits,
+                          std::unordered_set<unsigned int> const& signalMuonTrackIds,
+                          bool enabled) {
+    if (!enabled)
+      return {-2, -2, -2.f, 0.f, 0.f};
+    if (!hits.isValid())
+      return {};
+    CaloSummary result;
+    result.allHits = hits->size();
+    result.signalMuonHits = 0;
+    result.signalMuonEnergy = 0.f;
+    result.signalMuonFirstTime = std::numeric_limits<float>::infinity();
+    result.signalMuonLastTime = -std::numeric_limits<float>::infinity();
+    for (auto const& hit : *hits) {
+      if (!signalMuonTrackIds.count(hit.geantTrackId()))
+        continue;
+      ++result.signalMuonHits;
+      result.signalMuonEnergy += hit.energy();
+      result.signalMuonFirstTime = std::min(result.signalMuonFirstTime, static_cast<float>(hit.time()));
+      result.signalMuonLastTime = std::max(result.signalMuonLastTime, static_cast<float>(hit.time()));
+    }
+    if (result.signalMuonHits == 0)
+      result.signalMuonFirstTime = result.signalMuonLastTime = 0.f;
+    return result;
+  }
 }  // namespace
 
 class ShiftMuonRecoDiagnosticsProducer : public edm::stream::EDProducer<> {
@@ -77,13 +116,23 @@ public:
         cscSimHits_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("cscSimHits"))),
         rpcSimHits_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("rpcSimHits"))),
         gemSimHits_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("gemSimHits"))),
+        hcalSimHits_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("hcalSimHits"))),
+        zdcSimHits_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("zdcSimHits"))),
+        simTracks_(consumes<edm::SimTrackContainer>(parameters.getParameter<edm::InputTag>("simTracks"))),
         generalTracks_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("generalTracks"))),
         dsaGlobalLinks_(consumes<reco::MuonTrackLinksCollection>(
             parameters.getParameter<edm::InputTag>("dsaGlobalLinks"))),
         cosmicGlobalLinks_(consumes<reco::MuonTrackLinksCollection>(
             parameters.getParameter<edm::InputTag>("cosmicGlobalLinks"))),
         traversingGlobalLinks_(consumes<reco::MuonTrackLinksCollection>(
-            parameters.getParameter<edm::InputTag>("traversingGlobalLinks"))) {
+            parameters.getParameter<edm::InputTag>("traversingGlobalLinks"))),
+        enableDTMeasurement_(parameters.getParameter<bool>("enableDTMeasurement")),
+        enableGEMMeasurement_(parameters.getParameter<bool>("enableGEMMeasurement")),
+        trackerMode_(parameters.getParameter<int>("trackerMode")),
+        enableHcalDiagnostics_(parameters.getParameter<bool>("enableHcalDiagnostics")),
+        enableZDCDiagnostics_(parameters.getParameter<bool>("enableZDCDiagnostics")),
+        dtNavigationMode_(parameters.getParameter<int>("dtNavigationMode")),
+        recoVariantCode_(parameters.getParameter<int>("recoVariantCode")) {
     produces<nanoaod::FlatTable>();
   }
 
@@ -92,6 +141,26 @@ public:
     auto add = [&table](std::string const& name, int value, std::string const& documentation) {
       table->addColumn<int>(name, std::vector<int>{value}, documentation);
     };
+    auto addFloat = [&table](std::string const& name, float value, std::string const& documentation) {
+      table->addColumn<float>(name, std::vector<float>{value}, documentation);
+    };
+
+    std::unordered_set<unsigned int> signalMuonTrackIds;
+    auto const simTracks = event.getHandle(simTracks_);
+    if (simTracks.isValid())
+      for (auto const& track : *simTracks)
+        if (std::abs(track.type()) == 13 && track.genpartIndex() >= 0)
+          signalMuonTrackIds.insert(track.trackId());
+    auto const hcal = caloSummary(event.getHandle(hcalSimHits_), signalMuonTrackIds, enableHcalDiagnostics_);
+    auto const zdc = caloSummary(event.getHandle(zdcSimHits_), signalMuonTrackIds, enableZDCDiagnostics_);
+
+    add("recoVariantCode", recoVariantCode_, "workflow reconstruction-variant code");
+    add("enableDTMeasurement", enableDTMeasurement_, "DT measurements enabled in Shift muon reconstruction");
+    add("dtNavigationMode", dtNavigationMode_, "DT navigation: 0=off, 1=Standard, 2=Direct");
+    add("enableGEMMeasurement", enableGEMMeasurement_, "GEM measurements enabled in Shift DSA reconstruction");
+    add("trackerMode", trackerMode_, "tracker combination: 0=off, 1=generalTracks, 2=forward P5 prototype");
+    add("enableHcalDiagnostics", enableHcalDiagnostics_, "HCAL SimHit association enabled");
+    add("enableZDCDiagnostics", enableZDCDiagnostics_, "ZDC SimHit association enabled");
 
     add("nDTSimHits", muonSimHitCount(event.getHandle(dtSimHits_)), "muon SimHits in DT sensitive volumes");
     add("nCSCSimHits", muonSimHitCount(event.getHandle(cscSimHits_)), "muon SimHits in CSC sensitive volumes");
@@ -115,6 +184,16 @@ public:
     add("nTraversingTrackerMatches",
         collectionSize(event.getHandle(traversingGlobalLinks_)),
         "strict-traversing tracker+muon links");
+    add("nHcalSimHits", hcal.allHits, "all HCAL SimHits; -2 when this diagnostic is disabled");
+    add("nSignalMuonHcalSimHits", hcal.signalMuonHits, "primary signal-muon HCAL SimHits");
+    addFloat("signalMuonHcalSimEnergy", hcal.signalMuonEnergy, "summed primary signal-muon HCAL SimHit energy");
+    addFloat("signalMuonHcalFirstTime", hcal.signalMuonFirstTime, "earliest primary signal-muon HCAL SimHit time");
+    addFloat("signalMuonHcalLastTime", hcal.signalMuonLastTime, "latest primary signal-muon HCAL SimHit time");
+    add("nZDCSimHits", zdc.allHits, "all ZDC SimHits; -2 when this diagnostic is disabled");
+    add("nSignalMuonZDCSimHits", zdc.signalMuonHits, "primary signal-muon ZDC SimHits");
+    addFloat("signalMuonZDCSimEnergy", zdc.signalMuonEnergy, "summed primary signal-muon ZDC SimHit energy");
+    addFloat("signalMuonZDCFirstTime", zdc.signalMuonFirstTime, "earliest primary signal-muon ZDC SimHit time");
+    addFloat("signalMuonZDCLastTime", zdc.signalMuonLastTime, "latest primary signal-muon ZDC SimHit time");
     event.put(std::move(table));
   }
 
@@ -136,10 +215,20 @@ public:
     description.add<edm::InputTag>("cscSimHits", edm::InputTag("g4SimHits", "MuonCSCHits"));
     description.add<edm::InputTag>("rpcSimHits", edm::InputTag("g4SimHits", "MuonRPCHits"));
     description.add<edm::InputTag>("gemSimHits", edm::InputTag("g4SimHits", "MuonGEMHits"));
+    description.add<edm::InputTag>("hcalSimHits", edm::InputTag("g4SimHits", "HcalHits"));
+    description.add<edm::InputTag>("zdcSimHits", edm::InputTag("g4SimHits", "ZDCHITS"));
+    description.add<edm::InputTag>("simTracks", edm::InputTag("g4SimHits"));
     description.add<edm::InputTag>("generalTracks", edm::InputTag("generalTracks"));
     description.add<edm::InputTag>("dsaGlobalLinks", edm::InputTag("shiftGlobalDSAMuons"));
     description.add<edm::InputTag>("cosmicGlobalLinks", edm::InputTag("shiftGlobalCosmicMuons"));
     description.add<edm::InputTag>("traversingGlobalLinks", edm::InputTag("shiftGlobalTraversingMuons"));
+    description.add<bool>("enableDTMeasurement", true);
+    description.add<bool>("enableGEMMeasurement", true);
+    description.add<int>("trackerMode", 1);
+    description.add<bool>("enableHcalDiagnostics", false);
+    description.add<bool>("enableZDCDiagnostics", false);
+    description.add<int>("dtNavigationMode", 1);
+    description.add<int>("recoVariantCode", 0);
     descriptions.add("shiftMuonRecoDiagnostics", description);
   }
 
@@ -160,10 +249,20 @@ private:
   edm::EDGetTokenT<edm::PSimHitContainer> cscSimHits_;
   edm::EDGetTokenT<edm::PSimHitContainer> rpcSimHits_;
   edm::EDGetTokenT<edm::PSimHitContainer> gemSimHits_;
+  edm::EDGetTokenT<edm::PCaloHitContainer> hcalSimHits_;
+  edm::EDGetTokenT<edm::PCaloHitContainer> zdcSimHits_;
+  edm::EDGetTokenT<edm::SimTrackContainer> simTracks_;
   edm::EDGetTokenT<reco::TrackCollection> generalTracks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> dsaGlobalLinks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> cosmicGlobalLinks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> traversingGlobalLinks_;
+  bool enableDTMeasurement_;
+  bool enableGEMMeasurement_;
+  int trackerMode_;
+  bool enableHcalDiagnostics_;
+  bool enableZDCDiagnostics_;
+  int dtNavigationMode_;
+  int recoVariantCode_;
 };
 
 DEFINE_FWK_MODULE(ShiftMuonRecoDiagnosticsProducer);

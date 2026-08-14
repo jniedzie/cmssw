@@ -13,6 +13,39 @@ Keep detector-only, tracker-only, combined, unconstrained, and target-constraine
 hypotheses separate until physics validation shows which one should be used.
 Simulation truth is allowed only for diagnostics and performance denominators.
 
+## Bounded probes on 2026-08-14
+
+These tests used v15 plus small ten-event Step-2 inputs.  The 100-event detector
+sample was deliberately enriched with files in which v15 contained at least one
+`generalTracks` object, so its absolute acceptance fractions must not be
+extrapolated to the full sample.
+
+- No tracker information entered the v15 ShiftMuon fit: all 3,896 selected
+  muons have invalid tracker and combined-track links and zero attached tracker
+  hits.  Only 9 of 9,960 events contain any `generalTracks`, and only 6 of those
+  events also contain a ShiftMuon.
+- In the enriched 100-event Step-2 sample, primary signal muons made 53 tracker
+  SimHits in 2 events.  One inspected leg crossed TID and TEC with 25 SimHits,
+  but collision tracking, the stock P5 cosmic CTF pass, and a field-on/wider-TEC
+  P5 variant all reconstructed zero tracks for it.  The next tracker prototype
+  should therefore be a dedicated field-on TID/TEC or outside-in muon-seeded
+  pass, not another global-matcher tuning.
+- Of 2,123 v15 ShiftMuons with matched signal DT SimHits, only 13 have attached
+  DT hits.  A ten-event `navigationType=Direct` probe recovered four DT hits in
+  one DSA candidate that had none with Standard navigation, but also changed
+  its momentum and removed the other DSA candidate.  Test Direct navigation as
+  a parallel diagnostic collection with truth matching and source-selection
+  checks before changing production.
+- Primary signal muons in the enriched 100-event sample made ZDC SimHits in 39
+  events, HCAL SimHits in 8, and no ECAL, PLT, BHM, or BCM1F SimHits.  ZDC times
+  near -468 to -463 ns look potentially useful for direction diagnostics.
+  Neither Run-3 QIE10 nor legacy ZDC reconstruction produced RecHits because
+  both corresponding ZDC digi collections are empty; ZDC digitization must be
+  enabled or repaired before testing reconstructed observables.
+- GEM remains an acceptance rather than a fitting problem in this campaign:
+  only 5 selected v15 muons have matched signal GEM SimHits and none has an
+  attached GEM hit.
+
 ## Muon-system reconstruction
 
 - Complete a per-muon funnel for DT, CSC, RPC, and GEM: sensitive-volume

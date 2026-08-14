@@ -47,6 +47,7 @@
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
 #include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "SimDataFormats/CaloHit/interface/PCaloHitContainer.h"
 #include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
 #include "SimDataFormats/Vertex/interface/SimVertexContainer.h"
 
@@ -1484,6 +1485,8 @@ public:
         cscSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("cscSimHits"))),
         rpcSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("rpcSimHits"))),
         gemSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("gemSimHits"))),
+        hcalSimHitsToken_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("hcalSimHits"))),
+        zdcSimHitsToken_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("zdcSimHits"))),
         magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
@@ -1531,6 +1534,8 @@ public:
         directionalRefitMaxPrecisionRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxPrecisionRelativeQoverPChange")),
         produceMomentumClosureDiagnostics_(parameters.getParameter<bool>("produceMomentumClosureDiagnostics")),
+        enableHcalDiagnostics_(parameters.getParameter<bool>("enableHcalDiagnostics")),
+        enableZDCDiagnostics_(parameters.getParameter<bool>("enableZDCDiagnostics")),
         produceSplitLegRefits_(parameters.getParameter<bool>("produceSplitLegRefits")),
         directionalRefitUseExplicitBackwardTargetPropagation_(
             parameters.getParameter<bool>("directionalRefitUseExplicitBackwardTargetPropagation")),
@@ -1615,6 +1620,8 @@ public:
     auto const cscSimHits = event.getHandle(cscSimHitsToken_);
     auto const rpcSimHits = event.getHandle(rpcSimHitsToken_);
     auto const gemSimHits = event.getHandle(gemSimHitsToken_);
+    auto const hcalSimHits = event.getHandle(hcalSimHitsToken_);
+    auto const zdcSimHits = event.getHandle(zdcSimHitsToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
     bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
                                              directionalRefitUseGeometryMaterialEffectsInFitter_;
@@ -2232,9 +2239,15 @@ public:
     std::vector<int> simTruthMatched(selected.size(), 0), simTrackId(selected.size(), -1);
     std::vector<int> simDTHits(selected.size(), 0), simCSCHits(selected.size(), 0),
         simRPCHits(selected.size(), 0), simGEMHits(selected.size(), 0), simMuonDetectorMask(selected.size(), 0);
+    std::vector<int> simHcalHits(selected.size(), enableHcalDiagnostics_ ? -1 : -2),
+        simZDCHits(selected.size(), enableZDCDiagnostics_ ? -1 : -2);
     std::vector<float> simTrackP(selected.size(), -1.f), simFirstPrecisionHitP(selected.size(), -1.f),
         simLastPrecisionHitP(selected.size(), -1.f), simLossToFirstPrecisionHit(selected.size(), -1.f),
         simLossAcrossPrecisionHits(selected.size(), -1.f), simFirstPrecisionPath(selected.size(), -1.f);
+    std::vector<float> simHcalEnergy(selected.size(), enableHcalDiagnostics_ ? -1.f : -2.f),
+        simHcalFirstTime(selected.size(), 0.f), simHcalLastTime(selected.size(), 0.f),
+        simZDCEnergy(selected.size(), enableZDCDiagnostics_ ? -1.f : -2.f),
+        simZDCFirstTime(selected.size(), 0.f), simZDCLastTime(selected.size(), 0.f);
     if (produceMomentumClosureDiagnostics_ && genParticles.isValid() && simTracks.isValid() &&
         simVertices.isValid()) {
       std::unordered_map<unsigned int, std::vector<PSimHit const*>> precisionHitsByTrack;
@@ -2255,6 +2268,30 @@ public:
       collectHits(cscSimHits, 1, true);
       collectHits(rpcSimHits, 2, false);
       collectHits(gemSimHits, 3, true);
+
+      struct CaloHitSummary {
+        int hits = 0;
+        float energy = 0.f;
+        float firstTime = std::numeric_limits<float>::infinity();
+        float lastTime = -std::numeric_limits<float>::infinity();
+      };
+      std::unordered_map<unsigned int, CaloHitSummary> hcalHitsByTrack;
+      std::unordered_map<unsigned int, CaloHitSummary> zdcHitsByTrack;
+      auto collectCaloHits = [](auto const& handle, auto& summaries) {
+        if (!handle.isValid())
+          return;
+        for (auto const& hit : *handle) {
+          auto& summary = summaries[hit.geantTrackId()];
+          ++summary.hits;
+          summary.energy += hit.energy();
+          summary.firstTime = std::min(summary.firstTime, static_cast<float>(hit.time()));
+          summary.lastTime = std::max(summary.lastTime, static_cast<float>(hit.time()));
+        }
+      };
+      if (enableHcalDiagnostics_)
+        collectCaloHits(hcalSimHits, hcalHitsByTrack);
+      if (enableZDCDiagnostics_)
+        collectCaloHits(zdcSimHits, zdcHitsByTrack);
 
       for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
         int const genIndex = genPartIdx[selectedIndex];
@@ -2290,6 +2327,42 @@ public:
         simCSCHits[selectedIndex] = detectorCounts[1];
         simRPCHits[selectedIndex] = detectorCounts[2];
         simGEMHits[selectedIndex] = detectorCounts[3];
+        auto assignCalo = [selectedIndex](bool enabled,
+                                          bool available,
+                                          auto const& summaries,
+                                          unsigned int trackId,
+                                          auto& counts,
+                                          auto& energies,
+                                          auto& firstTimes,
+                                          auto& lastTimes) {
+          if (!enabled || !available)
+            return;
+          counts[selectedIndex] = 0;
+          energies[selectedIndex] = 0.f;
+          auto const found = summaries.find(trackId);
+          if (found == summaries.end())
+            return;
+          counts[selectedIndex] = found->second.hits;
+          energies[selectedIndex] = found->second.energy;
+          firstTimes[selectedIndex] = found->second.firstTime;
+          lastTimes[selectedIndex] = found->second.lastTime;
+        };
+        assignCalo(enableHcalDiagnostics_,
+                   hcalSimHits.isValid(),
+                   hcalHitsByTrack,
+                   matchedSimTrack->trackId(),
+                   simHcalHits,
+                   simHcalEnergy,
+                   simHcalFirstTime,
+                   simHcalLastTime);
+        assignCalo(enableZDCDiagnostics_,
+                   zdcSimHits.isValid(),
+                   zdcHitsByTrack,
+                   matchedSimTrack->trackId(),
+                   simZDCHits,
+                   simZDCEnergy,
+                   simZDCFirstTime,
+                   simZDCLastTime);
         for (unsigned int detectorIndex = 0; detectorIndex < detectorCounts.size(); ++detectorIndex)
           if (detectorCounts[detectorIndex] > 0)
             simMuonDetectorMask[selectedIndex] |= 1u << detectorIndex;
@@ -3135,6 +3208,18 @@ public:
     table->addColumn<int>("simCSCHits", simCSCHits, "matched muon Geant4 hits in CSC sensitive volumes");
     table->addColumn<int>("simRPCHits", simRPCHits, "matched muon Geant4 hits in RPC sensitive volumes");
     table->addColumn<int>("simGEMHits", simGEMHits, "matched muon Geant4 hits in GEM sensitive volumes");
+    table->addColumn<int>("simHcalHits",
+                          simHcalHits,
+                          "matched primary-muon HCAL SimHits; -1 unavailable, -2 diagnostic disabled");
+    table->addColumn<float>("simHcalEnergy", simHcalEnergy, "summed matched primary-muon HCAL SimHit energy");
+    table->addColumn<float>("simHcalFirstTime", simHcalFirstTime, "earliest matched primary-muon HCAL SimHit time");
+    table->addColumn<float>("simHcalLastTime", simHcalLastTime, "latest matched primary-muon HCAL SimHit time");
+    table->addColumn<int>("simZDCHits",
+                          simZDCHits,
+                          "matched primary-muon ZDC SimHits; -1 unavailable, -2 diagnostic disabled");
+    table->addColumn<float>("simZDCEnergy", simZDCEnergy, "summed matched primary-muon ZDC SimHit energy");
+    table->addColumn<float>("simZDCFirstTime", simZDCFirstTime, "earliest matched primary-muon ZDC SimHit time");
+    table->addColumn<float>("simZDCLastTime", simZDCLastTime, "latest matched primary-muon ZDC SimHit time");
     table->addColumn<int>("simMuonDetectorMask",
                           simMuonDetectorMask,
                           "sensitive-volume crossing mask from SimHits: bit0=DT, bit1=CSC, bit2=RPC, bit3=GEM");
@@ -3515,6 +3600,8 @@ public:
     description.add<edm::InputTag>("cscSimHits", edm::InputTag("g4SimHits", "MuonCSCHits"));
     description.add<edm::InputTag>("rpcSimHits", edm::InputTag("g4SimHits", "MuonRPCHits"));
     description.add<edm::InputTag>("gemSimHits", edm::InputTag("g4SimHits", "MuonGEMHits"));
+    description.add<edm::InputTag>("hcalSimHits", edm::InputTag("g4SimHits", "HcalHits"));
+    description.add<edm::InputTag>("zdcSimHits", edm::InputTag("g4SimHits", "ZDCHITS"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
@@ -3542,6 +3629,8 @@ public:
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
     description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.5);
     description.add<bool>("produceMomentumClosureDiagnostics", false);
+    description.add<bool>("enableHcalDiagnostics", false);
+    description.add<bool>("enableZDCDiagnostics", false);
     description.add<bool>("produceSplitLegRefits", false);
     description.add<bool>("directionalRefitUseExplicitBackwardTargetPropagation", false);
     description.add<bool>("produceTargetConstrainedMomentum", true);
@@ -3586,6 +3675,8 @@ private:
   edm::EDGetTokenT<edm::PSimHitContainer> cscSimHitsToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> rpcSimHitsToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> gemSimHitsToken_;
+  edm::EDGetTokenT<edm::PCaloHitContainer> hcalSimHitsToken_;
+  edm::EDGetTokenT<edm::PCaloHitContainer> zdcSimHitsToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
@@ -3615,6 +3706,8 @@ private:
   unsigned int directionalRefitMinPrecisionStations_;
   double directionalRefitMaxPrecisionRelativeQoverPChange_;
   bool produceMomentumClosureDiagnostics_;
+  bool enableHcalDiagnostics_;
+  bool enableZDCDiagnostics_;
   bool produceSplitLegRefits_;
   bool directionalRefitUseExplicitBackwardTargetPropagation_;
   bool produceTargetConstrainedMomentum_;
