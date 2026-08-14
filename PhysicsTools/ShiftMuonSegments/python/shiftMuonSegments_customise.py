@@ -69,14 +69,25 @@ def customiseKeepShiftTruth(process):
 
 def customiseRecoDebug(process):
     """Run the reconstruction-funnel diagnostic on a dedicated end path."""
-    from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegmentsCounter
+    from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import (
+        shiftMuonRecoDiagnostics,
+        shiftMuonSegmentsCounter,
+    )
 
+    process.shiftMuonRecoDiagnostics = shiftMuonRecoDiagnostics.clone()
     process.shiftMuonRecoDebug = shiftMuonSegmentsCounter.clone(printDetails=True)
-    process.shiftMuonRecoDebug_step = cms.EndPath(process.shiftMuonRecoDebug)
+    process.shiftMuonRecoDebug_step = cms.EndPath(
+        process.shiftMuonRecoDiagnostics + process.shiftMuonRecoDebug
+    )
     if hasattr(process, "schedule"):
         process.schedule.append(process.shiftMuonRecoDebug_step)
     else:
         raise RuntimeError("Cannot attach Shift muon debug analyzer: no process schedule")
+    for output in process.outputModules_().values():
+        if hasattr(output, "outputCommands"):
+            output.outputCommands.append(
+                "keep nanoaodFlatTable_shiftMuonRecoDiagnostics_*_*"
+            )
 
     # LogVerbatim categories must be explicitly admitted by MessageLogger.
     # The default INFO threshold alone does not make a custom verbatim
@@ -96,6 +107,7 @@ def customiseTraversingShiftMuonReco(process):
     """Add parallel cosmic-style through-going muon and tracker reconstruction."""
     from RecoMuon.MuonSeedGenerator.CosmicMuonSeedProducer_cfi import CosmicMuonSeed
     from RecoMuon.CosmicMuonProducer.cosmicMuons_cfi import cosmicMuons
+    from RecoMuon.CosmicMuonProducer.globalCosmicMuons_cfi import globalCosmicMuons
 
     process.shiftCosmicMuonSeed = CosmicMuonSeed.clone(
         ForcePointDown=False,
@@ -129,10 +141,34 @@ def customiseTraversingShiftMuonReco(process):
             Strict1Leg=True,
         ),
     )
+
+    # Keep the detector-only collections canonical, and form independent
+    # tracker+muon test hypotheses with CMSSW's established cosmic global fit.
+    # The stock collision thresholds reject the very small transverse momenta
+    # expected for SHIFT, so relax only those preselection thresholds; retain
+    # the covariance-aware spatial matcher and all of its quality cuts.
+    def make_global(muon_collection):
+        module = globalCosmicMuons.clone(
+            MuonCollectionLabel=muon_collection,
+            TrajectoryBuilderParameters=dict(
+                TkTrackCollectionLabel="generalTracks",
+            ),
+        )
+        matcher = module.TrajectoryBuilderParameters.GlobalMuonTrackMatcher
+        matcher.MinP = 0.01
+        matcher.MinPt = 0.0
+        return module
+
+    process.shiftGlobalDSAMuons = make_global("displacedStandAloneMuons")
+    process.shiftGlobalCosmicMuons = make_global("shiftCosmicMuons")
+    process.shiftGlobalTraversingMuons = make_global("shiftTraversingMuons")
     process.shiftTraversingMuon_step = cms.Path(
         process.shiftCosmicMuonSeed
         + process.shiftCosmicMuons
         + process.shiftTraversingMuons
+        + process.shiftGlobalDSAMuons
+        + process.shiftGlobalCosmicMuons
+        + process.shiftGlobalTraversingMuons
     )
     if hasattr(process, "schedule"):
         process.schedule.append(process.shiftTraversingMuon_step)
@@ -143,6 +179,9 @@ def customiseTraversingShiftMuonReco(process):
         "keep *_shiftCosmicMuonSeed_*_*",
         "keep *_shiftCosmicMuons_*_*",
         "keep *_shiftTraversingMuons_*_*",
+        "keep *_shiftGlobalDSAMuons_*_*",
+        "keep *_shiftGlobalCosmicMuons_*_*",
+        "keep *_shiftGlobalTraversingMuons_*_*",
         "keep *_generalTracks_*_*",
     )
     for output in process.outputModules_().values():

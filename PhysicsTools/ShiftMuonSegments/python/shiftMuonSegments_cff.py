@@ -106,6 +106,7 @@ def addShiftMuonSegments(
                 "keep nanoaodFlatTable_shiftMuonSegments_ShiftRPC_*",
                 "keep nanoaodFlatTable_shiftMuonSegments_ShiftGEM_*",
                 "keep nanoaodFlatTable_shiftMuonTable__*",
+                "keep nanoaodFlatTable_shiftMuonRecoDiagnostics_*_*",
             ):
                 if command not in output.outputCommands:
                     output.outputCommands.append(command)
