@@ -32,6 +32,10 @@ def main():
         "ShiftMuon_duplicateCosmicCount",
         "ShiftMuon_nDTHits", "ShiftMuon_nCSCHits", "ShiftMuon_nRPCHits",
         "ShiftMuon_nGEMHits", "ShiftMuon_nME0Hits", "ShiftMuon_detectorMask",
+        "ShiftMuon_simHcalHits", "ShiftMuon_simHcalEnergy",
+        "ShiftMuon_simHcalFirstTime", "ShiftMuon_simHcalLastTime",
+        "ShiftMuon_simZDCHits", "ShiftMuon_simZDCEnergy",
+        "ShiftMuon_simZDCFirstTime", "ShiftMuon_simZDCLastTime",
         "ShiftMuon_nHitsPlusEndcap", "ShiftMuon_nHitsBarrel", "ShiftMuon_nHitsMinusEndcap",
         "ShiftMuon_nHitsNearEndcap", "ShiftMuon_nHitsFarEndcap",
         "ShiftMuon_nStationsNearEndcap", "ShiftMuon_nStationsBarrel",
@@ -53,6 +57,11 @@ def main():
         "ShiftDimuonVertex_isTraversingDoubleTraversing",
         "ShiftDimuonVertex_isDoubleTraversingDoubleTraversing",
         "ShiftDimuonVertex_topologyMin", "ShiftDimuonVertex_topologyMax",
+        "ShiftRecoDiag_recoVariantCode", "ShiftRecoDiag_enableDTMeasurement",
+        "ShiftRecoDiag_dtNavigationMode", "ShiftRecoDiag_enableGEMMeasurement",
+        "ShiftRecoDiag_trackerMode", "ShiftRecoDiag_enableHcalDiagnostics",
+        "ShiftRecoDiag_enableZDCDiagnostics", "ShiftRecoDiag_nSignalMuonHcalSimHits",
+        "ShiftRecoDiag_nSignalMuonZDCSimHits", "ShiftRecoDiag_signalMuonZDCFirstTime",
     }
     forbidden = {
         "ShiftMuon_unconstrainedPt", "ShiftMuon_source", "ShiftMuon_isTraversing",
@@ -78,6 +87,16 @@ def main():
         "isTraversingDoubleTraversing", "isDoubleTraversingDoubleTraversing",
     )
     for event in events:
+        if int(event.ShiftRecoDiag_dtNavigationMode) not in range(3):
+            raise RuntimeError("invalid ShiftRecoDiag_dtNavigationMode")
+        if int(event.ShiftRecoDiag_trackerMode) not in range(3):
+            raise RuntimeError("invalid ShiftRecoDiag_trackerMode")
+        if not bool(event.ShiftRecoDiag_enableHcalDiagnostics):
+            if int(event.ShiftRecoDiag_nSignalMuonHcalSimHits) != -2:
+                raise RuntimeError("disabled HCAL diagnostics do not carry the -2 sentinel")
+        if not bool(event.ShiftRecoDiag_enableZDCDiagnostics):
+            if int(event.ShiftRecoDiag_nSignalMuonZDCSimHits) != -2:
+                raise RuntimeError("disabled ZDC diagnostics do not carry the -2 sentinel")
         for index in range(int(event.nShiftMuon)):
             muons += 1
             quality = int(event.ShiftMuon_quality[index])

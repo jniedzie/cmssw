@@ -10,10 +10,14 @@ def addShiftMuonSegments(
     directionalRefitUseGeometryMaterialEffectsInFitter=None,
     directionalRefitUseGeometryMaterialEffectsInSmoother=None,
     directionalRefitUseGeometryTargetMaterialEffects=None,
+    enableHcalDiagnostics=False,
+    enableZDCDiagnostics=False,
 ):
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
+    process.shiftMuonTable.enableHcalDiagnostics = cms.bool(enableHcalDiagnostics)
+    process.shiftMuonTable.enableZDCDiagnostics = cms.bool(enableZDCDiagnostics)
     if directionalRefitUseDetailedMaterialEffects is not None:
         process.shiftMuonTable.directionalRefitUseDetailedMaterialEffects = cms.bool(
             directionalRefitUseDetailedMaterialEffects
