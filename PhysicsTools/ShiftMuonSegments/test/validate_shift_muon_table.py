@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the compact dual-momentum ShiftMuon schema."""
+"""Validate the topology/provenance and dual-momentum ShiftMuon schema."""
 
 import argparse
 
@@ -25,7 +25,11 @@ def main():
         "ShiftMuon_constrainedPhi", "ShiftMuon_constrainedVx",
         "ShiftMuon_constrainedVy", "ShiftMuon_constrainedVz",
         "ShiftMuon_constrainedValid", "ShiftMuon_constrainedStatus",
-        "ShiftMuon_constrainedTargetChi2", "ShiftMuon_quality", "ShiftMuon_sourceIndex",
+        "ShiftMuon_constrainedTargetChi2", "ShiftMuon_topology", "ShiftMuon_orientationValid",
+        "ShiftMuon_recoAlgorithm", "ShiftMuon_quality", "ShiftMuon_sourceIndex",
+        "ShiftMuon_duplicateGroupSize", "ShiftMuon_duplicateSourceMask",
+        "ShiftMuon_duplicateDSACount", "ShiftMuon_duplicateTraversingCount",
+        "ShiftMuon_duplicateCosmicCount",
         "ShiftMuon_nDTHits", "ShiftMuon_nCSCHits", "ShiftMuon_nRPCHits",
         "ShiftMuon_nGEMHits", "ShiftMuon_nME0Hits", "ShiftMuon_detectorMask",
         "ShiftMuon_nHitsPlusEndcap", "ShiftMuon_nHitsBarrel", "ShiftMuon_nHitsMinusEndcap",
@@ -36,7 +40,7 @@ def main():
         "ShiftMuon_entrySubdetector", "ShiftMuon_exitSubdetector",
         "ShiftMuon_entryX", "ShiftMuon_entryY", "ShiftMuon_entryZ", "ShiftMuon_entryR",
         "ShiftMuon_exitX", "ShiftMuon_exitY", "ShiftMuon_exitZ", "ShiftMuon_exitR",
-        "ShiftMuon_hitSpan",
+        "ShiftMuon_hitSpan", "ShiftMuon_hitDeltaZ",
         "nShiftDimuonVertex", "ShiftDimuonVertex_constrainedValid",
         "ShiftDimuonVertex_constrainedMass", "ShiftDimuonVertex_constrainedPt",
         "ShiftDimuonVertex_constrainedPz", "ShiftDimuonVertex_constrainedEta",
@@ -48,6 +52,7 @@ def main():
         "ShiftDimuonVertex_isDSADoubleTraversing", "ShiftDimuonVertex_isTraversingTraversing",
         "ShiftDimuonVertex_isTraversingDoubleTraversing",
         "ShiftDimuonVertex_isDoubleTraversingDoubleTraversing",
+        "ShiftDimuonVertex_topologyMin", "ShiftDimuonVertex_topologyMax",
     }
     forbidden = {
         "ShiftMuon_unconstrainedPt", "ShiftMuon_source", "ShiftMuon_isTraversing",
@@ -61,6 +66,8 @@ def main():
         raise RuntimeError(f"redundant branches remain: {', '.join(redundant)}")
 
     quality_counts = {index: 0 for index in range(4)}
+    topology_counts = {index: 0 for index in range(5)}
+    algorithm_counts = {index: 0 for index in range(3)}
     constrained_valid = 0
     muons = 0
     dimuons = 0
@@ -77,6 +84,16 @@ def main():
             if quality not in quality_counts:
                 raise RuntimeError(f"invalid quality value {quality}")
             quality_counts[quality] += 1
+            topology = int(event.ShiftMuon_topology[index])
+            if topology not in topology_counts:
+                raise RuntimeError(f"invalid topology value {topology}")
+            topology_counts[topology] += 1
+            algorithm = int(event.ShiftMuon_recoAlgorithm[index])
+            if algorithm not in algorithm_counts:
+                raise RuntimeError(f"invalid recoAlgorithm value {algorithm}")
+            algorithm_counts[algorithm] += 1
+            if not bool(event.ShiftMuon_orientationValid[index]) and topology != 4:
+                raise RuntimeError(f"muon {muons - 1} has oriented topology without valid orientation")
             constrained_valid += bool(event.ShiftMuon_constrainedValid[index])
             subdetector_counts = (
                 int(event.ShiftMuon_nDTHits[index]), int(event.ShiftMuon_nCSCHits[index]),
@@ -105,6 +122,18 @@ def main():
                 )
             if float(event.ShiftMuon_hitSpan[index]) < 0.0:
                 raise RuntimeError(f"muon {muons - 1} has negative hit span")
+            if float(event.ShiftMuon_hitDeltaZ[index]) < 0.0:
+                raise RuntimeError(f"muon {muons - 1} has negative hitDeltaZ")
+            source_counts = (
+                int(event.ShiftMuon_duplicateDSACount[index]),
+                int(event.ShiftMuon_duplicateTraversingCount[index]),
+                int(event.ShiftMuon_duplicateCosmicCount[index]),
+            )
+            if sum(source_counts) != int(event.ShiftMuon_duplicateGroupSize[index]):
+                raise RuntimeError(f"muon {muons - 1} has inconsistent duplicate source counts")
+            expected_source_mask = sum((1 << source) for source, count in enumerate(source_counts) if count)
+            if int(event.ShiftMuon_duplicateSourceMask[index]) != expected_source_mask:
+                raise RuntimeError(f"muon {muons - 1} has inconsistent duplicateSourceMask")
         for index in range(int(event.nShiftDimuonVertex)):
             dimuons += 1
             constrained_dimuons += bool(event.ShiftDimuonVertex_constrainedValid[index])
@@ -113,9 +142,25 @@ def main():
             )
             if active_flags != 1:
                 raise RuntimeError(f"dimuon {dimuons - 1} has {active_flags} active quality-pair flags")
+            first = int(event.ShiftDimuonVertex_muonIdx1[index])
+            second = int(event.ShiftDimuonVertex_muonIdx2[index])
+            expected_pair = sorted((
+                int(event.ShiftMuon_topology[first]),
+                int(event.ShiftMuon_topology[second]),
+            ))
+            stored_pair = [
+                int(event.ShiftDimuonVertex_topologyMin[index]),
+                int(event.ShiftDimuonVertex_topologyMax[index]),
+            ]
+            if stored_pair != expected_pair:
+                raise RuntimeError(
+                    f"dimuon {dimuons - 1} has topology pair {stored_pair}, expected {expected_pair}"
+                )
 
     print(f"events={events.GetEntries()} muons={muons} constrainedValid={constrained_valid}/{muons}")
     print("quality=" + ",".join(f"{key}:{value}" for key, value in quality_counts.items()))
+    print("topology=" + ",".join(f"{key}:{value}" for key, value in topology_counts.items()))
+    print("recoAlgorithm=" + ",".join(f"{key}:{value}" for key, value in algorithm_counts.items()))
     print(f"dimuons={dimuons} constrainedValid={constrained_dimuons}/{dimuons}")
 
 

@@ -55,12 +55,14 @@ def main():
         "ShiftMuon_directionalRefitPrecisionSecondRejected",
         "ShiftMuon_directionalRefitPrecisionSelectedIteration",
     }
-    if "ShiftMuon_quality" in available:
+    if "ShiftMuon_topology" in available:
+        required.add("ShiftMuon_topology")
+    elif "ShiftMuon_quality" in available:
         required.add("ShiftMuon_quality")
     elif "ShiftMuon_source" in available:
         required.add("ShiftMuon_source")
     else:
-        raise RuntimeError("missing ShiftMuon quality/source branch")
+        raise RuntimeError("missing ShiftMuon topology/legacy category branch")
     missing = required - available
     if missing:
         raise RuntimeError(f"missing branches: {', '.join(sorted(missing))}")
@@ -74,9 +76,9 @@ def main():
     iteration_pairs = []
     quality_diagnostics = []
     truth_rows = []
-    q3_rows = q3_precision_valid = q3_all_hits_valid = 0
-    q3_precision_relative = []
-    q3_precision_dca = []
+    both_endcap_rows = both_endcap_precision_valid = both_endcap_all_hits_valid = 0
+    both_endcap_precision_relative = []
+    both_endcap_precision_dca = []
     material_delta = []
     material_path = []
     material_boundary_fraction = []
@@ -85,18 +87,21 @@ def main():
     selected_iterations = []
     for event in events:
         for index in range(int(event.nShiftMuon)):
-            is_double_traversing = (int(event.ShiftMuon_quality[index]) == 3 if
-                                    "ShiftMuon_quality" in available else
-                                    int(event.ShiftMuon_source[index]) == 1)
-            if is_double_traversing:
-                q3_rows += 1
-                q3_precision_valid += bool(event.ShiftMuon_directionalRefitPrecisionValid[index])
-                q3_all_hits_valid += bool(event.ShiftMuon_directionalRefitAllHitsValid[index])
+            if "ShiftMuon_topology" in available:
+                is_both_endcaps = int(event.ShiftMuon_topology[index]) == 2
+            elif "ShiftMuon_quality" in available:
+                is_both_endcaps = int(event.ShiftMuon_quality[index]) == 3
+            else:
+                is_both_endcaps = int(event.ShiftMuon_source[index]) == 1
+            if is_both_endcaps:
+                both_endcap_rows += 1
+                both_endcap_precision_valid += bool(event.ShiftMuon_directionalRefitPrecisionValid[index])
+                both_endcap_all_hits_valid += bool(event.ShiftMuon_directionalRefitAllHitsValid[index])
                 if event.ShiftMuon_directionalRefitPrecisionValid[index]:
-                    q3_precision_relative.append(
+                    both_endcap_precision_relative.append(
                         float(event.ShiftMuon_directionalRefitPrecisionRelativeToAllQoverP[index]))
-                    q3_precision_dca.append(float(event.ShiftMuon_directionalRefitPrecisionTargetDca[index]))
-            if (not is_double_traversing or not event.ShiftMuon_directionalRefitUsedPrecisionHits[index]):
+                    both_endcap_precision_dca.append(float(event.ShiftMuon_directionalRefitPrecisionTargetDca[index]))
+            if (not is_both_endcaps or not event.ShiftMuon_directionalRefitUsedPrecisionHits[index]):
                 continue
             gen_index = int(event.ShiftMuon_genPartIdx[index])
             if gen_index < 0:
@@ -146,11 +151,12 @@ def main():
                     event.ShiftMuon_simTruthMatched[index]):
                 truth_rows.append(index)
 
-    print(f"events={events.GetEntries()} q3={q3_rows} precisionValid={q3_precision_valid} "
-          f"allHitsValid={q3_all_hits_valid} selected={len(canonical)} truthMatched={len(truth_rows)}")
-    if q3_precision_relative:
-        print(f"precision/all qop median={np.median(q3_precision_relative):.4f} "
-              f"targetDca median={np.median(q3_precision_dca):.2f} cm")
+    print(f"events={events.GetEntries()} bothEndcaps={both_endcap_rows} "
+          f"precisionValid={both_endcap_precision_valid} allHitsValid={both_endcap_all_hits_valid} "
+          f"selected={len(canonical)} truthMatched={len(truth_rows)}")
+    if both_endcap_precision_relative:
+        print(f"precision/all qop median={np.median(both_endcap_precision_relative):.4f} "
+              f"targetDca median={np.median(both_endcap_precision_dca):.2f} cm")
     summarize("canonical", canonical)
     summarize("first iteration", first_iteration)
     summarize("valid second iteration", second_iteration)
