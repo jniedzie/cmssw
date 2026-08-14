@@ -11,6 +11,8 @@
 #include "DataFormats/MuonDetId/interface/ME0DetId.h"
 #include "DataFormats/MuonDetId/interface/MuonSubdetId.h"
 #include "DataFormats/MuonDetId/interface/RPCDetId.h"
+#include "DataFormats/MuonReco/interface/MuonTrackLinks.h"
+#include "DataFormats/MuonReco/interface/MuonFwd.h"
 #include "DataFormats/GeometrySurface/interface/Plane.h"
 #include "DataFormats/GeometrySurface/interface/Cylinder.h"
 #include "FWCore/Framework/interface/Event.h"
@@ -1468,12 +1470,19 @@ public:
       : dsaToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("dsaTracks"))),
         cosmicToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("cosmicTracks"))),
         traversingToken_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("traversingTracks"))),
+        dsaGlobalLinksToken_(consumes<reco::MuonTrackLinksCollection>(
+            parameters.getParameter<edm::InputTag>("dsaGlobalLinks"))),
+        cosmicGlobalLinksToken_(consumes<reco::MuonTrackLinksCollection>(
+            parameters.getParameter<edm::InputTag>("cosmicGlobalLinks"))),
+        traversingGlobalLinksToken_(consumes<reco::MuonTrackLinksCollection>(
+            parameters.getParameter<edm::InputTag>("traversingGlobalLinks"))),
         genParticlesToken_(
             consumes<reco::GenParticleCollection>(parameters.getParameter<edm::InputTag>("genParticles"))),
         simTracksToken_(consumes<edm::SimTrackContainer>(parameters.getParameter<edm::InputTag>("simTracks"))),
         simVerticesToken_(consumes<edm::SimVertexContainer>(parameters.getParameter<edm::InputTag>("simVertices"))),
         dtSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("dtSimHits"))),
         cscSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("cscSimHits"))),
+        rpcSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("rpcSimHits"))),
         gemSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("gemSimHits"))),
         magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
@@ -1596,11 +1605,15 @@ public:
     auto const dsa = event.getHandle(dsaToken_);
     auto const cosmic = event.getHandle(cosmicToken_);
     auto const traversing = event.getHandle(traversingToken_);
+    auto const dsaGlobalLinks = event.getHandle(dsaGlobalLinksToken_);
+    auto const cosmicGlobalLinks = event.getHandle(cosmicGlobalLinksToken_);
+    auto const traversingGlobalLinks = event.getHandle(traversingGlobalLinksToken_);
     auto const genParticles = event.getHandle(genParticlesToken_);
     auto const simTracks = event.getHandle(simTracksToken_);
     auto const simVertices = event.getHandle(simVerticesToken_);
     auto const dtSimHits = event.getHandle(dtSimHitsToken_);
     auto const cscSimHits = event.getHandle(cscSimHitsToken_);
+    auto const rpcSimHits = event.getHandle(rpcSimHitsToken_);
     auto const gemSimHits = event.getHandle(gemSimHitsToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
     bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
@@ -2217,22 +2230,31 @@ public:
     // direction contracts. Missing simulation products leave sentinels and
     // therefore keep this producer usable on data.
     std::vector<int> simTruthMatched(selected.size(), 0), simTrackId(selected.size(), -1);
+    std::vector<int> simDTHits(selected.size(), 0), simCSCHits(selected.size(), 0),
+        simRPCHits(selected.size(), 0), simGEMHits(selected.size(), 0), simMuonDetectorMask(selected.size(), 0);
     std::vector<float> simTrackP(selected.size(), -1.f), simFirstPrecisionHitP(selected.size(), -1.f),
         simLastPrecisionHitP(selected.size(), -1.f), simLossToFirstPrecisionHit(selected.size(), -1.f),
         simLossAcrossPrecisionHits(selected.size(), -1.f), simFirstPrecisionPath(selected.size(), -1.f);
     if (produceMomentumClosureDiagnostics_ && genParticles.isValid() && simTracks.isValid() &&
         simVertices.isValid()) {
       std::unordered_map<unsigned int, std::vector<PSimHit const*>> precisionHitsByTrack;
-      auto collectPrecisionHits = [&precisionHitsByTrack](auto const& handle) {
+      std::unordered_map<unsigned int, std::array<unsigned int, 4>> detectorHitCounts;
+      auto collectHits = [&precisionHitsByTrack, &detectorHitCounts](auto const& handle,
+                                                                    unsigned int detectorIndex,
+                                                                    bool precision) {
         if (!handle.isValid())
           return;
         for (auto const& hit : *handle)
-          if (std::abs(hit.particleType()) == 13)
-            precisionHitsByTrack[hit.trackId()].push_back(&hit);
+          if (std::abs(hit.particleType()) == 13) {
+            ++detectorHitCounts[hit.trackId()][detectorIndex];
+            if (precision)
+              precisionHitsByTrack[hit.trackId()].push_back(&hit);
+          }
       };
-      collectPrecisionHits(dtSimHits);
-      collectPrecisionHits(cscSimHits);
-      collectPrecisionHits(gemSimHits);
+      collectHits(dtSimHits, 0, true);
+      collectHits(cscSimHits, 1, true);
+      collectHits(rpcSimHits, 2, false);
+      collectHits(gemSimHits, 3, true);
 
       for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
         int const genIndex = genPartIdx[selectedIndex];
@@ -2260,6 +2282,17 @@ public:
         }
         if (!matchedSimTrack || bestScore > 0.1)
           continue;
+        simTruthMatched[selectedIndex] = 1;
+        simTrackId[selectedIndex] = matchedSimTrack->trackId();
+        simTrackP[selectedIndex] = matchedSimTrack->momentum().P();
+        auto const detectorCounts = detectorHitCounts[matchedSimTrack->trackId()];
+        simDTHits[selectedIndex] = detectorCounts[0];
+        simCSCHits[selectedIndex] = detectorCounts[1];
+        simRPCHits[selectedIndex] = detectorCounts[2];
+        simGEMHits[selectedIndex] = detectorCounts[3];
+        for (unsigned int detectorIndex = 0; detectorIndex < detectorCounts.size(); ++detectorIndex)
+          if (detectorCounts[detectorIndex] > 0)
+            simMuonDetectorMask[selectedIndex] |= 1u << detectorIndex;
         auto hitIt = precisionHitsByTrack.find(matchedSimTrack->trackId());
         if (hitIt == precisionHitsByTrack.end() || hitIt->second.empty())
           continue;
@@ -2284,9 +2317,6 @@ public:
         auto const* firstDet = trackingGeometry.idToDetUnit(DetId(firstHit->detUnitId()));
         if (!firstDet || !(firstHit->pabs() > 0.) || !(lastHit->pabs() > 0.))
           continue;
-        simTruthMatched[selectedIndex] = 1;
-        simTrackId[selectedIndex] = matchedSimTrack->trackId();
-        simTrackP[selectedIndex] = matchedSimTrack->momentum().P();
         simFirstPrecisionHitP[selectedIndex] = firstHit->pabs();
         simLastPrecisionHitP[selectedIndex] = lastHit->pabs();
         simLossToFirstPrecisionHit[selectedIndex] =
@@ -2297,6 +2327,9 @@ public:
     }
 
     std::vector<float> pt, eta, phi, mass, p, px, py, pz, trackPt, innerPt, outerPt, upstreamPt, preRefitPt,
+        trackerPt, trackerEta, trackerPhi, trackerP, trackerPz, trackerChi2, trackerNdof,
+        combinedPt, combinedEta, combinedPhi, combinedP, combinedPz, combinedChi2, combinedNdof,
+        combinedTargetPt, combinedTargetPz, combinedTargetDca,
         constrainedPt, constrainedEta, constrainedPhi, constrainedMass, constrainedP, constrainedPx,
         constrainedPy, constrainedPz, constrainedVx, constrainedVy, constrainedVz, constrainedChi2,
         constrainedNdof, constrainedTargetChi2,
@@ -2328,6 +2361,8 @@ public:
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2,
         entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan, hitDeltaZ;
     std::vector<int> charge, sourceIndex, recoAlgorithm, topology, orientationValid, validHits, validMuonHits,
+        trackerMatchValid, trackerTrackIndex, trackerValidHits, trackerPixelHits, trackerStripHits,
+        combinedTrackValid, combinedValidHits, combinedTrackerHits, combinedMuonHits,
         muonStations, lostHits, directionFlipped, quality, constrainedValid, constrainedHits, constrainedStatus,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
         directionalRefitValid, directionalRefitHits, directionalRefitFirstValid, directionalRefitFirstHits,
@@ -2360,6 +2395,58 @@ public:
       bool const flip = sign < 0.;
       auto const geometryDiagnostics =
           muonGeometryDiagnostics(track, trackingGeometry, eventSourceSide, sign);
+
+      // Associate the selected detector-only row to the independent CMSSW
+      // cosmic-global fit made from the same source collection.  These values
+      // are diagnostics only: they never enter cleaning, topology, momentum,
+      // or dimuon selection in this pass.
+      reco::MuonTrackLinksCollection const* sourceLinks = nullptr;
+      if (candidate->source == 0 && dsaGlobalLinks.isValid())
+        sourceLinks = dsaGlobalLinks.product();
+      else if (candidate->source == 1 && traversingGlobalLinks.isValid())
+        sourceLinks = traversingGlobalLinks.product();
+      else if (candidate->source == 2 && cosmicGlobalLinks.isValid())
+        sourceLinks = cosmicGlobalLinks.product();
+      reco::MuonTrackLinks const* matchedLink = nullptr;
+      if (sourceLinks)
+        for (auto const& link : *sourceLinks)
+          if (link.standAloneTrack().isNonnull() && link.standAloneTrack().key() == candidate->sourceIndex) {
+            matchedLink = &link;
+            break;
+          }
+      bool const hasTracker = matchedLink && matchedLink->trackerTrack().isNonnull();
+      bool const hasCombined = matchedLink && matchedLink->globalTrack().isNonnull();
+      trackerMatchValid.push_back(hasTracker);
+      trackerTrackIndex.push_back(hasTracker ? static_cast<int>(matchedLink->trackerTrack().key()) : -1);
+      trackerValidHits.push_back(hasTracker ? matchedLink->trackerTrack()->hitPattern().numberOfValidTrackerHits() : 0);
+      trackerPixelHits.push_back(hasTracker ? matchedLink->trackerTrack()->hitPattern().numberOfValidPixelHits() : 0);
+      trackerStripHits.push_back(hasTracker ? matchedLink->trackerTrack()->hitPattern().numberOfValidStripHits() : 0);
+      trackerPt.push_back(hasTracker ? matchedLink->trackerTrack()->pt() : 0.);
+      trackerEta.push_back(hasTracker ? matchedLink->trackerTrack()->eta() : 0.);
+      trackerPhi.push_back(hasTracker ? matchedLink->trackerTrack()->phi() : 0.);
+      trackerP.push_back(hasTracker ? matchedLink->trackerTrack()->p() : 0.);
+      trackerPz.push_back(hasTracker ? matchedLink->trackerTrack()->pz() : 0.);
+      trackerChi2.push_back(hasTracker ? matchedLink->trackerTrack()->chi2() : 0.);
+      trackerNdof.push_back(hasTracker ? matchedLink->trackerTrack()->ndof() : 0.);
+      combinedTrackValid.push_back(hasCombined);
+      combinedValidHits.push_back(hasCombined ? matchedLink->globalTrack()->numberOfValidHits() : 0);
+      combinedTrackerHits.push_back(
+          hasCombined ? matchedLink->globalTrack()->hitPattern().numberOfValidTrackerHits() : 0);
+      combinedMuonHits.push_back(hasCombined ? matchedLink->globalTrack()->hitPattern().numberOfValidMuonHits() : 0);
+      combinedPt.push_back(hasCombined ? matchedLink->globalTrack()->pt() : 0.);
+      combinedEta.push_back(hasCombined ? matchedLink->globalTrack()->eta() : 0.);
+      combinedPhi.push_back(hasCombined ? matchedLink->globalTrack()->phi() : 0.);
+      combinedP.push_back(hasCombined ? matchedLink->globalTrack()->p() : 0.);
+      combinedPz.push_back(hasCombined ? matchedLink->globalTrack()->pz() : 0.);
+      combinedChi2.push_back(hasCombined ? matchedLink->globalTrack()->chi2() : 0.);
+      combinedNdof.push_back(hasCombined ? matchedLink->globalTrack()->ndof() : 0.);
+      PropagatedState combinedTarget;
+      if (hasCombined)
+        combinedTarget = propagateToTargetLine(
+            *matchedLink->globalTrack(), vacuumPropagator, sign, preRefitMaterialPropagator, eventSourceSide);
+      combinedTargetPt.push_back(combinedTarget.valid ? combinedTarget.momentum.perp() : 0.);
+      combinedTargetPz.push_back(combinedTarget.valid ? combinedTarget.momentum.z() : 0.);
+      combinedTargetDca.push_back(combinedTarget.valid ? combinedTarget.position.perp() : -1.);
       // The propagated state was already canonicalised before transport.
       double const storedPx = propagated.momentum.x();
       double const storedPy = propagated.momentum.y();
@@ -2618,6 +2705,42 @@ public:
     table->addColumn<float>("constrainedNdof", constrainedNdof, "prompt-target trajectory degrees of freedom");
     table->addColumn<float>("constrainedTargetChi2", constrainedTargetChi2, "chi2 contribution of the target hit");
     table->addColumn<float>("trackPt", trackPt, "pT at the original CMSSW track reference state");
+    table->addColumn<int>("trackerMatchValid",
+                          trackerMatchValid,
+                          "1 when CMSSW cosmic-global matching found a generalTracks partner");
+    table->addColumn<int>("trackerTrackIndex", trackerTrackIndex, "index in generalTracks, or -1");
+    table->addColumn<int>("trackerValidHits", trackerValidHits, "valid tracker hits on the matched tracker track");
+    table->addColumn<int>("trackerPixelHits", trackerPixelHits, "valid pixel hits on the matched tracker track");
+    table->addColumn<int>("trackerStripHits", trackerStripHits, "valid strip hits on the matched tracker track");
+    table->addColumn<float>("trackerPt", trackerPt, "matched tracker-track transverse momentum");
+    table->addColumn<float>("trackerEta", trackerEta, "matched tracker-track pseudorapidity");
+    table->addColumn<float>("trackerPhi", trackerPhi, "matched tracker-track azimuth");
+    table->addColumn<float>("trackerP", trackerP, "matched tracker-track momentum magnitude");
+    table->addColumn<float>("trackerPz", trackerPz, "matched tracker-track longitudinal momentum");
+    table->addColumn<float>("trackerChi2", trackerChi2, "matched tracker-track chi2");
+    table->addColumn<float>("trackerNdof", trackerNdof, "matched tracker-track degrees of freedom");
+    table->addColumn<int>("combinedTrackValid",
+                          combinedTrackValid,
+                          "1 when the independent tracker+muon cosmic-global fit is available");
+    table->addColumn<int>("combinedValidHits", combinedValidHits, "valid hits on the tracker+muon fit");
+    table->addColumn<int>("combinedTrackerHits", combinedTrackerHits, "valid tracker hits on the combined fit");
+    table->addColumn<int>("combinedMuonHits", combinedMuonHits, "valid muon-system hits on the combined fit");
+    table->addColumn<float>("combinedPt", combinedPt, "tracker+muon fit transverse momentum at its reference state");
+    table->addColumn<float>("combinedEta", combinedEta, "tracker+muon fit pseudorapidity at its reference state");
+    table->addColumn<float>("combinedPhi", combinedPhi, "tracker+muon fit azimuth at its reference state");
+    table->addColumn<float>("combinedP", combinedP, "tracker+muon fit momentum magnitude at its reference state");
+    table->addColumn<float>("combinedPz", combinedPz, "tracker+muon fit longitudinal momentum at its reference state");
+    table->addColumn<float>("combinedChi2", combinedChi2, "tracker+muon fit chi2");
+    table->addColumn<float>("combinedNdof", combinedNdof, "tracker+muon fit degrees of freedom");
+    table->addColumn<float>("combinedTargetPt",
+                            combinedTargetPt,
+                            "tracker+muon test hypothesis transverse momentum at the target line");
+    table->addColumn<float>("combinedTargetPz",
+                            combinedTargetPz,
+                            "tracker+muon test hypothesis longitudinal momentum at the target line");
+    table->addColumn<float>("combinedTargetDca",
+                            combinedTargetDca,
+                            "tracker+muon test hypothesis transverse DCA to the target line, or -1");
     table->addColumn<float>("innerPt", innerPt, "pT at the geometrically inner detector state");
     table->addColumn<float>("outerPt", outerPt, "pT at the geometrically outer detector state");
     table->addColumn<float>("upstreamPt", upstreamPt, "pT at the fitted endpoint nearest the inferred source side");
@@ -3008,6 +3131,13 @@ public:
                           "MC closure diagnostic: selected row matched to a primary SimTrack with precision SimHits");
     table->addColumn<int>("simTrackId", simTrackId, "matched Geant4 SimTrack id, or -1");
     table->addColumn<float>("simTrackP", simTrackP, "matched SimTrack momentum at the production vertex");
+    table->addColumn<int>("simDTHits", simDTHits, "matched muon Geant4 hits in DT sensitive volumes");
+    table->addColumn<int>("simCSCHits", simCSCHits, "matched muon Geant4 hits in CSC sensitive volumes");
+    table->addColumn<int>("simRPCHits", simRPCHits, "matched muon Geant4 hits in RPC sensitive volumes");
+    table->addColumn<int>("simGEMHits", simGEMHits, "matched muon Geant4 hits in GEM sensitive volumes");
+    table->addColumn<int>("simMuonDetectorMask",
+                          simMuonDetectorMask,
+                          "sensitive-volume crossing mask from SimHits: bit0=DT, bit1=CSC, bit2=RPC, bit3=GEM");
     table->addColumn<float>(
         "simFirstPrecisionHitP", simFirstPrecisionHitP, "true momentum at the first source-facing precision SimHit");
     table->addColumn<float>(
@@ -3375,11 +3505,15 @@ public:
     description.add<edm::InputTag>("dsaTracks", edm::InputTag("displacedStandAloneMuons"));
     description.add<edm::InputTag>("cosmicTracks", edm::InputTag("shiftCosmicMuons"));
     description.add<edm::InputTag>("traversingTracks", edm::InputTag("shiftTraversingMuons"));
+    description.add<edm::InputTag>("dsaGlobalLinks", edm::InputTag("shiftGlobalDSAMuons"));
+    description.add<edm::InputTag>("cosmicGlobalLinks", edm::InputTag("shiftGlobalCosmicMuons"));
+    description.add<edm::InputTag>("traversingGlobalLinks", edm::InputTag("shiftGlobalTraversingMuons"));
     description.add<edm::InputTag>("genParticles", edm::InputTag("finalGenParticles"));
     description.add<edm::InputTag>("simTracks", edm::InputTag("g4SimHits"));
     description.add<edm::InputTag>("simVertices", edm::InputTag("g4SimHits"));
     description.add<edm::InputTag>("dtSimHits", edm::InputTag("g4SimHits", "MuonDTHits"));
     description.add<edm::InputTag>("cscSimHits", edm::InputTag("g4SimHits", "MuonCSCHits"));
+    description.add<edm::InputTag>("rpcSimHits", edm::InputTag("g4SimHits", "MuonRPCHits"));
     description.add<edm::InputTag>("gemSimHits", edm::InputTag("g4SimHits", "MuonGEMHits"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<bool>("useImprovedMomentumRefit", false);
@@ -3442,11 +3576,15 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> dsaToken_;
   edm::EDGetTokenT<reco::TrackCollection> cosmicToken_;
   edm::EDGetTokenT<reco::TrackCollection> traversingToken_;
+  edm::EDGetTokenT<reco::MuonTrackLinksCollection> dsaGlobalLinksToken_;
+  edm::EDGetTokenT<reco::MuonTrackLinksCollection> cosmicGlobalLinksToken_;
+  edm::EDGetTokenT<reco::MuonTrackLinksCollection> traversingGlobalLinksToken_;
   edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken_;
   edm::EDGetTokenT<edm::SimTrackContainer> simTracksToken_;
   edm::EDGetTokenT<edm::SimVertexContainer> simVerticesToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> dtSimHitsToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> cscSimHitsToken_;
+  edm::EDGetTokenT<edm::PSimHitContainer> rpcSimHitsToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> gemSimHitsToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;

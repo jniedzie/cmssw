@@ -13,11 +13,15 @@ shiftMuonTable = cms.EDProducer(
     dsaTracks=cms.InputTag("displacedStandAloneMuons"),
     cosmicTracks=cms.InputTag("shiftCosmicMuons"),
     traversingTracks=cms.InputTag("shiftTraversingMuons"),
+    dsaGlobalLinks=cms.InputTag("shiftGlobalDSAMuons"),
+    cosmicGlobalLinks=cms.InputTag("shiftGlobalCosmicMuons"),
+    traversingGlobalLinks=cms.InputTag("shiftGlobalTraversingMuons"),
     genParticles=cms.InputTag("finalGenParticles"),
     simTracks=cms.InputTag("g4SimHits"),
     simVertices=cms.InputTag("g4SimHits"),
     dtSimHits=cms.InputTag("g4SimHits", "MuonDTHits"),
     cscSimHits=cms.InputTag("g4SimHits", "MuonCSCHits"),
+    rpcSimHits=cms.InputTag("g4SimHits", "MuonRPCHits"),
     gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
     # Optional scale-improvement study: propagated-path hit ordering and the
@@ -100,7 +104,7 @@ shiftMuonTable = cms.EDProducer(
     directionalRefitMaxPrecisionRelativeQoverPChange=cms.double(0.5),
     # Simulation-only closure columns and source/opposite-side precision
     # refits. Disabled in production because the extra fits cost CPU.
-    produceMomentumClosureDiagnostics=cms.bool(False),
+    produceMomentumClosureDiagnostics=cms.bool(True),
     produceSplitLegRefits=cms.bool(False),
     # Backward target transport is now the canonical state contract.  This
     # compatibility parameter is retained for older configurations; it no
@@ -162,4 +166,31 @@ shiftMuonSegmentsCounter = cms.EDAnalyzer(
     printDetails=cms.bool(True),
     # MC-only, read-only transport closure probe. Keep disabled in production.
     printPropagationClosure=cms.bool(False),
+)
+
+# Persist an event-level reconstruction funnel while Step 3 still has access
+# to RAW2DIGI products. A value of -1 means that a stage/collection was absent,
+# which is distinct from a present but empty collection.
+shiftMuonRecoDiagnostics = cms.EDProducer(
+    "ShiftMuonRecoDiagnosticsProducer",
+    dtDigis=cms.InputTag("muonDTDigis"),
+    cscStripDigis=cms.InputTag("muonCSCDigis", "MuonCSCStripDigi"),
+    cscWireDigis=cms.InputTag("muonCSCDigis", "MuonCSCWireDigi"),
+    rpcDigis=cms.InputTag("muonRPCDigis"),
+    gemDigis=cms.InputTag("muonGEMDigis"),
+    dtRecHits=cms.InputTag("dt1DRecHits"),
+    dtSegments=cms.InputTag("dt4DSegments"),
+    cscRecHits=cms.InputTag("csc2DRecHits"),
+    cscSegments=cms.InputTag("cscSegments"),
+    rpcRecHits=cms.InputTag("rpcRecHits"),
+    gemRecHits=cms.InputTag("gemRecHits"),
+    gemSegments=cms.InputTag("gemSegments"),
+    dtSimHits=cms.InputTag("g4SimHits", "MuonDTHits"),
+    cscSimHits=cms.InputTag("g4SimHits", "MuonCSCHits"),
+    rpcSimHits=cms.InputTag("g4SimHits", "MuonRPCHits"),
+    gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
+    generalTracks=cms.InputTag("generalTracks"),
+    dsaGlobalLinks=cms.InputTag("shiftGlobalDSAMuons"),
+    cosmicGlobalLinks=cms.InputTag("shiftGlobalCosmicMuons"),
+    traversingGlobalLinks=cms.InputTag("shiftGlobalTraversingMuons"),
 )
