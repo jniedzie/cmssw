@@ -60,6 +60,7 @@ def customiseKeepShiftTruth(
     process,
     keepHcalSimHits=False,
     keepZDCSimHits=False,
+    zdcDigiTimePhaseOffset=0.0,
 ):
     """Retain generator and simulation truth needed for SHIFT hit attribution."""
     truth_commands = [
@@ -79,6 +80,9 @@ def customiseKeepShiftTruth(
         "keep *_reducedEcalRecHitsEB_*_*",
         "keep *_reducedEcalRecHitsEE_*_*",
         "keep *_reducedHcalRecHits_*_*",
+        "keep *_hbhereco_*_*",
+        "keep *_hfreco_*_*",
+        "keep *_horeco_*_*",
         "keep *_zdcreco_*_*",
     ))
     if keepHcalSimHits:
@@ -99,6 +103,42 @@ def customiseKeepShiftTruth(
         else:
             raise RuntimeError("Cannot attach legacy SHIFT ZDC reconstruction: no process schedule")
         truth_commands.append("keep *_shiftZDCReco_*_*")
+    # SHIFT muons cross the source-side ZDC roughly 0.93 microseconds earlier
+    # than a collision particle emitted at the interaction point would reach
+    # the same cell.  The ordinary ten-sample ZDC frame consequently contains
+    # no signal.  A dedicated Step-2 stream can shift the digitizer phase while
+    # leaving the ordinary campaign and all central-detector timing untouched.
+    if zdcDigiTimePhaseOffset:
+        adjusted = False
+        if (
+            hasattr(process, "mix")
+            and hasattr(process.mix, "digitizers")
+            and hasattr(process.mix.digitizers, "hcal")
+            and hasattr(process.mix.digitizers.hcal, "zdc")
+        ):
+            hcal = process.mix.digitizers.hcal
+            # Run-3 DIGI disables the legacy Phase-I ZDC digitizer by
+            # default.  Changing its timing PSet alone therefore cannot make
+            # a collection; explicitly instantiate it for this stream.
+            if hasattr(hcal, "doZDCDigi"):
+                hcal.doZDCDigi = cms.bool(True)
+            zdc = hcal.zdc
+            zdc.timePhase = cms.double(
+                float(zdc.timePhase.value()) + float(zdcDigiTimePhaseOffset)
+            )
+            adjusted = True
+        if not adjusted:
+            for module_name in ("simHcalUnsuppressedDigis", "simHcalDigis"):
+                if not hasattr(process, module_name):
+                    continue
+                module = getattr(process, module_name)
+                if hasattr(module, "digiCfg") and hasattr(module.digiCfg, "zdc"):
+                    module.digiCfg.zdc.timePhase = cms.double(
+                        float(module.digiCfg.zdc.timePhase.value()) + float(zdcDigiTimePhaseOffset)
+                    )
+                    adjusted = True
+        if not adjusted:
+            raise RuntimeError("Requested SHIFT ZDC time-phase shift, but no HCAL digitizer was found")
     for output in process.outputModules_().values():
         if not hasattr(output, "outputCommands"):
             continue

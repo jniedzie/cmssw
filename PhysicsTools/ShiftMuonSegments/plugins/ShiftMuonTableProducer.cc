@@ -10,8 +10,14 @@
 #include "DataFormats/GEMRecHit/interface/GEMRecHit.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2DCollection.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiStripRecHit2DCollection.h"
+#include "DataFormats/EcalRecHit/interface/EcalRecHitCollections.h"
+#include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
+#include "DataFormats/HcalDetId/interface/HcalSubdetector.h"
+#include "DataFormats/HcalDetId/interface/HcalTestNumbering.h"
 #include "DataFormats/MuonDetId/interface/CSCDetId.h"
 #include "DataFormats/MuonDetId/interface/DTChamberId.h"
+#include "DataFormats/MuonDetId/interface/DTWireId.h"
 #include "DataFormats/MuonDetId/interface/GEMDetId.h"
 #include "DataFormats/MuonDetId/interface/ME0DetId.h"
 #include "DataFormats/MuonDetId/interface/MuonSubdetId.h"
@@ -50,7 +56,9 @@
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
+#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
 #include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+#include "Geometry/Records/interface/CaloGeometryRecord.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
 #include "SimDataFormats/CaloHit/interface/PCaloHitContainer.h"
 #include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
@@ -358,8 +366,39 @@ namespace {
     unsigned int nCompatibleDTSegments = 0;
     unsigned int nCompatiblePixelHits = 0;
     unsigned int nCompatibleStripHits = 0;
+    unsigned int nPropagatedDTSegments = 0;
+    unsigned int nPropagatedPixelHits = 0;
+    unsigned int nPropagatedStripHits = 0;
+    double minDTResidual = -1.;
+    double minDTEstimatorChi2 = -1.;
+    double minTrackerResidual = -1.;
+    double minTrackerEstimatorChi2 = -1.;
+    unsigned int nMatchedEcalRecHits = 0;
+    unsigned int nMatchedHBHERecHits = 0;
+    unsigned int nMatchedHFRecHits = 0;
+    unsigned int nMatchedHORecHits = 0;
+    unsigned int nMatchedZDCRecHits = 0;
+    double matchedEcalEnergy = 0.;
+    double matchedHBHEEnergy = 0.;
+    double matchedHFEnergy = 0.;
+    double matchedHOEnergy = 0.;
+    double matchedZDCEnergy = 0.;
+    double matchedEcalTime = 0.;
+    double matchedHBHETime = 0.;
+    double matchedHFTime = 0.;
+    double matchedHOTime = 0.;
+    double matchedZDCTime = 0.;
+    double minEcalLineDistance = -1.;
+    double minHBHELineDistance = -1.;
+    double minHFLineDistance = -1.;
+    double minHOLineDistance = -1.;
+    double minZDCLineDistance = -1.;
+    int caloTimingDirectionSign = 0;
+    unsigned int nCaloTimingMeasurements = 0;
+    double caloTimingDeltaChi2 = 0.;
     unsigned int nAddedDTRefitHits = 0;
     unsigned int nAddedTrackerRefitHits = 0;
+    std::set<uint32_t> addedDTChamberIds;
     double precisionRefitLeverArm = 0.;
     bool directionalRefitUsedPrecisionHits = false;
     bool directionalRefitAllHitsValid = false;
@@ -1516,20 +1555,43 @@ public:
         gemSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("gemSimHits"))),
         hcalSimHitsToken_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("hcalSimHits"))),
         zdcSimHitsToken_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("zdcSimHits"))),
+        ecalBarrelRecHitsToken_(consumes<EcalRecHitCollection>(
+            parameters.getParameter<edm::InputTag>("ecalBarrelRecHits"))),
+        ecalEndcapRecHitsToken_(consumes<EcalRecHitCollection>(
+            parameters.getParameter<edm::InputTag>("ecalEndcapRecHits"))),
+        hbheRecHitsToken_(consumes<HBHERecHitCollection>(parameters.getParameter<edm::InputTag>("hbheRecHits"))),
+        hfRecHitsToken_(consumes<HFRecHitCollection>(parameters.getParameter<edm::InputTag>("hfRecHits"))),
+        hoRecHitsToken_(consumes<HORecHitCollection>(parameters.getParameter<edm::InputTag>("hoRecHits"))),
+        zdcRecHitsToken_(consumes<ZDCRecHitCollection>(parameters.getParameter<edm::InputTag>("zdcRecHits"))),
         dtSegmentsToken_(consumes<DTRecSegment4DCollection>(parameters.getParameter<edm::InputTag>("dtSegments"))),
         pixelRecHitsToken_(consumes<SiPixelRecHitCollection>(parameters.getParameter<edm::InputTag>("pixelRecHits"))),
         stripMatchedRecHitsToken_(consumes<SiStripMatchedRecHit2DCollection>(
             parameters.getParameter<edm::InputTag>("stripMatchedRecHits"))),
+        stripRphiRecHitsToken_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripRphiRecHits"))),
+        stripRphiUnmatchedRecHitsToken_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripRphiUnmatchedRecHits"))),
+        stripStereoRecHitsToken_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripStereoRecHits"))),
+        stripStereoUnmatchedRecHitsToken_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripStereoUnmatchedRecHits"))),
         magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
         trackerRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("trackerRecHitBuilder")))),
+        caloGeometryToken_(esConsumes()),
         augmentDTHits_(parameters.getParameter<bool>("augmentDTHits")),
         augmentTrackerHits_(parameters.getParameter<bool>("augmentTrackerHits")),
         useExtendedTiming_(parameters.getParameter<bool>("useExtendedTiming")),
-        additionalHitMaxDistance_(parameters.getParameter<double>("additionalHitMaxDistance")),
+        additionalDTMaxDistance_(parameters.getParameter<double>("additionalDTMaxDistance")),
+        additionalTrackerMaxDistance_(parameters.getParameter<double>("additionalTrackerMaxDistance")),
+        additionalHitMaxChi2_(parameters.getParameter<double>("additionalHitMaxChi2")),
+        ecalMatchMaxDistance_(parameters.getParameter<double>("ecalMatchMaxDistance")),
+        hcalMatchMaxDistance_(parameters.getParameter<double>("hcalMatchMaxDistance")),
+        zdcMatchMaxDistance_(parameters.getParameter<double>("zdcMatchMaxDistance")),
+        caloMatchMinEnergy_(parameters.getParameter<double>("caloMatchMinEnergy")),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         directionalRefitUseMaterialEffects_(
@@ -1641,6 +1703,8 @@ public:
          !std::isfinite(targetSigmaX_) || !std::isfinite(targetSigmaY_) || !std::isfinite(targetSigmaZ_)))
       throw cms::Exception("Configuration")
           << "target position must be finite, targetSigmaX/Y positive, and targetSigmaZ non-negative";
+    for (auto const& tag : parameters.getParameter<std::vector<edm::InputTag>>("trackerSimHits"))
+      trackerSimHitsTokens_.push_back(consumes<edm::PSimHitContainer>(tag));
     produces<nanoaod::FlatTable>();
     produces<nanoaod::FlatTable>("ShiftDimuonVertex");
   }
@@ -1659,11 +1723,25 @@ public:
     auto const cscSimHits = event.getHandle(cscSimHitsToken_);
     auto const rpcSimHits = event.getHandle(rpcSimHitsToken_);
     auto const gemSimHits = event.getHandle(gemSimHitsToken_);
+    std::vector<edm::Handle<edm::PSimHitContainer>> trackerSimHits;
+    trackerSimHits.reserve(trackerSimHitsTokens_.size());
+    for (auto const& token : trackerSimHitsTokens_)
+      trackerSimHits.push_back(event.getHandle(token));
     auto const hcalSimHits = event.getHandle(hcalSimHitsToken_);
     auto const zdcSimHits = event.getHandle(zdcSimHitsToken_);
+    auto const ecalBarrelRecHits = event.getHandle(ecalBarrelRecHitsToken_);
+    auto const ecalEndcapRecHits = event.getHandle(ecalEndcapRecHitsToken_);
+    auto const hbheRecHits = event.getHandle(hbheRecHitsToken_);
+    auto const hfRecHits = event.getHandle(hfRecHitsToken_);
+    auto const hoRecHits = event.getHandle(hoRecHitsToken_);
+    auto const zdcRecHits = event.getHandle(zdcRecHitsToken_);
     auto const dtSegments = event.getHandle(dtSegmentsToken_);
     auto const pixelRecHits = event.getHandle(pixelRecHitsToken_);
     auto const stripMatchedRecHits = event.getHandle(stripMatchedRecHitsToken_);
+    auto const stripRphiRecHits = event.getHandle(stripRphiRecHitsToken_);
+    auto const stripRphiUnmatchedRecHits = event.getHandle(stripRphiUnmatchedRecHitsToken_);
+    auto const stripStereoRecHits = event.getHandle(stripStereoRecHitsToken_);
+    auto const stripStereoUnmatchedRecHits = event.getHandle(stripStereoUnmatchedRecHitsToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
     bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
                                              directionalRefitUseGeometryMaterialEffectsInFitter_;
@@ -1785,6 +1863,7 @@ public:
         directionalRefitSmootherPropagator = &geometryMaterialPropagator;
     }
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
+    auto const& caloGeometry = setup.getData(caloGeometryToken_);
     auto const& muonRecHitBuilder = setup.getData(muonRecHitBuilderToken_);
     auto const& trackerRecHitBuilder = setup.getData(trackerRecHitBuilderToken_);
     // KFTrajectoryFitter/Smoother use TkCloner as a generic rechit clone-or-
@@ -1879,53 +1958,257 @@ public:
         if ((*hit)->isValid())
           existingDetIds.insert((*hit)->geographicalId().rawId());
       std::unordered_map<uint32_t, std::pair<double, TransientTrackingRecHit::RecHitPointer>> bestAdditionalHits;
-      auto considerHit = [&](TransientTrackingRecHit::RecHitPointer const& transientHit, bool precision,
-                             unsigned int& compatibleCount) {
+      Chi2MeasurementEstimator const additionalHitEstimator(additionalHitMaxChi2_);
+      bool const useOuterAssociationState = eventSourceSide * candidate.track->outerPosition().z() >
+                                            eventSourceSide * candidate.track->innerPosition().z();
+      auto associationOriginal =
+          useOuterAssociationState ? trajectoryStateTransform::outerFreeState(*candidate.track, &magneticField)
+                                   : trajectoryStateTransform::innerFreeState(*candidate.track, &magneticField);
+      std::unique_ptr<FreeTrajectoryState> associationSeed;
+      if (associationOriginal.hasError()) {
+        double const associationSign = directionSign == 0 ? 1. : directionSign;
+        GlobalTrajectoryParameters const parameters(associationOriginal.position(),
+                                                    associationSign * associationOriginal.momentum(),
+                                                    associationSign * associationOriginal.charge(),
+                                                    &magneticField);
+        associationSeed =
+            std::make_unique<FreeTrajectoryState>(parameters, associationOriginal.curvilinearError());
+      }
+      auto considerHit = [&](TransientTrackingRecHit::RecHitPointer const& transientHit,
+                             double maxDistance,
+                             unsigned int& propagatedCount,
+                             unsigned int& compatibleCount,
+                             double& minimumResidual,
+                             double& minimumEstimatorChi2) {
         if (!transientHit || !transientHit->isValid() || !transientHit->det() ||
-            existingDetIds.count(transientHit->geographicalId().rawId()))
+            existingDetIds.count(transientHit->geographicalId().rawId()) || !associationSeed)
           return;
-        bool const useOuter = eventSourceSide * candidate.track->outerPosition().z() >
-                              eventSourceSide * candidate.track->innerPosition().z();
-        auto original = useOuter ? trajectoryStateTransform::outerFreeState(*candidate.track, &magneticField)
-                                 : trajectoryStateTransform::innerFreeState(*candidate.track, &magneticField);
-        if (!original.hasError())
-          return;
-        double const sign = directionSign == 0 ? 1. : directionSign;
-        GlobalTrajectoryParameters const parameters(
-            original.position(), sign * original.momentum(), sign * original.charge(), &magneticField);
-        FreeTrajectoryState const seed(parameters, original.curvilinearError());
-        auto const propagated = vacuumPropagator.propagate(seed, *transientHit->surface());
+        auto const propagated = vacuumPropagator.propagate(*associationSeed, *transientHit->surface());
         if (!propagated.isValid())
           return;
+        ++propagatedCount;
         double const residual = (propagated.globalPosition() - transientHit->globalPosition()).mag();
-        if (!std::isfinite(residual) || residual > additionalHitMaxDistance_)
+        if (std::isfinite(residual) && (minimumResidual < 0. || residual < minimumResidual))
+          minimumResidual = residual;
+        auto const estimate = additionalHitEstimator.estimate(propagated, *transientHit);
+        if (std::isfinite(estimate.second) &&
+            (minimumEstimatorChi2 < 0. || estimate.second < minimumEstimatorChi2))
+          minimumEstimatorChi2 = estimate.second;
+        if (!std::isfinite(residual) || (maxDistance >= 0. && residual > maxDistance) || !estimate.first)
           return;
         ++compatibleCount;
         auto& best = bestAdditionalHits[transientHit->geographicalId().rawId()];
-        if (!best.second || residual < best.first)
-          best = {residual, transientHit};
-        if (precision)
-          existingDetIds.insert(transientHit->geographicalId().rawId());
+        // Do not reserve a detector after the first passing object.  DT often
+        // has several reconstructed segment hypotheses in one chamber; keep
+        // scanning and retain the covariance-compatible segment with the
+        // smallest estimator chi2.
+        if (!best.second || estimate.second < best.first)
+          best = {estimate.second, transientHit};
       };
       if (augmentDTHits_ && dtSegments.isValid())
         for (auto segment = dtSegments->begin(); segment != dtSegments->end(); ++segment)
-          considerHit(muonRecHitBuilder.build(&*segment), true, candidate.nCompatibleDTSegments);
-      auto considerTrackerCollection = [&](auto const& handle, unsigned int& compatibleCount) {
+          considerHit(muonRecHitBuilder.build(&*segment),
+                      additionalDTMaxDistance_,
+                      candidate.nPropagatedDTSegments,
+                      candidate.nCompatibleDTSegments,
+                      candidate.minDTResidual,
+                      candidate.minDTEstimatorChi2);
+      auto considerTrackerCollection = [&](auto const& handle) {
         if (!handle.isValid())
           return;
         for (auto const& detSet : *handle)
           for (auto const& hit : detSet)
-            considerHit(trackerRecHitBuilder.build(&hit), false, compatibleCount);
+            considerHit(trackerRecHitBuilder.build(&hit),
+                        additionalTrackerMaxDistance_,
+                        candidate.nPropagatedStripHits,
+                        candidate.nCompatibleStripHits,
+                        candidate.minTrackerResidual,
+                        candidate.minTrackerEstimatorChi2);
       };
       if (augmentTrackerHits_) {
-        considerTrackerCollection(pixelRecHits, candidate.nCompatiblePixelHits);
-        considerTrackerCollection(stripMatchedRecHits, candidate.nCompatibleStripHits);
+        if (pixelRecHits.isValid())
+          for (auto const& detSet : *pixelRecHits)
+            for (auto const& hit : detSet)
+              considerHit(trackerRecHitBuilder.build(&hit),
+                          additionalTrackerMaxDistance_,
+                          candidate.nPropagatedPixelHits,
+                          candidate.nCompatiblePixelHits,
+                          candidate.minTrackerResidual,
+                          candidate.minTrackerEstimatorChi2);
+        considerTrackerCollection(stripMatchedRecHits);
+        considerTrackerCollection(stripRphiRecHits);
+        considerTrackerCollection(stripRphiUnmatchedRecHits);
+        considerTrackerCollection(stripStereoRecHits);
+        considerTrackerCollection(stripStereoUnmatchedRecHits);
       }
       for (auto const& [rawId, best] : bestAdditionalHits) {
         bool const precision = DetId(rawId).det() == DetId::Muon;
         additionalHits.emplace_back(best.second, precision);
         candidate.nAddedDTRefitHits += precision;
         candidate.nAddedTrackerRefitHits += !precision;
+        if (precision)
+          candidate.addedDTChamberIds.insert(DTChamberId(rawId).rawId());
+      }
+
+      // Calorimeters and ZDC are independent timing/direction tags, not
+      // precision trajectory measurements.  Associate their reconstructed
+      // cells to the already fitted detector chord and retain enough
+      // information to validate MIP efficiency and time ordering before any
+      // covariance-bearing constraint is considered.
+      struct TimedCaloPoint {
+        GlobalPoint position;
+        double time = 0.;
+      };
+      std::vector<TimedCaloPoint> timedCaloPoints;
+      auto associateCalo = [&](auto const& handle,
+                               int surfaceMode,
+                               bool useForDirectionTiming,
+                               double maxDistance,
+                               unsigned int& matched,
+                               double& energy,
+                               double& meanTime,
+                               double& minimumDistance) {
+        if (!handle.isValid() || !associationSeed)
+          return;
+        // Rechits in a calorimeter section share only a small number of
+        // cylindrical radii or endcap z planes. Cache the propagated helix
+        // intersection per centimetre instead of propagating once per cell.
+        std::unordered_map<int, std::pair<bool, GlobalPoint>> intersections;
+        double const previousTimeWeight = energy;
+        double timeWeight = 0.;
+        double weightedTime = 0.;
+        double weightedX = 0., weightedY = 0., weightedZ = 0.;
+        for (auto const& hit : *handle) {
+          if (hit.energy() < caloMatchMinEnergy_)
+            continue;
+          auto const cell = caloGeometry.getGeometry(hit.id());
+          if (!cell)
+            continue;
+          auto const position = cell->getPosition();
+          bool const usePlane = surfaceMode > 0 || (surfaceMode < 0 && std::abs(position.z()) > position.perp());
+          double const coordinate = usePlane ? position.z() : position.perp();
+          int const key = (usePlane ? 1000000 : 0) + static_cast<int>(std::lround(coordinate));
+          auto intersection = intersections.find(key);
+          if (intersection == intersections.end()) {
+            TrajectoryStateOnSurface propagated;
+            if (usePlane) {
+              auto const surface = Plane::build(GlobalPoint(0., 0., coordinate), Surface::RotationType());
+              propagated = vacuumPropagator.propagate(*associationSeed, *surface);
+            } else {
+              auto const surface = Cylinder::build(GlobalPoint(0., 0., 0.), Surface::RotationType(), coordinate);
+              propagated = vacuumPropagator.propagate(*associationSeed, *surface);
+            }
+            intersection = intersections
+                               .emplace(key,
+                                        std::make_pair(propagated.isValid(),
+                                                       propagated.isValid() ? propagated.globalPosition()
+                                                                            : GlobalPoint()))
+                               .first;
+          }
+          if (!intersection->second.first)
+            continue;
+          double const distance = (intersection->second.second - position).mag();
+          if (std::isfinite(distance) && (minimumDistance < 0. || distance < minimumDistance))
+            minimumDistance = distance;
+          if (!std::isfinite(distance) || distance > maxDistance)
+            continue;
+          ++matched;
+          energy += hit.energy();
+          double const weight = std::max(std::abs(static_cast<double>(hit.energy())), 1.e-6);
+          timeWeight += weight;
+          weightedTime += weight * hit.time();
+          weightedX += weight * position.x();
+          weightedY += weight * position.y();
+          weightedZ += weight * position.z();
+        }
+        if (timeWeight > 0.) {
+          meanTime = (previousTimeWeight * meanTime + weightedTime) / (previousTimeWeight + timeWeight);
+          if (useForDirectionTiming)
+            timedCaloPoints.push_back(
+                {GlobalPoint(weightedX / timeWeight, weightedY / timeWeight, weightedZ / timeWeight), meanTime});
+        }
+      };
+      associateCalo(ecalBarrelRecHits,
+                    0,
+                    true,
+                    ecalMatchMaxDistance_,
+                    candidate.nMatchedEcalRecHits,
+                    candidate.matchedEcalEnergy,
+                    candidate.matchedEcalTime,
+                    candidate.minEcalLineDistance);
+      associateCalo(ecalEndcapRecHits,
+                    1,
+                    true,
+                    ecalMatchMaxDistance_,
+                    candidate.nMatchedEcalRecHits,
+                    candidate.matchedEcalEnergy,
+                    candidate.matchedEcalTime,
+                    candidate.minEcalLineDistance);
+      associateCalo(hbheRecHits,
+                    -1,
+                    true,
+                    hcalMatchMaxDistance_,
+                    candidate.nMatchedHBHERecHits,
+                    candidate.matchedHBHEEnergy,
+                    candidate.matchedHBHETime,
+                    candidate.minHBHELineDistance);
+      associateCalo(hfRecHits,
+                    1,
+                    true,
+                    hcalMatchMaxDistance_,
+                    candidate.nMatchedHFRecHits,
+                    candidate.matchedHFEnergy,
+                    candidate.matchedHFTime,
+                    candidate.minHFLineDistance);
+      associateCalo(hoRecHits,
+                    0,
+                    true,
+                    hcalMatchMaxDistance_,
+                    candidate.nMatchedHORecHits,
+                    candidate.matchedHOEnergy,
+                    candidate.matchedHOTime,
+                    candidate.minHOLineDistance);
+      associateCalo(zdcRecHits,
+                    1,
+                    false,
+                    zdcMatchMaxDistance_,
+                    candidate.nMatchedZDCRecHits,
+                    candidate.matchedZDCEnergy,
+                    candidate.matchedZDCTime,
+                    candidate.minZDCLineDistance);
+
+      if (timedCaloPoints.size() >= 2) {
+        constexpr double inverseSpeedOfLightNsPerCm = 1. / 29.9792458;
+        constexpr double timingSigmaNs = 5.;
+        GlobalPoint const reference(candidate.track->innerPosition().x(),
+                                    candidate.track->innerPosition().y(),
+                                    candidate.track->innerPosition().z());
+        GlobalVector const axis(candidate.track->innerMomentum().x(),
+                               candidate.track->innerMomentum().y(),
+                               candidate.track->innerMomentum().z());
+        if (axis.mag2() > 0.) {
+          auto directionChi2 = [&](double sign) {
+            double intercept = 0.;
+            for (auto const& point : timedCaloPoints)
+              intercept += point.time -
+                           sign * (point.position - reference).dot(axis.unit()) * inverseSpeedOfLightNsPerCm;
+            intercept /= timedCaloPoints.size();
+            double chi2 = 0.;
+            for (auto const& point : timedCaloPoints) {
+              double const residual = point.time - intercept -
+                                      sign * (point.position - reference).dot(axis.unit()) *
+                                          inverseSpeedOfLightNsPerCm;
+              chi2 += residual * residual / (timingSigmaNs * timingSigmaNs);
+            }
+            return chi2;
+          };
+          double const alongChi2 = directionChi2(1.);
+          double const oppositeChi2 = directionChi2(-1.);
+          candidate.nCaloTimingMeasurements = timedCaloPoints.size();
+          candidate.caloTimingDeltaChi2 = std::abs(alongChi2 - oppositeChi2);
+          if (candidate.caloTimingDeltaChi2 >= minTimingDeltaChi2_)
+            candidate.caloTimingDirectionSign = alongChi2 < oppositeChi2 ? 1 : -1;
+        }
       }
 
       // Refit the same reconstructed hits in their measured time-of-flight
@@ -1987,7 +2270,11 @@ public:
                              : std::numeric_limits<double>::infinity();
         precisionHasShiftTopology = precisionTargetDca <= maxTargetLineDca_ && precisionAbsEta >= minAbsEta_;
       }
-      bool const usePrecisionRefit = useImprovedMomentumRefit_ && !augmentTrackerHits_ && precisionRefit.valid &&
+      // Enabling the tracker study must be a strict no-op when no tracker
+      // measurement was accepted.  Only a genuinely augmented fit switches
+      // away from the established precision-muon result.
+      bool const usePrecisionRefit = useImprovedMomentumRefit_ && candidate.nAddedTrackerRefitHits == 0 &&
+                                     precisionRefit.valid &&
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
@@ -2342,8 +2629,11 @@ public:
     // direction contracts. Missing simulation products leave sentinels and
     // therefore keep this producer usable on data.
     std::vector<int> simTruthMatched(selected.size(), 0), simTrackId(selected.size(), -1);
-    std::vector<int> simDTHits(selected.size(), 0), simCSCHits(selected.size(), 0),
+    std::vector<int> simPixelHits(selected.size(), 0), simStripHits(selected.size(), 0),
+        simDTHits(selected.size(), 0), simCSCHits(selected.size(), 0),
         simRPCHits(selected.size(), 0), simGEMHits(selected.size(), 0), simMuonDetectorMask(selected.size(), 0);
+    std::vector<int> simHBHEHits(selected.size(), 0), simHFHits(selected.size(), 0), simHOHits(selected.size(), 0),
+        nAddedDTTruthChamberMatches(selected.size(), -1);
     std::vector<int> simHcalHits(selected.size(), enableHcalDiagnostics_ ? -1 : -2),
         simZDCHits(selected.size(), enableZDCDiagnostics_ ? -1 : -2);
     std::vector<float> simTrackP(selected.size(), -1.f), simFirstPrecisionHitP(selected.size(), -1.f),
@@ -2357,6 +2647,8 @@ public:
         simVertices.isValid()) {
       std::unordered_map<unsigned int, std::vector<PSimHit const*>> precisionHitsByTrack;
       std::unordered_map<unsigned int, std::array<unsigned int, 4>> detectorHitCounts;
+      std::unordered_map<unsigned int, std::array<unsigned int, 2>> trackerHitCounts;
+      std::unordered_map<unsigned int, std::set<uint32_t>> dtChambersByTrack;
       auto collectHits = [&precisionHitsByTrack, &detectorHitCounts](auto const& handle,
                                                                     unsigned int detectorIndex,
                                                                     bool precision) {
@@ -2373,30 +2665,57 @@ public:
       collectHits(cscSimHits, 1, true);
       collectHits(rpcSimHits, 2, false);
       collectHits(gemSimHits, 3, true);
+      if (dtSimHits.isValid())
+        for (auto const& hit : *dtSimHits)
+          if (std::abs(hit.particleType()) == 13)
+            dtChambersByTrack[hit.trackId()].insert(DTWireId(hit.detUnitId()).chamberId().rawId());
+      for (auto const& handle : trackerSimHits) {
+        if (!handle.isValid())
+          continue;
+        for (auto const& hit : *handle) {
+          if (std::abs(hit.particleType()) != 13)
+            continue;
+          int const subdetector = DetId(hit.detUnitId()).subdetId();
+          unsigned int const index = subdetector <= 2 ? 0 : 1;
+          ++trackerHitCounts[hit.trackId()][index];
+        }
+      }
 
       struct CaloHitSummary {
         int hits = 0;
+        std::array<int, 3> hcalSubdetectorHits{{0, 0, 0}};
         float energy = 0.f;
         float firstTime = std::numeric_limits<float>::infinity();
         float lastTime = -std::numeric_limits<float>::infinity();
       };
       std::unordered_map<unsigned int, CaloHitSummary> hcalHitsByTrack;
       std::unordered_map<unsigned int, CaloHitSummary> zdcHitsByTrack;
-      auto collectCaloHits = [](auto const& handle, auto& summaries) {
+      auto collectCaloHits = [](auto const& handle, auto& summaries, bool classifyHcalSubdetector) {
         if (!handle.isValid())
           return;
         for (auto const& hit : *handle) {
           auto& summary = summaries[hit.geantTrackId()];
           ++summary.hits;
+          if (classifyHcalSubdetector) {
+            int subdetector = 0, zside = 0, depth = 0, eta = 0, phi = 0, layer = 0;
+            HcalTestNumbering::unpackHcalIndex(
+                hit.id(), subdetector, zside, depth, eta, phi, layer);
+            if (subdetector == HcalBarrel || subdetector == HcalEndcap)
+              ++summary.hcalSubdetectorHits[0];
+            else if (subdetector == HcalForward)
+              ++summary.hcalSubdetectorHits[1];
+            else if (subdetector == HcalOuter)
+              ++summary.hcalSubdetectorHits[2];
+          }
           summary.energy += hit.energy();
           summary.firstTime = std::min(summary.firstTime, static_cast<float>(hit.time()));
           summary.lastTime = std::max(summary.lastTime, static_cast<float>(hit.time()));
         }
       };
       if (enableHcalDiagnostics_)
-        collectCaloHits(hcalSimHits, hcalHitsByTrack);
+        collectCaloHits(hcalSimHits, hcalHitsByTrack, true);
       if (enableZDCDiagnostics_)
-        collectCaloHits(zdcSimHits, zdcHitsByTrack);
+        collectCaloHits(zdcSimHits, zdcHitsByTrack, false);
 
       for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
         int const genIndex = genPartIdx[selectedIndex];
@@ -2427,11 +2746,19 @@ public:
         simTruthMatched[selectedIndex] = 1;
         simTrackId[selectedIndex] = matchedSimTrack->trackId();
         simTrackP[selectedIndex] = matchedSimTrack->momentum().P();
+        auto const trackerCounts = trackerHitCounts[matchedSimTrack->trackId()];
+        simPixelHits[selectedIndex] = trackerCounts[0];
+        simStripHits[selectedIndex] = trackerCounts[1];
         auto const detectorCounts = detectorHitCounts[matchedSimTrack->trackId()];
         simDTHits[selectedIndex] = detectorCounts[0];
         simCSCHits[selectedIndex] = detectorCounts[1];
         simRPCHits[selectedIndex] = detectorCounts[2];
         simGEMHits[selectedIndex] = detectorCounts[3];
+        nAddedDTTruthChamberMatches[selectedIndex] = 0;
+        auto const truthDTChambers = dtChambersByTrack.find(matchedSimTrack->trackId());
+        if (truthDTChambers != dtChambersByTrack.end())
+          for (auto const chamber : selected[selectedIndex]->addedDTChamberIds)
+            nAddedDTTruthChamberMatches[selectedIndex] += truthDTChambers->second.count(chamber);
         auto assignCalo = [selectedIndex](bool enabled,
                                           bool available,
                                           auto const& summaries,
@@ -2460,6 +2787,12 @@ public:
                    simHcalEnergy,
                    simHcalFirstTime,
                    simHcalLastTime);
+        auto const hcalSummary = hcalHitsByTrack.find(matchedSimTrack->trackId());
+        if (hcalSummary != hcalHitsByTrack.end()) {
+          simHBHEHits[selectedIndex] = hcalSummary->second.hcalSubdetectorHits[0];
+          simHFHits[selectedIndex] = hcalSummary->second.hcalSubdetectorHits[1];
+          simHOHits[selectedIndex] = hcalSummary->second.hcalSubdetectorHits[2];
+        }
         assignCalo(enableZDCDiagnostics_,
                    zdcSimHits.isValid(),
                    zdcHitsByTrack,
@@ -2537,7 +2870,12 @@ public:
         ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2,
-        entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan, hitDeltaZ;
+        entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan, hitDeltaZ,
+        minDTResidual, minDTEstimatorChi2, minTrackerResidual, minTrackerEstimatorChi2,
+        matchedEcalEnergy, matchedHBHEEnergy, matchedHFEnergy, matchedHOEnergy, matchedZDCEnergy,
+        matchedEcalTime, matchedHBHETime, matchedHFTime, matchedHOTime, matchedZDCTime,
+        minEcalLineDistance, minHBHELineDistance, minHFLineDistance, minHOLineDistance, minZDCLineDistance,
+        caloTimingDeltaChi2;
     std::vector<int> charge, sourceIndex, recoAlgorithm, topology, orientationValid, validHits, validMuonHits,
         trackerMatchValid, trackerTrackIndex, trackerValidHits, trackerPixelHits, trackerStripHits,
         combinedTrackValid, combinedValidHits, combinedTrackerHits, combinedMuonHits,
@@ -2547,6 +2885,9 @@ public:
         directionalRefitSecondValid, directionalRefitSecondHits, directionalRefitSecondConverged,
         directionalRefitSelectedIteration, nDTRefitHits, nCSCRefitHits, nRPCRefitHits, nGEMRefitHits,
         nCompatibleDTSegments, nCompatiblePixelHits, nCompatibleStripHits,
+        nPropagatedDTSegments, nPropagatedPixelHits, nPropagatedStripHits,
+        nMatchedEcalRecHits, nMatchedHBHERecHits, nMatchedHFRecHits, nMatchedHORecHits, nMatchedZDCRecHits,
+        caloTimingDirectionSign, nCaloTimingMeasurements,
         nAddedDTRefitHits, nAddedTrackerRefitHits,
         nPrecisionRefitStations, directionalRefitUsedPrecisionHits, directionalRefitAllHitsValid,
         directionalRefitAllHits, directionalRefitAllHitsSelectedIteration, directionalRefitPrecisionValid,
@@ -2731,6 +3072,36 @@ public:
       nCompatibleDTSegments.push_back(candidate->nCompatibleDTSegments);
       nCompatiblePixelHits.push_back(candidate->nCompatiblePixelHits);
       nCompatibleStripHits.push_back(candidate->nCompatibleStripHits);
+      nPropagatedDTSegments.push_back(candidate->nPropagatedDTSegments);
+      nPropagatedPixelHits.push_back(candidate->nPropagatedPixelHits);
+      nPropagatedStripHits.push_back(candidate->nPropagatedStripHits);
+      minDTResidual.push_back(candidate->minDTResidual);
+      minDTEstimatorChi2.push_back(candidate->minDTEstimatorChi2);
+      minTrackerResidual.push_back(candidate->minTrackerResidual);
+      minTrackerEstimatorChi2.push_back(candidate->minTrackerEstimatorChi2);
+      nMatchedEcalRecHits.push_back(candidate->nMatchedEcalRecHits);
+      nMatchedHBHERecHits.push_back(candidate->nMatchedHBHERecHits);
+      nMatchedHFRecHits.push_back(candidate->nMatchedHFRecHits);
+      nMatchedHORecHits.push_back(candidate->nMatchedHORecHits);
+      nMatchedZDCRecHits.push_back(candidate->nMatchedZDCRecHits);
+      matchedEcalEnergy.push_back(candidate->matchedEcalEnergy);
+      matchedHBHEEnergy.push_back(candidate->matchedHBHEEnergy);
+      matchedHFEnergy.push_back(candidate->matchedHFEnergy);
+      matchedHOEnergy.push_back(candidate->matchedHOEnergy);
+      matchedZDCEnergy.push_back(candidate->matchedZDCEnergy);
+      matchedEcalTime.push_back(candidate->matchedEcalTime);
+      matchedHBHETime.push_back(candidate->matchedHBHETime);
+      matchedHFTime.push_back(candidate->matchedHFTime);
+      matchedHOTime.push_back(candidate->matchedHOTime);
+      matchedZDCTime.push_back(candidate->matchedZDCTime);
+      minEcalLineDistance.push_back(candidate->minEcalLineDistance);
+      minHBHELineDistance.push_back(candidate->minHBHELineDistance);
+      minHFLineDistance.push_back(candidate->minHFLineDistance);
+      minHOLineDistance.push_back(candidate->minHOLineDistance);
+      minZDCLineDistance.push_back(candidate->minZDCLineDistance);
+      caloTimingDirectionSign.push_back(candidate->caloTimingDirectionSign);
+      nCaloTimingMeasurements.push_back(candidate->nCaloTimingMeasurements);
+      caloTimingDeltaChi2.push_back(candidate->caloTimingDeltaChi2);
       nAddedDTRefitHits.push_back(candidate->nAddedDTRefitHits);
       nAddedTrackerRefitHits.push_back(candidate->nAddedTrackerRefitHits);
       nPrecisionRefitStations.push_back(candidate->nPrecisionRefitStations);
@@ -3041,6 +3412,36 @@ public:
     table->addColumn<int>("nCompatibleDTSegments", nCompatibleDTSegments, "unassigned DT segments geometrically compatible with this ShiftMuon");
     table->addColumn<int>("nCompatiblePixelHits", nCompatiblePixelHits, "pixel rechits geometrically compatible with this ShiftMuon");
     table->addColumn<int>("nCompatibleStripHits", nCompatibleStripHits, "matched strip rechits geometrically compatible with this ShiftMuon");
+    table->addColumn<int>("nPropagatedDTSegments", nPropagatedDTSegments, "unassigned DT segments reached by propagation before compatibility cuts");
+    table->addColumn<int>("nPropagatedPixelHits", nPropagatedPixelHits, "pixel rechits reached by propagation before compatibility cuts");
+    table->addColumn<int>("nPropagatedStripHits", nPropagatedStripHits, "all matched and unmatched strip rechits reached by propagation before compatibility cuts");
+    table->addColumn<float>("minDTResidual", minDTResidual, "minimum propagated-to-DT-segment global residual in cm; -1 when none propagated");
+    table->addColumn<float>("minDTEstimatorChi2", minDTEstimatorChi2, "minimum covariance-aware DT compatibility chi2; -1 when none propagated");
+    table->addColumn<float>("minTrackerResidual", minTrackerResidual, "minimum propagated-to-tracker-rechit global residual in cm; -1 when none propagated");
+    table->addColumn<float>("minTrackerEstimatorChi2", minTrackerEstimatorChi2, "minimum covariance-aware tracker compatibility chi2; -1 when none propagated");
+    table->addColumn<int>("nMatchedEcalRecHits", nMatchedEcalRecHits, "ECAL rechits associated to the fitted detector chord");
+    table->addColumn<int>("nMatchedHBHERecHits", nMatchedHBHERecHits, "HBHE rechits associated to the fitted detector chord");
+    table->addColumn<int>("nMatchedHFRecHits", nMatchedHFRecHits, "HF rechits associated to the fitted detector chord");
+    table->addColumn<int>("nMatchedHORecHits", nMatchedHORecHits, "HO rechits associated to the fitted detector chord");
+    table->addColumn<int>("nMatchedZDCRecHits", nMatchedZDCRecHits, "ZDC rechits associated to the fitted detector chord");
+    table->addColumn<float>("matchedEcalEnergy", matchedEcalEnergy, "summed associated ECAL rechit energy");
+    table->addColumn<float>("matchedHBHEEnergy", matchedHBHEEnergy, "summed associated HBHE rechit energy");
+    table->addColumn<float>("matchedHFEnergy", matchedHFEnergy, "summed associated HF rechit energy");
+    table->addColumn<float>("matchedHOEnergy", matchedHOEnergy, "summed associated HO rechit energy");
+    table->addColumn<float>("matchedZDCEnergy", matchedZDCEnergy, "summed associated ZDC rechit energy");
+    table->addColumn<float>("matchedEcalTime", matchedEcalTime, "energy-weighted associated ECAL rechit time");
+    table->addColumn<float>("matchedHBHETime", matchedHBHETime, "energy-weighted associated HBHE rechit time");
+    table->addColumn<float>("matchedHFTime", matchedHFTime, "energy-weighted associated HF rechit time");
+    table->addColumn<float>("matchedHOTime", matchedHOTime, "energy-weighted associated HO rechit time");
+    table->addColumn<float>("matchedZDCTime", matchedZDCTime, "energy-weighted associated ZDC rechit time in the shifted readout frame");
+    table->addColumn<float>("minEcalLineDistance", minEcalLineDistance, "minimum ECAL-cell distance to the fitted detector chord in cm");
+    table->addColumn<float>("minHBHELineDistance", minHBHELineDistance, "minimum HBHE-cell distance to the fitted detector chord in cm");
+    table->addColumn<float>("minHFLineDistance", minHFLineDistance, "minimum HF-cell distance to the fitted detector chord in cm");
+    table->addColumn<float>("minHOLineDistance", minHOLineDistance, "minimum HO-cell distance to the fitted detector chord in cm");
+    table->addColumn<float>("minZDCLineDistance", minZDCLineDistance, "minimum ZDC-cell distance to the fitted detector chord in cm");
+    table->addColumn<int>("caloTimingDirectionSign", caloTimingDirectionSign, "calorimeter-only time-order sign relative to fitted momentum; zero when inconclusive");
+    table->addColumn<int>("nCaloTimingMeasurements", nCaloTimingMeasurements, "independent calorimeter subsystem timing centroids");
+    table->addColumn<float>("caloTimingDeltaChi2", caloTimingDeltaChi2, "calorimeter time-order chi2 separation between directions");
     table->addColumn<int>("nAddedDTRefitHits", nAddedDTRefitHits, "compatible DT segments supplied to the augmented refit");
     table->addColumn<int>("nAddedTrackerRefitHits", nAddedTrackerRefitHits, "compatible tracker rechits supplied to the augmented refit");
     table->addColumn<int>("nCSCRefitHits", nCSCRefitHits, "valid CSC inputs available to the directional refit");
@@ -3320,11 +3721,19 @@ public:
                           simTruthMatched,
                           "MC closure diagnostic: selected row matched to a primary SimTrack with precision SimHits");
     table->addColumn<int>("simTrackId", simTrackId, "matched Geant4 SimTrack id, or -1");
+    table->addColumn<int>("simPixelHits", simPixelHits, "matched muon Geant4 hits in pixel sensitive volumes");
+    table->addColumn<int>("simStripHits", simStripHits, "matched muon Geant4 hits in strip sensitive volumes");
     table->addColumn<float>("simTrackP", simTrackP, "matched SimTrack momentum at the production vertex");
     table->addColumn<int>("simDTHits", simDTHits, "matched muon Geant4 hits in DT sensitive volumes");
     table->addColumn<int>("simCSCHits", simCSCHits, "matched muon Geant4 hits in CSC sensitive volumes");
     table->addColumn<int>("simRPCHits", simRPCHits, "matched muon Geant4 hits in RPC sensitive volumes");
     table->addColumn<int>("simGEMHits", simGEMHits, "matched muon Geant4 hits in GEM sensitive volumes");
+    table->addColumn<int>("nAddedDTTruthChamberMatches",
+                          nAddedDTTruthChamberMatches,
+                          "MC-only number of added DT segments in a chamber crossed by the matched signal muon");
+    table->addColumn<int>("simHBHEHits", simHBHEHits, "matched muon Geant4 hits in HB or HE");
+    table->addColumn<int>("simHFHits", simHFHits, "matched muon Geant4 hits in HF");
+    table->addColumn<int>("simHOHits", simHOHits, "matched muon Geant4 hits in HO");
     table->addColumn<int>("simHcalHits",
                           simHcalHits,
                           "matched primary-muon HCAL SimHits; -1 unavailable, -2 diagnostic disabled");
@@ -3717,17 +4126,36 @@ public:
     description.add<edm::InputTag>("cscSimHits", edm::InputTag("g4SimHits", "MuonCSCHits"));
     description.add<edm::InputTag>("rpcSimHits", edm::InputTag("g4SimHits", "MuonRPCHits"));
     description.add<edm::InputTag>("gemSimHits", edm::InputTag("g4SimHits", "MuonGEMHits"));
+    description.add<std::vector<edm::InputTag>>("trackerSimHits", {});
     description.add<edm::InputTag>("hcalSimHits", edm::InputTag("g4SimHits", "HcalHits"));
     description.add<edm::InputTag>("zdcSimHits", edm::InputTag("g4SimHits", "ZDCHITS"));
+    description.add<edm::InputTag>("ecalBarrelRecHits", edm::InputTag("reducedEcalRecHitsEB"));
+    description.add<edm::InputTag>("ecalEndcapRecHits", edm::InputTag("reducedEcalRecHitsEE"));
+    description.add<edm::InputTag>("hbheRecHits", edm::InputTag("hbhereco"));
+    description.add<edm::InputTag>("hfRecHits", edm::InputTag("hfreco"));
+    description.add<edm::InputTag>("hoRecHits", edm::InputTag("horeco"));
+    description.add<edm::InputTag>("zdcRecHits", edm::InputTag("shiftZDCReco"));
     description.add<edm::InputTag>("dtSegments", edm::InputTag("dt4DSegments"));
     description.add<edm::InputTag>("pixelRecHits", edm::InputTag("siPixelRecHits"));
     description.add<edm::InputTag>("stripMatchedRecHits", edm::InputTag("siStripMatchedRecHits", "matchedRecHit"));
+    description.add<edm::InputTag>("stripRphiRecHits", edm::InputTag("siStripMatchedRecHits", "rphiRecHit"));
+    description.add<edm::InputTag>("stripRphiUnmatchedRecHits",
+                                   edm::InputTag("siStripMatchedRecHits", "rphiRecHitUnmatched"));
+    description.add<edm::InputTag>("stripStereoRecHits", edm::InputTag("siStripMatchedRecHits", "stereoRecHit"));
+    description.add<edm::InputTag>("stripStereoUnmatchedRecHits",
+                                   edm::InputTag("siStripMatchedRecHits", "stereoRecHitUnmatched"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
     description.add<std::string>("trackerRecHitBuilder", "WithTrackAngle");
     description.add<bool>("augmentDTHits", false);
     description.add<bool>("augmentTrackerHits", false);
     description.add<bool>("useExtendedTiming", false);
-    description.add<double>("additionalHitMaxDistance", 10.0);
+    description.add<double>("additionalDTMaxDistance", 200.0);
+    description.add<double>("additionalTrackerMaxDistance", 30.0);
+    description.add<double>("additionalHitMaxChi2", 100.0);
+    description.add<double>("ecalMatchMaxDistance", 15.0);
+    description.add<double>("hcalMatchMaxDistance", 40.0);
+    description.add<double>("zdcMatchMaxDistance", 200.0);
+    description.add<double>("caloMatchMinEnergy", 0.01);
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<bool>("directionalRefitUseMaterialEffects", false);
@@ -3800,19 +4228,37 @@ private:
   edm::EDGetTokenT<edm::PSimHitContainer> cscSimHitsToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> rpcSimHitsToken_;
   edm::EDGetTokenT<edm::PSimHitContainer> gemSimHitsToken_;
+  std::vector<edm::EDGetTokenT<edm::PSimHitContainer>> trackerSimHitsTokens_;
   edm::EDGetTokenT<edm::PCaloHitContainer> hcalSimHitsToken_;
   edm::EDGetTokenT<edm::PCaloHitContainer> zdcSimHitsToken_;
+  edm::EDGetTokenT<EcalRecHitCollection> ecalBarrelRecHitsToken_;
+  edm::EDGetTokenT<EcalRecHitCollection> ecalEndcapRecHitsToken_;
+  edm::EDGetTokenT<HBHERecHitCollection> hbheRecHitsToken_;
+  edm::EDGetTokenT<HFRecHitCollection> hfRecHitsToken_;
+  edm::EDGetTokenT<HORecHitCollection> hoRecHitsToken_;
+  edm::EDGetTokenT<ZDCRecHitCollection> zdcRecHitsToken_;
   edm::EDGetTokenT<DTRecSegment4DCollection> dtSegmentsToken_;
   edm::EDGetTokenT<SiPixelRecHitCollection> pixelRecHitsToken_;
   edm::EDGetTokenT<SiStripMatchedRecHit2DCollection> stripMatchedRecHitsToken_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripRphiRecHitsToken_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripRphiUnmatchedRecHitsToken_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripStereoRecHitsToken_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripStereoUnmatchedRecHitsToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> trackerRecHitBuilderToken_;
+  edm::ESGetToken<CaloGeometry, CaloGeometryRecord> caloGeometryToken_;
   bool augmentDTHits_;
   bool augmentTrackerHits_;
   bool useExtendedTiming_;
-  double additionalHitMaxDistance_;
+  double additionalDTMaxDistance_;
+  double additionalTrackerMaxDistance_;
+  double additionalHitMaxChi2_;
+  double ecalMatchMaxDistance_;
+  double hcalMatchMaxDistance_;
+  double zdcMatchMaxDistance_;
+  double caloMatchMinEnergy_;
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
   bool directionalRefitUseMaterialEffects_;

@@ -47,6 +47,41 @@ extrapolated to the full sample.
   only 5 selected v15 muons have matched signal GEM SimHits and none has an
   attached GEM hit.
 
+## Integrated implementation and probes on 2026-08-17
+
+The `detector_integration_v3` preset is the first production candidate that
+contains the whole diagnostic chain in one schema. It adds all pixel and strip
+RecHit collections after a detector-only ShiftMuon exists, covariance-selects
+unassigned DT segments, retains full ECAL/HCAL/HF/HO RecHits, explicitly
+enables the Phase-I ZDC digitizer in a separately named Step-2 stream, and
+records propagated calorimeter/ZDC associations and timing hypotheses. Calo
+and ZDC measurements remain diagnostic and do not alter the precision fit.
+
+The targeted 30-event probe established several mechanism-level results:
+
+- A tracker-dense event contained 441 pixel and 772 matched-strip RecHits, but
+  the matched signal muon had zero pixel and zero strip SimHits. Zero attached
+  tracker hits was therefore correct, not an association failure. The new
+  `simPixelHits` and `simStripHits` columns make this denominator explicit in
+  the large test.
+- Removing the redundant global-distance veto admitted three DT segments that
+  all pass the covariance estimator. All three are in DT chambers crossed by
+  the matched signal muon. In that event the fit input grew from four to seven
+  measurements and the relative pT error improved from 30.1% to 25.4%. This is
+  encouraging but only one truth-matched case; use
+  `nAddedDTTruthChamberMatches` and the resolution histograms to measure purity
+  and net performance in the larger test.
+- Run-3 DIGI had `doZDCDigi=False`; changing the time phase alone could never
+  produce a signal. Enabling the legacy Phase-I digitizer plus a -930 ns phase
+  produces 22 ZDC digi frames and 22 reconstructed channels per event. Empty
+  frames and pedestal/noise make raw occupancy meaningless, so the new
+  threshold, energy, maximum-energy, and timing summaries must be used.
+- Propagating the fitted helix to detector cylinders/endcap planes is materially
+  better defined than the former infinite straight-line match. The small probe
+  still shows substantial accidental HO/ZDC associations. Treat calo direction
+  as a test observable, not a production direction decision, until its
+  truth-crossing efficiency and false-tag rate are measured.
+
 ## Muon-system reconstruction
 
 - Complete a per-muon funnel for DT, CSC, RPC, and GEM: sensitive-volume
