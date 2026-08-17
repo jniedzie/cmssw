@@ -12,12 +12,22 @@ def addShiftMuonSegments(
     directionalRefitUseGeometryTargetMaterialEffects=None,
     enableHcalDiagnostics=False,
     enableZDCDiagnostics=False,
+    augmentDTHits=False,
+    augmentTrackerHits=False,
+    useExtendedTiming=False,
 ):
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
+    process.load("RecoTracker.TransientTrackingRecHit.TransientTrackingRecHitBuilder_cfi")
+    process.load("RecoLocalTracker.SiPixelRecHits.PixelCPEESProducers_cff")
+    process.load("RecoLocalTracker.SiStripRecHitConverter.StripCPEfromTrackAngle_cfi")
+    process.load("RecoLocalTracker.SiStripRecHitConverter.SiStripRecHitMatcher_cfi")
     process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
     process.shiftMuonTable.enableHcalDiagnostics = cms.bool(enableHcalDiagnostics)
     process.shiftMuonTable.enableZDCDiagnostics = cms.bool(enableZDCDiagnostics)
+    process.shiftMuonTable.augmentDTHits = cms.bool(augmentDTHits)
+    process.shiftMuonTable.augmentTrackerHits = cms.bool(augmentTrackerHits)
+    process.shiftMuonTable.useExtendedTiming = cms.bool(useExtendedTiming)
     if directionalRefitUseDetailedMaterialEffects is not None:
         process.shiftMuonTable.directionalRefitUseDetailedMaterialEffects = cms.bool(
             directionalRefitUseDetailedMaterialEffects
