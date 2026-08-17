@@ -57,11 +57,11 @@ def main():
         "ShiftDimuonVertex_isTraversingDoubleTraversing",
         "ShiftDimuonVertex_isDoubleTraversingDoubleTraversing",
         "ShiftDimuonVertex_topologyMin", "ShiftDimuonVertex_topologyMax",
-        "ShiftRecoDiag_recoVariantCode", "ShiftRecoDiag_enableDTMeasurement",
-        "ShiftRecoDiag_dtNavigationMode", "ShiftRecoDiag_enableGEMMeasurement",
-        "ShiftRecoDiag_trackerMode", "ShiftRecoDiag_enableHcalDiagnostics",
-        "ShiftRecoDiag_enableZDCDiagnostics", "ShiftRecoDiag_nSignalMuonHcalSimHits",
-        "ShiftRecoDiag_nSignalMuonZDCSimHits", "ShiftRecoDiag_signalMuonZDCFirstTime",
+        "shiftRecoDiagRecoVariantCode", "shiftRecoDiagEnableDTMeasurement",
+        "shiftRecoDiagDtNavigationMode", "shiftRecoDiagEnableGEMMeasurement",
+        "shiftRecoDiagTrackerMode", "shiftRecoDiagEnableHcalDiagnostics",
+        "shiftRecoDiagEnableZDCDiagnostics", "shiftRecoDiagNSignalMuonHcalSimHits",
+        "shiftRecoDiagNSignalMuonZDCSimHits", "shiftRecoDiagSignalMuonZDCFirstTime",
     }
     forbidden = {
         "ShiftMuon_unconstrainedPt", "ShiftMuon_source", "ShiftMuon_isTraversing",
@@ -69,10 +69,13 @@ def main():
     }
     missing = sorted(required - available)
     redundant = sorted(forbidden & available)
+    misnamed_diagnostics = sorted(name for name in available if name.startswith("ShiftRecoDiag_"))
     if missing:
         raise RuntimeError(f"missing branches: {', '.join(missing)}")
     if redundant:
         raise RuntimeError(f"redundant branches remain: {', '.join(redundant)}")
+    if misnamed_diagnostics:
+        raise RuntimeError(f"collection-style names used for scalar diagnostics: {', '.join(misnamed_diagnostics)}")
 
     quality_counts = {index: 0 for index in range(4)}
     topology_counts = {index: 0 for index in range(5)}
@@ -87,15 +90,15 @@ def main():
         "isTraversingDoubleTraversing", "isDoubleTraversingDoubleTraversing",
     )
     for event in events:
-        if int(event.ShiftRecoDiag_dtNavigationMode) not in range(3):
-            raise RuntimeError("invalid ShiftRecoDiag_dtNavigationMode")
-        if int(event.ShiftRecoDiag_trackerMode) not in range(3):
-            raise RuntimeError("invalid ShiftRecoDiag_trackerMode")
-        if not bool(event.ShiftRecoDiag_enableHcalDiagnostics):
-            if int(event.ShiftRecoDiag_nSignalMuonHcalSimHits) != -2:
+        if int(event.shiftRecoDiagDtNavigationMode) not in range(3):
+            raise RuntimeError("invalid shiftRecoDiagDtNavigationMode")
+        if int(event.shiftRecoDiagTrackerMode) not in range(3):
+            raise RuntimeError("invalid shiftRecoDiagTrackerMode")
+        if not bool(event.shiftRecoDiagEnableHcalDiagnostics):
+            if int(event.shiftRecoDiagNSignalMuonHcalSimHits) != -2:
                 raise RuntimeError("disabled HCAL diagnostics do not carry the -2 sentinel")
-        if not bool(event.ShiftRecoDiag_enableZDCDiagnostics):
-            if int(event.ShiftRecoDiag_nSignalMuonZDCSimHits) != -2:
+        if not bool(event.shiftRecoDiagEnableZDCDiagnostics):
+            if int(event.shiftRecoDiagNSignalMuonZDCSimHits) != -2:
                 raise RuntimeError("disabled ZDC diagnostics do not carry the -2 sentinel")
         for index in range(int(event.nShiftMuon)):
             muons += 1

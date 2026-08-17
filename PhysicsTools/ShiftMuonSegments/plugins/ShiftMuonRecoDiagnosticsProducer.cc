@@ -30,6 +30,7 @@
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <iterator>
 #include <limits>
@@ -153,12 +154,16 @@ public:
   }
 
   void produce(edm::Event& event, edm::EventSetup const&) override {
-    auto table = std::make_unique<nanoaod::FlatTable>(1, "ShiftRecoDiag", true, false);
-    auto add = [&table](std::string const& name, int value, std::string const& documentation) {
-      table->addColumn<int>(name, std::vector<int>{value}, documentation);
+    auto table = std::make_unique<nanoaod::FlatTable>(1, "", true, false);
+    auto branchName = [](std::string name) {
+      name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
+      return "shiftRecoDiag" + name;
     };
-    auto addFloat = [&table](std::string const& name, float value, std::string const& documentation) {
-      table->addColumn<float>(name, std::vector<float>{value}, documentation);
+    auto add = [&table, &branchName](std::string const& name, int value, std::string const& documentation) {
+      table->addColumn<int>(branchName(name), std::vector<int>{value}, documentation);
+    };
+    auto addFloat = [&table, &branchName](std::string const& name, float value, std::string const& documentation) {
+      table->addColumn<float>(branchName(name), std::vector<float>{value}, documentation);
     };
 
     std::unordered_set<unsigned int> signalMuonTrackIds;
