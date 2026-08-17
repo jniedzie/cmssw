@@ -45,6 +45,9 @@
 #include "TrackingTools/Records/interface/TransientRecHitRecord.h"
 #include "TrackingTools/TrackFitters/interface/KFTrajectoryFitter.h"
 #include "TrackingTools/TrackFitters/interface/KFTrajectorySmoother.h"
+#include "TrackingTools/TrackAssociator/interface/TrackAssociatorParameters.h"
+#include "TrackingTools/TrackAssociator/interface/TrackDetectorAssociator.h"
+#include "TrackingTools/TrackAssociator/interface/TrackDetMatchInfo.h"
 #include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
 #include "TrackingTools/TrajectoryParametrization/interface/CurvilinearTrajectoryError.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
@@ -393,9 +396,28 @@ namespace {
     double minHFLineDistance = -1.;
     double minHOLineDistance = -1.;
     double minZDCLineDistance = -1.;
+    unsigned int nCrossedHBHEIds = 0;
+    unsigned int nCrossedHBHERecHits = 0;
+    unsigned int nValidCrossedHBHETimes = 0;
+    unsigned int nCrossedHOIds = 0;
+    unsigned int nCrossedHORecHits = 0;
+    unsigned int nValidCrossedHOTimes = 0;
+    int hcalAssociationDirection = 0;
+    double crossedHBHEEnergy = 0.;
+    double hbhe3x3Energy = 0.;
+    double maxCrossedHBHEEnergy = 0.;
+    double maxCrossedHBHETime = 0.;
+    double crossedHOEnergy = 0.;
+    double ho3x3Energy = 0.;
+    double maxCrossedHOEnergy = 0.;
+    double maxCrossedHOTime = 0.;
     int caloTimingDirectionSign = 0;
     unsigned int nCaloTimingMeasurements = 0;
     double caloTimingDeltaChi2 = 0.;
+    int combinedTimingDirectionSign = 0;
+    unsigned int nCombinedTimingMeasurements = 0;
+    double combinedTimingDeltaChi2 = 0.;
+    int combinedTimingAgreesWithMuon = 0;
     unsigned int nAddedDTRefitHits = 0;
     unsigned int nAddedTrackerRefitHits = 0;
     std::set<uint32_t> addedDTChamberIds;
@@ -1265,6 +1287,12 @@ namespace {
     return result;
   }
 
+  struct TimedPoint {
+    GlobalPoint position;
+    double time = 0.;
+    double sigma = 1.;
+  };
+
   struct TimingResult {
     int directionSign = 0;
     unsigned int measurements = 0;
@@ -1276,9 +1304,9 @@ namespace {
                                GlobalTrackingGeometry const& geometry,
                                unsigned int minMeasurements,
                                double minDeltaChi2,
-                               bool useExtendedTiming) {
-    struct TimedPoint { GlobalPoint position; double time; double sigma; };
-    std::vector<TimedPoint> points;
+                               bool useExtendedTiming,
+                               std::vector<TimedPoint> const& additionalPoints = {}) {
+    std::vector<TimedPoint> points = additionalPoints;
     for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
       if (!(*hit)->isValid())
         continue;
@@ -1652,6 +1680,8 @@ public:
         minSharedDetIds_(parameters.getParameter<unsigned int>("minSharedDetIds")),
         maxDuplicateAngle_(parameters.getParameter<double>("maxDuplicateAngle")),
         maxDuplicateLineDistance_(parameters.getParameter<double>("maxDuplicateLineDistance")),
+        maxTrackerMuonLineDistance_(parameters.getParameter<double>("maxTrackerMuonLineDistance")),
+        maxTrackerMuonAxisAngle_(parameters.getParameter<double>("maxTrackerMuonAxisAngle")),
         minTimingMeasurements_(parameters.getParameter<unsigned int>("minTimingMeasurements")),
         minTimingDeltaChi2_(parameters.getParameter<double>("minTimingDeltaChi2")),
         maxTargetLineDca_(parameters.getParameter<double>("maxTargetLineDca")),
@@ -1665,6 +1695,10 @@ public:
         maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
+    auto collector = consumesCollector();
+    hcalAssociatorParameters_.loadParameters(
+        parameters.getParameter<edm::ParameterSet>("TrackAssociatorParameters"), collector);
+    hcalAssociator_.useDefaultPropagator();
     bool const anyGeometryFitMaterialEffects = directionalRefitUseGeometryMaterialEffects_ ||
                                                directionalRefitUseGeometryMaterialEffectsInFitter_ ||
                                                directionalRefitUseGeometryMaterialEffectsInSmoother_;
@@ -1807,6 +1841,11 @@ public:
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
     vacuumPropagator.setUseMagVolumes(true);
+    // The standalone fit momentum can be far below the physical incoming
+    // momentum. The associator's default material propagator then stops
+    // before HCAL/HO; use the same field-aware vacuum transport already used
+    // for detector-crossing diagnostics and treat calorimeters as tags only.
+    hcalAssociator_.setPropagator(&vacuumPropagator);
     SteppingHelixPropagator geometryCovariancePropagator(&magneticField, anyDirection);
     geometryCovariancePropagator.setMaterialMode(false);
     geometryCovariancePropagator.setUseMagVolumes(true);
@@ -2055,11 +2094,74 @@ public:
       // cells to the already fitted detector chord and retain enough
       // information to validate MIP efficiency and time ordering before any
       // covariance-bearing constraint is considered.
-      struct TimedCaloPoint {
-        GlobalPoint position;
-        double time = 0.;
-      };
-      std::vector<TimedCaloPoint> timedCaloPoints;
+      std::vector<TimedPoint> timedCaloPoints;
+
+      // Use the detector-aware CMSSW associator for the active HCAL/HO tag.
+      // Unlike the legacy centre-distance matcher below, this follows the
+      // trajectory through real cell volumes and returns the exact crossed
+      // DetIds.  Only valid rechit times contribute to timing; in particular
+      // the HBHE no-time sentinel (-999 ns) is explicitly rejected.
+      if (enableHcalDiagnostics_ && associationSeed) {
+        // reco::Track Any/InsideOut/OutsideIn all assume conventional tracker
+        // endpoint semantics and return no crossed cells for these standalone
+        // SHIFT tracks. Reuse the explicit source-facing physical state built
+        // above; this is the same state that successfully propagates to raw
+        // tracker and DT measurements.
+        auto matchInfo = hcalAssociator_.associate(
+            event, setup, *associationSeed, hcalAssociatorParameters_);
+        candidate.hcalAssociationDirection = 2;
+        candidate.nCrossedHBHEIds = matchInfo.crossedHcalIds.size();
+        candidate.nCrossedHBHERecHits = matchInfo.crossedHcalRecHits.size();
+        candidate.crossedHBHEEnergy = matchInfo.crossedEnergy(TrackDetMatchInfo::HcalRecHits);
+        candidate.hbhe3x3Energy = matchInfo.nXnEnergy(TrackDetMatchInfo::HcalRecHits, 1);
+        candidate.nCrossedHOIds = matchInfo.crossedHOIds.size();
+        candidate.nCrossedHORecHits = matchInfo.crossedHORecHits.size();
+        candidate.crossedHOEnergy = matchInfo.crossedEnergy(TrackDetMatchInfo::HORecHits);
+        candidate.ho3x3Energy = matchInfo.nXnEnergy(TrackDetMatchInfo::HORecHits, 1);
+
+        auto addExactTiming = [&](auto const& hits,
+                                  unsigned int& validTimes,
+                                  double& maximumEnergy,
+                                  double& maximumTime) {
+          double weight = 0.;
+          double weightedTime = 0., weightedX = 0., weightedY = 0., weightedZ = 0.;
+          for (auto const* hit : hits) {
+            if (!hit)
+              continue;
+            if (hit->energy() > maximumEnergy) {
+              maximumEnergy = hit->energy();
+              maximumTime = hit->time();
+            }
+            double const time = hit->time();
+            if (!std::isfinite(time) || time <= -900.)
+              continue;
+            auto const cell = caloGeometry.getGeometry(hit->id());
+            if (!cell)
+              continue;
+            double const hitWeight = std::max(std::abs(static_cast<double>(hit->energy())), 1.e-6);
+            auto const position = cell->getPosition();
+            ++validTimes;
+            weight += hitWeight;
+            weightedTime += hitWeight * time;
+            weightedX += hitWeight * position.x();
+            weightedY += hitWeight * position.y();
+            weightedZ += hitWeight * position.z();
+          }
+          if (weight > 0.)
+            timedCaloPoints.push_back({GlobalPoint(weightedX / weight, weightedY / weight, weightedZ / weight),
+                                       weightedTime / weight,
+                                       5.});
+        };
+        addExactTiming(matchInfo.crossedHcalRecHits,
+                       candidate.nValidCrossedHBHETimes,
+                       candidate.maxCrossedHBHEEnergy,
+                       candidate.maxCrossedHBHETime);
+        addExactTiming(matchInfo.crossedHORecHits,
+                       candidate.nValidCrossedHOTimes,
+                       candidate.maxCrossedHOEnergy,
+                       candidate.maxCrossedHOTime);
+      }
+
       auto associateCalo = [&](auto const& handle,
                                int surfaceMode,
                                bool useForDirectionTiming,
@@ -2114,68 +2216,78 @@ public:
             continue;
           ++matched;
           energy += hit.energy();
-          double const weight = std::max(std::abs(static_cast<double>(hit.energy())), 1.e-6);
-          timeWeight += weight;
-          weightedTime += weight * hit.time();
-          weightedX += weight * position.x();
-          weightedY += weight * position.y();
-          weightedZ += weight * position.z();
+          double const hitTime = hit.time();
+          if (std::isfinite(hitTime) && hitTime > -900.) {
+            double const weight = std::max(std::abs(static_cast<double>(hit.energy())), 1.e-6);
+            timeWeight += weight;
+            weightedTime += weight * hitTime;
+            weightedX += weight * position.x();
+            weightedY += weight * position.y();
+            weightedZ += weight * position.z();
+          }
         }
         if (timeWeight > 0.) {
           meanTime = (previousTimeWeight * meanTime + weightedTime) / (previousTimeWeight + timeWeight);
           if (useForDirectionTiming)
             timedCaloPoints.push_back(
-                {GlobalPoint(weightedX / timeWeight, weightedY / timeWeight, weightedZ / timeWeight), meanTime});
+                {GlobalPoint(weightedX / timeWeight, weightedY / timeWeight, weightedZ / timeWeight),
+                 meanTime,
+                 5.});
         }
       };
-      associateCalo(ecalBarrelRecHits,
-                    0,
-                    true,
-                    ecalMatchMaxDistance_,
-                    candidate.nMatchedEcalRecHits,
-                    candidate.matchedEcalEnergy,
-                    candidate.matchedEcalTime,
-                    candidate.minEcalLineDistance);
-      associateCalo(ecalEndcapRecHits,
-                    1,
-                    true,
-                    ecalMatchMaxDistance_,
-                    candidate.nMatchedEcalRecHits,
-                    candidate.matchedEcalEnergy,
-                    candidate.matchedEcalTime,
-                    candidate.minEcalLineDistance);
-      associateCalo(hbheRecHits,
-                    -1,
-                    true,
-                    hcalMatchMaxDistance_,
-                    candidate.nMatchedHBHERecHits,
-                    candidate.matchedHBHEEnergy,
-                    candidate.matchedHBHETime,
-                    candidate.minHBHELineDistance);
-      associateCalo(hfRecHits,
-                    1,
-                    true,
-                    hcalMatchMaxDistance_,
-                    candidate.nMatchedHFRecHits,
-                    candidate.matchedHFEnergy,
-                    candidate.matchedHFTime,
-                    candidate.minHFLineDistance);
-      associateCalo(hoRecHits,
-                    0,
-                    true,
-                    hcalMatchMaxDistance_,
-                    candidate.nMatchedHORecHits,
-                    candidate.matchedHOEnergy,
-                    candidate.matchedHOTime,
-                    candidate.minHOLineDistance);
-      associateCalo(zdcRecHits,
-                    1,
-                    false,
-                    zdcMatchMaxDistance_,
-                    candidate.nMatchedZDCRecHits,
-                    candidate.matchedZDCEnergy,
-                    candidate.matchedZDCTime,
-                    candidate.minZDCLineDistance);
+      // The production study found no useful ECAL or HF association, while
+      // HBHE and especially HO retain a truth-correlated subset.  Keep only
+      // those two Phase-I HCAL systems in the active timing study.  The old
+      // schema columns remain zero for backwards-compatible diagnostics.
+      if (enableHcalDiagnostics_) {
+        associateCalo(hbheRecHits,
+                      -1,
+                      false,
+                      hcalMatchMaxDistance_,
+                      candidate.nMatchedHBHERecHits,
+                      candidate.matchedHBHEEnergy,
+                      candidate.matchedHBHETime,
+                      candidate.minHBHELineDistance);
+        associateCalo(hoRecHits,
+                      0,
+                      false,
+                      hcalMatchMaxDistance_,
+                      candidate.nMatchedHORecHits,
+                      candidate.matchedHOEnergy,
+                      candidate.matchedHOTime,
+                      candidate.minHOLineDistance);
+      }
+      if (enableZDCDiagnostics_)
+        associateCalo(zdcRecHits,
+                      1,
+                      false,
+                      zdcMatchMaxDistance_,
+                      candidate.nMatchedZDCRecHits,
+                      candidate.matchedZDCEnergy,
+                      candidate.matchedZDCTime,
+                      candidate.minZDCLineDistance);
+
+      // A single HO or HBHE centroid cannot determine a direction by itself,
+      // but it can extend the already populated CSC/DT/RPC timing fit.  Keep
+      // this as a diagnostic hypothesis until its truth direction and
+      // subsystem clock offsets are validated; it does not alter the
+      // canonical ShiftMuon direction or momentum.
+      candidate.nCaloTimingMeasurements = timedCaloPoints.size();
+      if (!timedCaloPoints.empty()) {
+        auto const combinedTiming = timingDirection(*candidate.track,
+                                                    trackingGeometry,
+                                                    minTimingMeasurements_,
+                                                    minTimingDeltaChi2_,
+                                                    useExtendedTiming_,
+                                                    timedCaloPoints);
+        candidate.combinedTimingDirectionSign = combinedTiming.directionSign;
+        candidate.nCombinedTimingMeasurements = combinedTiming.measurements;
+        candidate.combinedTimingDeltaChi2 = combinedTiming.deltaChi2;
+        candidate.combinedTimingAgreesWithMuon =
+            candidate.timingDirectionSign != 0 && combinedTiming.directionSign != 0
+                ? (candidate.timingDirectionSign == combinedTiming.directionSign ? 1 : -1)
+                : 0;
+      }
 
       if (timedCaloPoints.size() >= 2) {
         constexpr double inverseSpeedOfLightNsPerCm = 1. / 29.9792458;
@@ -2204,7 +2316,6 @@ public:
           };
           double const alongChi2 = directionChi2(1.);
           double const oppositeChi2 = directionChi2(-1.);
-          candidate.nCaloTimingMeasurements = timedCaloPoints.size();
           candidate.caloTimingDeltaChi2 = std::abs(alongChi2 - oppositeChi2);
           if (candidate.caloTimingDeltaChi2 >= minTimingDeltaChi2_)
             candidate.caloTimingDirectionSign = alongChi2 < oppositeChi2 ? 1 : -1;
@@ -2870,14 +2981,17 @@ public:
         ptError, etaError, phiError, vx, vy, vz,
         trackVx, trackVy, trackVz, dxy, dz, innerR, innerZ, outerR, outerZ, chi2, ndof, normalizedChi2, linePcaR, linePcaZ,
         chordLinePcaR, chordLinePcaZ, targetLinePath, timingChi2, timingDeltaChi2,
+        trackerMatchLineDistance, trackerMatchAxisAngle,
         entryX, entryY, entryZ, entryR, exitX, exitY, exitZ, exitR, hitSpan, hitDeltaZ,
         minDTResidual, minDTEstimatorChi2, minTrackerResidual, minTrackerEstimatorChi2,
         matchedEcalEnergy, matchedHBHEEnergy, matchedHFEnergy, matchedHOEnergy, matchedZDCEnergy,
         matchedEcalTime, matchedHBHETime, matchedHFTime, matchedHOTime, matchedZDCTime,
         minEcalLineDistance, minHBHELineDistance, minHFLineDistance, minHOLineDistance, minZDCLineDistance,
-        caloTimingDeltaChi2;
+        crossedHBHEEnergy, hbhe3x3Energy, maxCrossedHBHEEnergy, maxCrossedHBHETime,
+        crossedHOEnergy, ho3x3Energy, maxCrossedHOEnergy, maxCrossedHOTime,
+        caloTimingDeltaChi2, combinedTimingDeltaChi2;
     std::vector<int> charge, sourceIndex, recoAlgorithm, topology, orientationValid, validHits, validMuonHits,
-        trackerMatchValid, trackerTrackIndex, trackerValidHits, trackerPixelHits, trackerStripHits,
+        trackerMatchRawValid, trackerMatchValid, trackerTrackIndex, trackerValidHits, trackerPixelHits, trackerStripHits,
         combinedTrackValid, combinedValidHits, combinedTrackerHits, combinedMuonHits,
         muonStations, lostHits, directionFlipped, quality, constrainedValid, constrainedHits, constrainedStatus,
         inferredSourceSide, chargeMatchesGen, timingDirectionSign, nTimingMeasurements, directionalRefitAttempted,
@@ -2887,7 +3001,11 @@ public:
         nCompatibleDTSegments, nCompatiblePixelHits, nCompatibleStripHits,
         nPropagatedDTSegments, nPropagatedPixelHits, nPropagatedStripHits,
         nMatchedEcalRecHits, nMatchedHBHERecHits, nMatchedHFRecHits, nMatchedHORecHits, nMatchedZDCRecHits,
-        caloTimingDirectionSign, nCaloTimingMeasurements,
+        nCrossedHBHEIds, nCrossedHBHERecHits, nValidCrossedHBHETimes,
+        nCrossedHOIds, nCrossedHORecHits, nValidCrossedHOTimes,
+        hcalAssociationDirection,
+        caloTimingDirectionSign, nCaloTimingMeasurements, combinedTimingDirectionSign,
+        nCombinedTimingMeasurements, combinedTimingAgreesWithMuon,
         nAddedDTRefitHits, nAddedTrackerRefitHits,
         nPrecisionRefitStations, directionalRefitUsedPrecisionHits, directionalRefitAllHitsValid,
         directionalRefitAllHits, directionalRefitAllHitsSelectedIteration, directionalRefitPrecisionValid,
@@ -2935,8 +3053,25 @@ public:
             matchedLink = &link;
             break;
           }
-      bool const hasTracker = matchedLink && matchedLink->trackerTrack().isNonnull();
-      bool const hasCombined = matchedLink && matchedLink->globalTrack().isNonnull();
+      bool const hasRawTracker = matchedLink && matchedLink->trackerTrack().isNonnull();
+      double const matchLineDistance = hasRawTracker
+                                           ? symmetricLineDistance(*matchedLink->trackerTrack(),
+                                                                   *matchedLink->standAloneTrack())
+                                           : -1.;
+      double const matchAxisAngle = hasRawTracker
+                                        ? std::acos(std::clamp(
+                                              std::abs(matchedLink->trackerTrack()->momentum().unit().Dot(
+                                                  matchedLink->standAloneTrack()->momentum().unit())),
+                                              0.,
+                                              1.))
+                                        : -1.;
+      bool const hasTracker = hasRawTracker && std::isfinite(matchLineDistance) &&
+                              matchLineDistance <= maxTrackerMuonLineDistance_ &&
+                              std::isfinite(matchAxisAngle) && matchAxisAngle <= maxTrackerMuonAxisAngle_;
+      bool const hasCombined = hasTracker && matchedLink->globalTrack().isNonnull();
+      trackerMatchRawValid.push_back(hasRawTracker);
+      trackerMatchLineDistance.push_back(matchLineDistance);
+      trackerMatchAxisAngle.push_back(matchAxisAngle);
       trackerMatchValid.push_back(hasTracker);
       trackerTrackIndex.push_back(hasTracker ? static_cast<int>(matchedLink->trackerTrack().key()) : -1);
       trackerValidHits.push_back(hasTracker ? matchedLink->trackerTrack()->hitPattern().numberOfValidTrackerHits() : 0);
@@ -3099,9 +3234,28 @@ public:
       minHFLineDistance.push_back(candidate->minHFLineDistance);
       minHOLineDistance.push_back(candidate->minHOLineDistance);
       minZDCLineDistance.push_back(candidate->minZDCLineDistance);
+      nCrossedHBHEIds.push_back(candidate->nCrossedHBHEIds);
+      nCrossedHBHERecHits.push_back(candidate->nCrossedHBHERecHits);
+      nValidCrossedHBHETimes.push_back(candidate->nValidCrossedHBHETimes);
+      nCrossedHOIds.push_back(candidate->nCrossedHOIds);
+      nCrossedHORecHits.push_back(candidate->nCrossedHORecHits);
+      nValidCrossedHOTimes.push_back(candidate->nValidCrossedHOTimes);
+      hcalAssociationDirection.push_back(candidate->hcalAssociationDirection);
+      crossedHBHEEnergy.push_back(candidate->crossedHBHEEnergy);
+      hbhe3x3Energy.push_back(candidate->hbhe3x3Energy);
+      maxCrossedHBHEEnergy.push_back(candidate->maxCrossedHBHEEnergy);
+      maxCrossedHBHETime.push_back(candidate->maxCrossedHBHETime);
+      crossedHOEnergy.push_back(candidate->crossedHOEnergy);
+      ho3x3Energy.push_back(candidate->ho3x3Energy);
+      maxCrossedHOEnergy.push_back(candidate->maxCrossedHOEnergy);
+      maxCrossedHOTime.push_back(candidate->maxCrossedHOTime);
       caloTimingDirectionSign.push_back(candidate->caloTimingDirectionSign);
       nCaloTimingMeasurements.push_back(candidate->nCaloTimingMeasurements);
       caloTimingDeltaChi2.push_back(candidate->caloTimingDeltaChi2);
+      combinedTimingDirectionSign.push_back(candidate->combinedTimingDirectionSign);
+      nCombinedTimingMeasurements.push_back(candidate->nCombinedTimingMeasurements);
+      combinedTimingDeltaChi2.push_back(candidate->combinedTimingDeltaChi2);
+      combinedTimingAgreesWithMuon.push_back(candidate->combinedTimingAgreesWithMuon);
       nAddedDTRefitHits.push_back(candidate->nAddedDTRefitHits);
       nAddedTrackerRefitHits.push_back(candidate->nAddedTrackerRefitHits);
       nPrecisionRefitStations.push_back(candidate->nPrecisionRefitStations);
@@ -3261,9 +3415,18 @@ public:
     table->addColumn<float>("constrainedNdof", constrainedNdof, "prompt-target trajectory degrees of freedom");
     table->addColumn<float>("constrainedTargetChi2", constrainedTargetChi2, "chi2 contribution of the target hit");
     table->addColumn<float>("trackPt", trackPt, "pT at the original CMSSW track reference state");
+    table->addColumn<int>("trackerMatchRawValid",
+                          trackerMatchRawValid,
+                          "1 when the loose CMSSW global matcher returned a tracker link before the independent geometry gate");
     table->addColumn<int>("trackerMatchValid",
                           trackerMatchValid,
-                          "1 when CMSSW cosmic-global matching found a generalTracks partner");
+                          "1 when the tracker+standalone link also passes detector-line distance and axis-angle gates");
+    table->addColumn<float>("trackerMatchLineDistance",
+                            trackerMatchLineDistance,
+                            "symmetric tracker-to-standalone detector-line distance in cm; -1 without a raw link");
+    table->addColumn<float>("trackerMatchAxisAngle",
+                            trackerMatchAxisAngle,
+                            "unsigned tracker-to-standalone momentum-axis angle in radians; -1 without a raw link");
     table->addColumn<int>("trackerTrackIndex", trackerTrackIndex, "index in generalTracks, or -1");
     table->addColumn<int>("trackerValidHits", trackerValidHits, "valid tracker hits on the matched tracker track");
     table->addColumn<int>("trackerPixelHits", trackerPixelHits, "valid pixel hits on the matched tracker track");
@@ -3439,9 +3602,36 @@ public:
     table->addColumn<float>("minHFLineDistance", minHFLineDistance, "minimum HF-cell distance to the fitted detector chord in cm");
     table->addColumn<float>("minHOLineDistance", minHOLineDistance, "minimum HO-cell distance to the fitted detector chord in cm");
     table->addColumn<float>("minZDCLineDistance", minZDCLineDistance, "minimum ZDC-cell distance to the fitted detector chord in cm");
+    table->addColumn<int>("nCrossedHBHEIds", nCrossedHBHEIds, "HBHE detector cells geometrically crossed by TrackDetectorAssociator");
+    table->addColumn<int>("nCrossedHBHERecHits", nCrossedHBHERecHits, "HBHE rechits in geometrically crossed detector cells");
+    table->addColumn<int>("nValidCrossedHBHETimes", nValidCrossedHBHETimes, "crossed HBHE rechits with a finite non-sentinel time");
+    table->addColumn<float>("crossedHBHEEnergy", crossedHBHEEnergy, "energy in exactly crossed HBHE cells");
+    table->addColumn<float>("hbhe3x3Energy", hbhe3x3Energy, "HBHE 3x3 energy around the propagated crossing");
+    table->addColumn<float>("maxCrossedHBHEEnergy", maxCrossedHBHEEnergy, "largest HBHE rechit energy among exactly crossed cells");
+    table->addColumn<float>("maxCrossedHBHETime", maxCrossedHBHETime, "time of the largest crossed HBHE rechit; inspect nValidCrossedHBHETimes before use");
+    table->addColumn<int>("nCrossedHOIds", nCrossedHOIds, "HO detector cells geometrically crossed by TrackDetectorAssociator");
+    table->addColumn<int>("nCrossedHORecHits", nCrossedHORecHits, "HO rechits in geometrically crossed detector cells");
+    table->addColumn<int>("nValidCrossedHOTimes", nValidCrossedHOTimes, "crossed HO rechits with a finite non-sentinel time");
+    table->addColumn<int>("hcalAssociationDirection", hcalAssociationDirection, "TrackDetectorAssociator state: 2 explicit source-facing FreeTrajectoryState, 0 disabled");
+    table->addColumn<float>("crossedHOEnergy", crossedHOEnergy, "energy in exactly crossed HO cells");
+    table->addColumn<float>("ho3x3Energy", ho3x3Energy, "HO 3x3 energy around the propagated crossing");
+    table->addColumn<float>("maxCrossedHOEnergy", maxCrossedHOEnergy, "largest HO rechit energy among exactly crossed cells");
+    table->addColumn<float>("maxCrossedHOTime", maxCrossedHOTime, "time of the largest crossed HO rechit; inspect nValidCrossedHOTimes before use");
     table->addColumn<int>("caloTimingDirectionSign", caloTimingDirectionSign, "calorimeter-only time-order sign relative to fitted momentum; zero when inconclusive");
     table->addColumn<int>("nCaloTimingMeasurements", nCaloTimingMeasurements, "independent calorimeter subsystem timing centroids");
     table->addColumn<float>("caloTimingDeltaChi2", caloTimingDeltaChi2, "calorimeter time-order chi2 separation between directions");
+    table->addColumn<int>("combinedTimingDirectionSign",
+                          combinedTimingDirectionSign,
+                          "direction sign from the diagnostic muon-system plus HBHE/HO timing fit");
+    table->addColumn<int>("nCombinedTimingMeasurements",
+                          nCombinedTimingMeasurements,
+                          "muon-system and HBHE/HO timing points in the diagnostic combined fit");
+    table->addColumn<float>("combinedTimingDeltaChi2",
+                            combinedTimingDeltaChi2,
+                            "direction chi2 separation from the diagnostic muon-system plus HBHE/HO timing fit");
+    table->addColumn<int>("combinedTimingAgreesWithMuon",
+                          combinedTimingAgreesWithMuon,
+                          "combined versus muon-only direction: +1 agree, -1 disagree, 0 inconclusive");
     table->addColumn<int>("nAddedDTRefitHits", nAddedDTRefitHits, "compatible DT segments supplied to the augmented refit");
     table->addColumn<int>("nAddedTrackerRefitHits", nAddedTrackerRefitHits, "compatible tracker rechits supplied to the augmented refit");
     table->addColumn<int>("nCSCRefitHits", nCSCRefitHits, "valid CSC inputs available to the directional refit");
@@ -4198,6 +4388,8 @@ public:
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
     description.add<double>("maxDuplicateLineDistance", 30.0);
+    description.add<double>("maxTrackerMuonLineDistance", 100.0);
+    description.add<double>("maxTrackerMuonAxisAngle", 0.15);
     description.add<unsigned int>("minTimingMeasurements", 2);
     description.add<double>("minTimingDeltaChi2", 4.0);
     description.add<double>("maxTargetLineDca", 200.0);
@@ -4211,6 +4403,9 @@ public:
     description.add<unsigned int>("maxDimuonVertices", 1);
     description.add<bool>("requireOppositeSign", true);
     description.add<double>("maxGenDeltaR", 0.5);
+    edm::ParameterSetDescription associatorDescription;
+    TrackAssociatorParameters::fillPSetDescription(associatorDescription);
+    description.add<edm::ParameterSetDescription>("TrackAssociatorParameters", associatorDescription);
     descriptions.add("shiftMuonTable", description);
   }
 
@@ -4249,6 +4444,8 @@ private:
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> trackerRecHitBuilderToken_;
   edm::ESGetToken<CaloGeometry, CaloGeometryRecord> caloGeometryToken_;
+  TrackDetectorAssociator hcalAssociator_;
+  TrackAssociatorParameters hcalAssociatorParameters_;
   bool augmentDTHits_;
   bool augmentTrackerHits_;
   bool useExtendedTiming_;
@@ -4301,6 +4498,8 @@ private:
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
   double maxDuplicateLineDistance_;
+  double maxTrackerMuonLineDistance_;
+  double maxTrackerMuonAxisAngle_;
   unsigned int minTimingMeasurements_;
   double minTimingDeltaChi2_;
   double maxTargetLineDca_;

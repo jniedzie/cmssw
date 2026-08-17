@@ -181,7 +181,7 @@ def customiseRecoDebug(
         process.shiftMuonRecoDiagnostics.zdcRecHits = cms.InputTag("shiftZDCReco")
     if trackerMode == "p5":
         process.shiftMuonRecoDiagnostics.generalTracks = cms.InputTag(
-            "ctfWithMaterialTracksP5"
+            "ctfWithMaterialTracksP5LHCNavigation"
         )
     process.shiftMuonRecoDebug = shiftMuonSegmentsCounter.clone(printDetails=True)
     process.shiftMuonRecoDebug_step = cms.EndPath(
@@ -265,7 +265,12 @@ def customiseTraversingShiftMuonReco(
     # the covariance-aware spatial matcher and all of its quality cuts.
     tracker_collections = {
         "general": "generalTracks",
-        "p5": "ctfWithMaterialTracksP5",
+        # The P5 cosmic final selector imposes prompt/cosmic kinematic cuts
+        # that remove the recovered forward tracks. Use the independently
+        # fitted LHC-navigation collection as the tracker-seeded hypothesis;
+        # it still enters ShiftMuon only through a successful tracker+muon
+        # global match below.
+        "p5": "ctfWithMaterialTracksP5LHCNavigation",
     }
     if trackerMode not in ("none", *tracker_collections):
         raise ValueError(f"Unsupported SHIFT tracker mode: {trackerMode}")
@@ -310,6 +315,24 @@ def customiseTraversingShiftMuonReco(
         # SHIFT is field-on and the observed signal crossing uses TID plus
         # inner TEC rings, so retain the bounded forward prototype explicitly.
         process.combinatorialcosmicseedfinderP5.requireBOFF = cms.bool(False)
+        # The stock two-hit P5 seed fixes the *total* momentum to 5 GeV and
+        # then immediately applies a 0.5 GeV pT CKF cut.  At the observed
+        # |eta|~6-7 this constructs pT~0.01 GeV and rejects every seed before
+        # the first tracker measurement.  Use a forward-appropriate initial
+        # momentum, retain a deliberately broad covariance, admit both
+        # charges, and let hit compatibility rather than that inconsistent
+        # prompt/cosmic pT threshold decide whether a candidate grows.
+        process.combinatorialcosmicseedfinderP5.SeedMomentum = cms.double(500.0)
+        process.combinatorialcosmicseedfinderP5.ErrorRescaling = cms.double(1000.0)
+        process.combinatorialcosmicseedfinderP5.Charges = cms.vint32(-1, 1)
+        process.ckfBaseTrajectoryFilterP5.minPt = cms.double(0.0)
+        # The forward seed already contains two TEC measurements. Require one
+        # genuine extension hit for this prototype and avoid the stock P5
+        # high-|eta| five-hit rule rejecting the trajectory while it grows.
+        # Candidate purity is evaluated later with independent detector and
+        # truth diagnostics; two-hit seed-only trajectories are never kept.
+        process.ckfBaseTrajectoryFilterP5.minimumNumberOfHits = cms.int32(3)
+        process.ckfBaseTrajectoryFilterP5.minHitsAtHighEta = cms.int32(3)
         for layers in (
             process.combinatorialcosmicseedingpairsTECposP5,
             process.combinatorialcosmicseedingpairsTECnegP5,
@@ -346,8 +369,12 @@ def customiseTraversingShiftMuonReco(
     elif trackerMode == "p5":
         keep_commands.extend(
             (
-                "keep *_ctfWithMaterialTracksP5_*_*",
+                "keep *_combinatorialcosmicseedfinderP5_*_*",
+                "keep *_ckfTrackCandidatesP5_*_*",
+                "keep *_ckfTrackCandidatesP5LHCNavigation_*_*",
                 "keep *_ctfWithMaterialTracksCosmics_*_*",
+                "keep *_ctfWithMaterialTracksP5_*_*",
+                "keep *_ctfWithMaterialTracksP5LHCNavigation_*_*",
             )
         )
     for output in process.outputModules_().values():
