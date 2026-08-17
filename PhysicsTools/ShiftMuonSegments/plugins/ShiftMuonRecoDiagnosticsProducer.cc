@@ -16,7 +16,9 @@
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2DCollection.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiStripRecHit2DCollection.h"
 #include "DataFormats/EcalRecHit/interface/EcalRecHitCollections.h"
+#include "DataFormats/HcalDigi/interface/HcalDigiCollections.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
@@ -97,6 +99,33 @@ namespace {
       result.signalMuonFirstTime = result.signalMuonLastTime = 0.f;
     return result;
   }
+
+  struct RecHitEnergySummary {
+    int aboveThreshold = -1;
+    float positiveEnergy = -1.f;
+    float maximumEnergy = -1.f;
+    float maximumTime = 0.f;
+  };
+
+  template <typename Collection>
+  RecHitEnergySummary recHitEnergySummary(edm::Handle<Collection> const& hits, double threshold) {
+    if (!hits.isValid())
+      return {};
+    RecHitEnergySummary result{0, 0.f, -std::numeric_limits<float>::infinity(), 0.f};
+    for (auto const& hit : *hits) {
+      float const energy = hit.energy();
+      if (energy > 0.f)
+        result.positiveEnergy += energy;
+      result.aboveThreshold += energy >= threshold;
+      if (energy > result.maximumEnergy) {
+        result.maximumEnergy = energy;
+        result.maximumTime = hit.time();
+      }
+    }
+    if (hits->empty())
+      result.maximumEnergy = -1.f;
+    return result;
+  }
 }  // namespace
 
 class ShiftMuonRecoDiagnosticsProducer : public edm::stream::EDProducer<> {
@@ -134,6 +163,20 @@ public:
         pixelRecHits_(consumes<SiPixelRecHitCollection>(parameters.getParameter<edm::InputTag>("pixelRecHits"))),
         stripMatchedRecHits_(consumes<SiStripMatchedRecHit2DCollection>(
             parameters.getParameter<edm::InputTag>("stripMatchedRecHits"))),
+        stripRphiRecHits_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripRphiRecHits"))),
+        stripRphiUnmatchedRecHits_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripRphiUnmatchedRecHits"))),
+        stripStereoRecHits_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripStereoRecHits"))),
+        stripStereoUnmatchedRecHits_(consumes<SiStripRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripStereoUnmatchedRecHits"))),
+        hbheDigis_(consumes<HBHEDigiCollection>(parameters.getParameter<edm::InputTag>("hbheDigis"))),
+        hfDigis_(consumes<HFDigiCollection>(parameters.getParameter<edm::InputTag>("hfDigis"))),
+        hoDigis_(consumes<HODigiCollection>(parameters.getParameter<edm::InputTag>("hoDigis"))),
+        zdcDigis_(consumes<ZDCDigiCollection>(parameters.getParameter<edm::InputTag>("zdcDigis"))),
+        hbheQIE11Digis_(consumes<QIE11DigiCollection>(parameters.getParameter<edm::InputTag>("hbheQIE11Digis"))),
+        hfQIE10Digis_(consumes<QIE10DigiCollection>(parameters.getParameter<edm::InputTag>("hfQIE10Digis"))),
         ecalBarrelRecHits_(consumes<EcalRecHitCollection>(parameters.getParameter<edm::InputTag>("ecalBarrelRecHits"))),
         ecalEndcapRecHits_(consumes<EcalRecHitCollection>(parameters.getParameter<edm::InputTag>("ecalEndcapRecHits"))),
         hbheRecHits_(consumes<HBHERecHitCollection>(parameters.getParameter<edm::InputTag>("hbheRecHits"))),
@@ -154,16 +197,14 @@ public:
   }
 
   void produce(edm::Event& event, edm::EventSetup const&) override {
-    auto table = std::make_unique<nanoaod::FlatTable>(1, "", true, false);
-    auto branchName = [](std::string name) {
-      name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
-      return "shiftRecoDiag" + name;
+    // Preserve the established NanoAOD schema: singleton table name provides
+    // the ``ShiftRecoDiag_`` prefix and columns retain their lower-camel names.
+    auto table = std::make_unique<nanoaod::FlatTable>(1, "ShiftRecoDiag", true, false);
+    auto add = [&table](std::string const& name, int value, std::string const& documentation) {
+      table->addColumn<int>(name, std::vector<int>{value}, documentation);
     };
-    auto add = [&table, &branchName](std::string const& name, int value, std::string const& documentation) {
-      table->addColumn<int>(branchName(name), std::vector<int>{value}, documentation);
-    };
-    auto addFloat = [&table, &branchName](std::string const& name, float value, std::string const& documentation) {
-      table->addColumn<float>(branchName(name), std::vector<float>{value}, documentation);
+    auto addFloat = [&table](std::string const& name, float value, std::string const& documentation) {
+      table->addColumn<float>(name, std::vector<float>{value}, documentation);
     };
 
     std::unordered_set<unsigned int> signalMuonTrackIds;
@@ -174,6 +215,18 @@ public:
           signalMuonTrackIds.insert(track.trackId());
     auto const hcal = caloSummary(event.getHandle(hcalSimHits_), signalMuonTrackIds, enableHcalDiagnostics_);
     auto const zdc = caloSummary(event.getHandle(zdcSimHits_), signalMuonTrackIds, enableZDCDiagnostics_);
+    auto const ecalBarrelRecHits = event.getHandle(ecalBarrelRecHits_);
+    auto const ecalEndcapRecHits = event.getHandle(ecalEndcapRecHits_);
+    auto const hbheRecHits = event.getHandle(hbheRecHits_);
+    auto const hfRecHits = event.getHandle(hfRecHits_);
+    auto const hoRecHits = event.getHandle(hoRecHits_);
+    auto const zdcRecHits = event.getHandle(zdcRecHits_);
+    auto const ebReco = recHitEnergySummary(ecalBarrelRecHits, 0.05);
+    auto const eeReco = recHitEnergySummary(ecalEndcapRecHits, 0.05);
+    auto const hbheReco = recHitEnergySummary(hbheRecHits, 0.1);
+    auto const hfReco = recHitEnergySummary(hfRecHits, 0.1);
+    auto const hoReco = recHitEnergySummary(hoRecHits, 0.1);
+    auto const zdcReco = recHitEnergySummary(zdcRecHits, 0.01);
 
     add("recoVariantCode", recoVariantCode_, "workflow reconstruction-variant code");
     add("enableDTMeasurement", enableDTMeasurement_, "DT measurements enabled in Shift muon reconstruction");
@@ -207,12 +260,38 @@ public:
         "strict-traversing tracker+muon links");
     add("nPixelRecHits", collectionSize(event.getHandle(pixelRecHits_)), "pixel rechits available for direct association");
     add("nStripMatchedRecHits", collectionSize(event.getHandle(stripMatchedRecHits_)), "matched strip rechits available for direct association");
-    add("nEcalBarrelRecHits", collectionSize(event.getHandle(ecalBarrelRecHits_)), "reduced ECAL barrel rechits");
-    add("nEcalEndcapRecHits", collectionSize(event.getHandle(ecalEndcapRecHits_)), "reduced ECAL endcap rechits");
-    add("nHBHERecHits", collectionSize(event.getHandle(hbheRecHits_)), "reduced HBHE rechits");
-    add("nHFRecHits", collectionSize(event.getHandle(hfRecHits_)), "reduced HF rechits");
-    add("nHORecHits", collectionSize(event.getHandle(hoRecHits_)), "reduced HO rechits");
-    add("nZDCRecHits", collectionSize(event.getHandle(zdcRecHits_)), "ZDC rechits, or -1 when unavailable");
+    add("nStripRphiRecHits", collectionSize(event.getHandle(stripRphiRecHits_)), "rphi strip rechits available for direct association");
+    add("nStripRphiUnmatchedRecHits", collectionSize(event.getHandle(stripRphiUnmatchedRecHits_)), "unmatched rphi strip rechits available for direct association");
+    add("nStripStereoRecHits", collectionSize(event.getHandle(stripStereoRecHits_)), "stereo strip rechits available for direct association");
+    add("nStripStereoUnmatchedRecHits", collectionSize(event.getHandle(stripStereoUnmatchedRecHits_)), "unmatched stereo strip rechits available for direct association");
+    add("nHBHEDigis", collectionSize(event.getHandle(hbheDigis_)), "legacy HBHE digi frames");
+    add("nHFDigis", collectionSize(event.getHandle(hfDigis_)), "legacy HF digi frames");
+    add("nHODigis", collectionSize(event.getHandle(hoDigis_)), "HO digi frames");
+    add("nZDCDigis", collectionSize(event.getHandle(zdcDigis_)), "legacy ZDC digi frames");
+    add("nHBHEQIE11Digis", collectionSize(event.getHandle(hbheQIE11Digis_)), "Run-3 HBHE QIE11 digi frames");
+    add("nHFQIE10Digis", collectionSize(event.getHandle(hfQIE10Digis_)), "Run-3 HF QIE10 digi frames");
+    add("nEcalBarrelRecHits", collectionSize(ecalBarrelRecHits), "ECAL barrel rechits");
+    add("nEcalEndcapRecHits", collectionSize(ecalEndcapRecHits), "ECAL endcap rechits");
+    add("nHBHERecHits", collectionSize(hbheRecHits), "full HBHE rechits");
+    add("nHFRecHits", collectionSize(hfRecHits), "full HF rechits");
+    add("nHORecHits", collectionSize(hoRecHits), "full HO rechits");
+    add("nZDCRecHits", collectionSize(zdcRecHits), "ZDC rechits, or -1 when unavailable");
+    auto addRecoSummary = [&add, &addFloat](std::string const& prefix,
+                                           RecHitEnergySummary const& summary,
+                                           std::string const& threshold) {
+      add("n" + prefix + "RecHitsAboveThreshold",
+          summary.aboveThreshold,
+          prefix + " rechits above " + threshold + " GeV");
+      addFloat(prefix + "PositiveRecEnergy", summary.positiveEnergy, "summed positive " + prefix + " rechit energy");
+      addFloat(prefix + "MaxRecEnergy", summary.maximumEnergy, "maximum " + prefix + " rechit energy");
+      addFloat(prefix + "MaxRecTime", summary.maximumTime, "time of the maximum-energy " + prefix + " rechit");
+    };
+    addRecoSummary("EcalBarrel", ebReco, "0.05");
+    addRecoSummary("EcalEndcap", eeReco, "0.05");
+    addRecoSummary("HBHE", hbheReco, "0.1");
+    addRecoSummary("HF", hfReco, "0.1");
+    addRecoSummary("HO", hoReco, "0.1");
+    addRecoSummary("ZDC", zdcReco, "0.01");
     add("nBCM1FSimHits", muonSimHitCount(event.getHandle(bcm1fSimHits_)), "muon SimHits in BCM1F");
     add("nBHMSimHits", muonSimHitCount(event.getHandle(bhmSimHits_)), "muon SimHits in BHM");
     add("nPLTSimHits", muonSimHitCount(event.getHandle(pltSimHits_)), "muon SimHits in PLT");
@@ -256,6 +335,20 @@ public:
     description.add<edm::InputTag>("traversingGlobalLinks", edm::InputTag("shiftGlobalTraversingMuons"));
     description.add<edm::InputTag>("pixelRecHits", edm::InputTag("siPixelRecHits"));
     description.add<edm::InputTag>("stripMatchedRecHits", edm::InputTag("siStripMatchedRecHits", "matchedRecHit"));
+    description.add<edm::InputTag>("stripRphiRecHits", edm::InputTag("siStripMatchedRecHits", "rphiRecHit"));
+    description.add<edm::InputTag>("stripRphiUnmatchedRecHits",
+                                   edm::InputTag("siStripMatchedRecHits", "rphiRecHitUnmatched"));
+    description.add<edm::InputTag>("stripStereoRecHits", edm::InputTag("siStripMatchedRecHits", "stereoRecHit"));
+    description.add<edm::InputTag>("stripStereoUnmatchedRecHits",
+                                   edm::InputTag("siStripMatchedRecHits", "stereoRecHitUnmatched"));
+    description.add<edm::InputTag>("hbheDigis", edm::InputTag("simHcalUnsuppressedDigis"));
+    description.add<edm::InputTag>("hfDigis", edm::InputTag("simHcalUnsuppressedDigis"));
+    description.add<edm::InputTag>("hoDigis", edm::InputTag("simHcalUnsuppressedDigis"));
+    description.add<edm::InputTag>("zdcDigis", edm::InputTag("simHcalUnsuppressedDigis"));
+    description.add<edm::InputTag>("hbheQIE11Digis",
+                                   edm::InputTag("simHcalUnsuppressedDigis", "HBHEQIE11DigiCollection"));
+    description.add<edm::InputTag>("hfQIE10Digis",
+                                   edm::InputTag("simHcalUnsuppressedDigis", "HFQIE10DigiCollection"));
     description.add<edm::InputTag>("ecalBarrelRecHits", edm::InputTag("reducedEcalRecHitsEB"));
     description.add<edm::InputTag>("ecalEndcapRecHits", edm::InputTag("reducedEcalRecHitsEE"));
     description.add<edm::InputTag>("hbheRecHits", edm::InputTag("reducedHcalRecHits", "hbhereco"));
@@ -301,6 +394,16 @@ private:
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> traversingGlobalLinks_;
   edm::EDGetTokenT<SiPixelRecHitCollection> pixelRecHits_;
   edm::EDGetTokenT<SiStripMatchedRecHit2DCollection> stripMatchedRecHits_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripRphiRecHits_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripRphiUnmatchedRecHits_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripStereoRecHits_;
+  edm::EDGetTokenT<SiStripRecHit2DCollection> stripStereoUnmatchedRecHits_;
+  edm::EDGetTokenT<HBHEDigiCollection> hbheDigis_;
+  edm::EDGetTokenT<HFDigiCollection> hfDigis_;
+  edm::EDGetTokenT<HODigiCollection> hoDigis_;
+  edm::EDGetTokenT<ZDCDigiCollection> zdcDigis_;
+  edm::EDGetTokenT<QIE11DigiCollection> hbheQIE11Digis_;
+  edm::EDGetTokenT<QIE10DigiCollection> hfQIE10Digis_;
   edm::EDGetTokenT<EcalRecHitCollection> ecalBarrelRecHits_;
   edm::EDGetTokenT<EcalRecHitCollection> ecalEndcapRecHits_;
   edm::EDGetTokenT<HBHERecHitCollection> hbheRecHits_;

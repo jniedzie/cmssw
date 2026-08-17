@@ -1,7 +1,7 @@
 import FWCore.ParameterSet.Config as cms
-from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegments, shiftMuonSegmentsCounter, shiftMuonTable
+from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonSegments, shiftMuonTable
 
-shiftMuonSegmentsSequence = cms.Sequence(shiftMuonSegmentsCounter + shiftMuonTable + shiftMuonSegments)
+shiftMuonSegmentsSequence = cms.Sequence(shiftMuonTable + shiftMuonSegments)
 
 def addShiftMuonSegments(
     process,
@@ -21,7 +21,6 @@ def addShiftMuonSegments(
     process.load("RecoLocalTracker.SiPixelRecHits.PixelCPEESProducers_cff")
     process.load("RecoLocalTracker.SiStripRecHitConverter.StripCPEfromTrackAngle_cfi")
     process.load("RecoLocalTracker.SiStripRecHitConverter.SiStripRecHitMatcher_cfi")
-    process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
     process.shiftMuonTable = shiftMuonTable.clone()
     process.shiftMuonTable.enableHcalDiagnostics = cms.bool(enableHcalDiagnostics)
     process.shiftMuonTable.enableZDCDiagnostics = cms.bool(enableZDCDiagnostics)
@@ -52,9 +51,11 @@ def addShiftMuonSegments(
     # that suffix here so the standard NanoAOD output commands write both
     # ShiftDT/CSC/GEM segment tables and ShiftRPC reconstructed-hit table.
     process.shiftMuonSegmentsTable = shiftMuonSegments.clone()
-    shift_muon_modules = (
-        process.shiftMuonSegmentsCounter + process.shiftMuonTable + process.shiftMuonSegmentsTable
-    )
+    # The legacy counter dereferences TrackExtra objects from generalTracks.
+    # Those extras are intentionally absent from ordinary AOD, so the analyzer
+    # is not safe in the production NanoAOD path.  Step 3 already runs its
+    # dedicated diagnostic clone while the complete RECO products are present.
+    shift_muon_modules = process.shiftMuonTable + process.shiftMuonSegmentsTable
     if (
         process.shiftMuonTable.useImprovedMomentumRefit.value()
         and (
