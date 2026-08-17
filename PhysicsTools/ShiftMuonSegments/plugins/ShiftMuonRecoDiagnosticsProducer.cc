@@ -14,6 +14,8 @@
 #include "DataFormats/RPCDigi/interface/RPCDigiCollection.h"
 #include "DataFormats/RPCRecHit/interface/RPCRecHitCollection.h"
 #include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/TrackCandidate/interface/TrackCandidateCollection.h"
+#include "DataFormats/TrajectorySeed/interface/TrajectorySeedCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2DCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiStripRecHit2DCollection.h"
@@ -154,6 +156,17 @@ public:
         zdcSimHits_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("zdcSimHits"))),
         simTracks_(consumes<edm::SimTrackContainer>(parameters.getParameter<edm::InputTag>("simTracks"))),
         generalTracks_(consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("generalTracks"))),
+        trackerSeeds_(consumes<TrajectorySeedCollection>(parameters.getParameter<edm::InputTag>("trackerSeeds"))),
+        trackerTrackCandidates_(consumes<TrackCandidateCollection>(
+            parameters.getParameter<edm::InputTag>("trackerTrackCandidates"))),
+        trackerRawTracks_(
+            consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("trackerRawTracks"))),
+        trackerSelectedTracks_(
+            consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("trackerSelectedTracks"))),
+        trackerLHCTrackCandidates_(consumes<TrackCandidateCollection>(
+            parameters.getParameter<edm::InputTag>("trackerLHCTrackCandidates"))),
+        trackerLHCTracks_(
+            consumes<reco::TrackCollection>(parameters.getParameter<edm::InputTag>("trackerLHCTracks"))),
         dsaGlobalLinks_(consumes<reco::MuonTrackLinksCollection>(
             parameters.getParameter<edm::InputTag>("dsaGlobalLinks"))),
         cosmicGlobalLinks_(consumes<reco::MuonTrackLinksCollection>(
@@ -193,6 +206,8 @@ public:
         enableZDCDiagnostics_(parameters.getParameter<bool>("enableZDCDiagnostics")),
         dtNavigationMode_(parameters.getParameter<int>("dtNavigationMode")),
         recoVariantCode_(parameters.getParameter<int>("recoVariantCode")) {
+    for (auto const& tag : parameters.getParameter<std::vector<edm::InputTag>>("trackerSimHits"))
+      trackerSimHits_.push_back(consumes<edm::PSimHitContainer>(tag));
     produces<nanoaod::FlatTable>();
   }
 
@@ -213,6 +228,35 @@ public:
       for (auto const& track : *simTracks)
         if (std::abs(track.type()) == 13 && track.genpartIndex() >= 0)
           signalMuonTrackIds.insert(track.trackId());
+    std::unordered_map<unsigned int, unsigned int> signalTrackerHitCounts;
+    std::unordered_map<unsigned int, unsigned int> signalMuonSystemHitCounts;
+    for (auto const& token : trackerSimHits_) {
+      auto const hits = event.getHandle(token);
+      if (!hits.isValid())
+        continue;
+      for (auto const& hit : *hits)
+        if (signalMuonTrackIds.count(hit.trackId()))
+          ++signalTrackerHitCounts[hit.trackId()];
+    }
+    auto countMuonSystemHits = [&](auto const& hits) {
+      if (!hits.isValid())
+        return;
+      for (auto const& hit : *hits)
+        if (signalMuonTrackIds.count(hit.trackId()))
+          ++signalMuonSystemHitCounts[hit.trackId()];
+    };
+    countMuonSystemHits(event.getHandle(dtSimHits_));
+    countMuonSystemHits(event.getHandle(cscSimHits_));
+    countMuonSystemHits(event.getHandle(rpcSimHits_));
+    countMuonSystemHits(event.getHandle(gemSimHits_));
+    int signalWithTrackerHits = 0, signalWithMuonSystemHits = 0, signalWithBoth = 0;
+    for (auto const trackId : signalMuonTrackIds) {
+      bool const hasTracker = signalTrackerHitCounts[trackId] > 0;
+      bool const hasMuonSystem = signalMuonSystemHitCounts[trackId] > 0;
+      signalWithTrackerHits += hasTracker;
+      signalWithMuonSystemHits += hasMuonSystem;
+      signalWithBoth += hasTracker && hasMuonSystem;
+    }
     auto const hcal = caloSummary(event.getHandle(hcalSimHits_), signalMuonTrackIds, enableHcalDiagnostics_);
     auto const zdc = caloSummary(event.getHandle(zdcSimHits_), signalMuonTrackIds, enableZDCDiagnostics_);
     auto const ecalBarrelRecHits = event.getHandle(ecalBarrelRecHits_);
@@ -253,6 +297,28 @@ public:
     add("nGEMRecHits", collectionSize(event.getHandle(gemRecHits_)), "GEM reconstructed hits");
     add("nGEMSegments", collectionSize(event.getHandle(gemSegments_)), "GEM segments");
     add("nGeneralTracks", collectionSize(event.getHandle(generalTracks_)), "generalTracks available to global matching");
+    add("nTrackerSeeds", collectionSize(event.getHandle(trackerSeeds_)), "dedicated cosmic tracker seeds");
+    add("nTrackerTrackCandidates",
+        collectionSize(event.getHandle(trackerTrackCandidates_)),
+        "dedicated cosmic tracker CKF candidates");
+    add("nTrackerRawTracks", collectionSize(event.getHandle(trackerRawTracks_)), "tracks before the cosmic selector");
+    add("nTrackerSelectedTracks",
+        collectionSize(event.getHandle(trackerSelectedTracks_)),
+        "selected dedicated cosmic tracker tracks");
+    add("nTrackerLHCTrackCandidates",
+        collectionSize(event.getHandle(trackerLHCTrackCandidates_)),
+        "dedicated P5 CKF candidates using the LHC navigation school");
+    add("nTrackerLHCTracks",
+        collectionSize(event.getHandle(trackerLHCTracks_)),
+        "dedicated P5 tracks using the LHC navigation school");
+    add("nSignalMuonSimTracks", signalMuonTrackIds.size(), "primary signal-muon SimTracks");
+    add("nSignalMuonWithTrackerSimHits", signalWithTrackerHits, "primary signal muons with tracker SimHits");
+    add("nSignalMuonWithMuonSystemSimHits",
+        signalWithMuonSystemHits,
+        "primary signal muons with DT, CSC, RPC, or GEM SimHits");
+    add("nSignalMuonWithTrackerAndMuonSystemSimHits",
+        signalWithBoth,
+        "primary signal muons with both tracker and muon-system SimHits on the same SimTrack");
     add("nDSATrackerMatches", collectionSize(event.getHandle(dsaGlobalLinks_)), "DSA tracker+muon links");
     add("nCosmicTrackerMatches", collectionSize(event.getHandle(cosmicGlobalLinks_)), "cosmic tracker+muon links");
     add("nTraversingTrackerMatches",
@@ -330,6 +396,26 @@ public:
     description.add<edm::InputTag>("zdcSimHits", edm::InputTag("g4SimHits", "ZDCHITS"));
     description.add<edm::InputTag>("simTracks", edm::InputTag("g4SimHits"));
     description.add<edm::InputTag>("generalTracks", edm::InputTag("generalTracks"));
+    description.add<edm::InputTag>("trackerSeeds", edm::InputTag("combinatorialcosmicseedfinderP5"));
+    description.add<edm::InputTag>("trackerTrackCandidates", edm::InputTag("ckfTrackCandidatesP5"));
+    description.add<edm::InputTag>("trackerRawTracks", edm::InputTag("ctfWithMaterialTracksCosmics"));
+    description.add<edm::InputTag>("trackerSelectedTracks", edm::InputTag("ctfWithMaterialTracksP5"));
+    description.add<edm::InputTag>("trackerLHCTrackCandidates", edm::InputTag("ckfTrackCandidatesP5LHCNavigation"));
+    description.add<edm::InputTag>("trackerLHCTracks", edm::InputTag("ctfWithMaterialTracksP5LHCNavigation"));
+    description.add<std::vector<edm::InputTag>>(
+        "trackerSimHits",
+        {edm::InputTag("g4SimHits", "TrackerHitsPixelBarrelLowTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsPixelBarrelHighTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsPixelEndcapLowTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsPixelEndcapHighTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTIBLowTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTIBHighTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTIDLowTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTIDHighTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTOBLowTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTOBHighTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTECLowTof"),
+         edm::InputTag("g4SimHits", "TrackerHitsTECHighTof")});
     description.add<edm::InputTag>("dsaGlobalLinks", edm::InputTag("shiftGlobalDSAMuons"));
     description.add<edm::InputTag>("cosmicGlobalLinks", edm::InputTag("shiftGlobalCosmicMuons"));
     description.add<edm::InputTag>("traversingGlobalLinks", edm::InputTag("shiftGlobalTraversingMuons"));
@@ -389,6 +475,13 @@ private:
   edm::EDGetTokenT<edm::PCaloHitContainer> zdcSimHits_;
   edm::EDGetTokenT<edm::SimTrackContainer> simTracks_;
   edm::EDGetTokenT<reco::TrackCollection> generalTracks_;
+  edm::EDGetTokenT<TrajectorySeedCollection> trackerSeeds_;
+  edm::EDGetTokenT<TrackCandidateCollection> trackerTrackCandidates_;
+  edm::EDGetTokenT<reco::TrackCollection> trackerRawTracks_;
+  edm::EDGetTokenT<reco::TrackCollection> trackerSelectedTracks_;
+  edm::EDGetTokenT<TrackCandidateCollection> trackerLHCTrackCandidates_;
+  edm::EDGetTokenT<reco::TrackCollection> trackerLHCTracks_;
+  std::vector<edm::EDGetTokenT<edm::PSimHitContainer>> trackerSimHits_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> dsaGlobalLinks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> cosmicGlobalLinks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> traversingGlobalLinks_;

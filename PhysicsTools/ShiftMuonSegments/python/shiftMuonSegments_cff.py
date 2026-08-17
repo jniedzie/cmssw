@@ -21,6 +21,8 @@ def addShiftMuonSegments(
     process.load("RecoLocalTracker.SiPixelRecHits.PixelCPEESProducers_cff")
     process.load("RecoLocalTracker.SiStripRecHitConverter.StripCPEfromTrackAngle_cfi")
     process.load("RecoLocalTracker.SiStripRecHitConverter.SiStripRecHitMatcher_cfi")
+    if enableHcalDiagnostics:
+        process.load("TrackingTools.TrackAssociator.DetIdAssociatorESProducer_cff")
     process.shiftMuonTable = shiftMuonTable.clone()
     process.shiftMuonTable.enableHcalDiagnostics = cms.bool(enableHcalDiagnostics)
     process.shiftMuonTable.enableZDCDiagnostics = cms.bool(enableZDCDiagnostics)

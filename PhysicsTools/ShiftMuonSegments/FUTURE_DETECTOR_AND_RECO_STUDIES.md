@@ -82,6 +82,78 @@ The targeted 30-event probe established several mechanism-level results:
   as a test observable, not a production direction decision, until its
   truth-crossing efficiency and false-tag rate are measured.
 
+The completed 10k `detector_integration_v3` study then changed the priorities:
+
+- DT augmentation is populated for about 20% of selected ShiftMuons with high
+  truth-chamber purity and is retained in the standard production candidate.
+- Tracker attachment is empty because the selected muon-system population and
+  tracker-crossing population do not overlap in this sample. None of 3,732
+  truth-matched ShiftMuons enters the approximate Phase-I tracker envelope,
+  although 5,798 status-1 generated muons do. A tracker-only or dedicated
+  outside-in candidate path is needed to recover that population; loosening
+  rechit association would only attach unrelated strip occupancy.
+- ZDC, GEM, ECAL, HF, PLT, BHM, and BCM1F are removed from the active
+  optimization scope. HBHE and HO remain diagnostic timing/tag inputs, with
+  HO providing the only clearly truth-correlated reconstructed calo subset.
+- The next `dt_hcal_tracker_v1` candidate keeps DT and guarded tracker
+  augmentation, but actively associates only HBHE/HO. It records a combined
+  muon-system plus HBHE/HO timing hypothesis without allowing it to change the
+  canonical direction or momentum before a closure test.
+
+A local two-file Step-4 validation of `dt_hcal_tracker_v1` completed on 20
+events. The HO-positive file contained two associated ShiftMuons: adding one HO
+centroid increased each timing fit from six to seven measurements, preserved
+the muon-only direction in both cases, and changed the direction-separation
+Delta chi2 from 78.4 to 80.6 and from 15.5 to 117.4. Canonical momentum,
+topology, DT augmentation, and tracker augmentation were event-by-event
+identical to the prior reconstruction. The TEA histogrammer also read the new
+NanoAOD schema and produced the combined-timing diagnostics successfully.
+
+The subsequent tracker-seeded and detector-aware HCAL prototype established
+three additional constraints before a larger production:
+
+- The forward tracker failure was localised to seed-to-CKF growth. The stock
+  P5 seed assigns 5 GeV total momentum, which is only about 0.01 GeV in pT at
+  the observed extreme pseudorapidity and is rejected by the 0.5 GeV CKF cut.
+  A 500 GeV seed with broad covariance, both charge hypotheses, a zero CKF pT
+  threshold, and a three-hit minimum recovers one eight-hit track on the known
+  25-SimHit signal leg. All eight fitted detector units overlap signal-muon
+  SimHits. The fitted momentum remains badly underconstrained (about 2 GeV
+  rather than hundreds of GeV), so this track is only a spatial hypothesis.
+- A nominal cosmic-global DSA match was nevertheless produced in that event,
+  even though no primary signal muon had any DT/CSC/RPC/GEM SimHits. The
+  tracker and standalone detector lines were about 480 cm apart. Raw links
+  are now recorded separately and must pass a 100 cm symmetric line-distance
+  and 0.15 rad unsigned axis-angle gate before tracker/combined diagnostics are
+  accepted. Tracker-only tracks are not promoted to ShiftMuons.
+- The legacy 40 cm HCAL/HO cell-centre matcher accepted finite HBHE time
+  sentinels of -999 ns. Invalid times are now rejected. A detector-aware
+  TrackDetectorAssociator path records exact crossed HBHE/HO DetIds, rechits,
+  crossed and 3x3 energies, maximum-cell energy/time, and valid-time counts.
+  It returned no exact crossings for the two previously loose HO-positive
+  tracks, for conventional and explicit source-facing propagation. Therefore
+  the old HO associations remain A/B spatial diagnostics and no longer enter
+  combined timing until a truth-efficiency and accidental-rate gate supports
+  a looser association.
+
+On 3,738 truth-matched ShiftMuons the legacy HO threshold scan confirms that
+distance widening is useful only as an efficiency/purity diagnostic: 40 cm
+gives 9.7% efficiency and 69.4% purity, 200 cm gives 33.2% and 70.4%, and
+400 cm gives 46.6% and 70.3%. HO energy does not improve separation. A loose
+time requirement such as greater than -20 ns raises the 40 cm matched-sample
+purity to 82.4%, but must not be used before subsystem clock and time-of-flight
+calibration. HBHE cannot be rescued this way: 120 cm gives 100% efficiency but
+only 3.9% purity, and all four existing 40 cm matches are false with the -999
+ns time sentinel. Keep HBHE timing disabled and do not widen its raw-distance
+gate.
+
+The `dt_hcal_tracker_seeded_v1` variant runs the retained DT augmentation, the
+forward P5 tracker prototype, and HCAL/HO diagnostics together. Its intended
+next test is bounded: measure tracker seed-to-fit truth purity, raw-to-gated
+tracker/muon link purity, exact/loose HO efficiency and fakes, valid timing
+fractions, unchanged canonical momentum/dimuon output, and CPU before any
+tracker or calorimeter information becomes canonical.
+
 ## Muon-system reconstruction
 
 - Complete a per-muon funnel for DT, CSC, RPC, and GEM: sensitive-volume

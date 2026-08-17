@@ -1,4 +1,5 @@
 import FWCore.ParameterSet.Config as cms
+from TrackingTools.TrackAssociator.default_cfi import TrackAssociatorParameters as _trackAssociatorParameters
 
 # Commit marker for the workflow-wide CMSSW conditions consistency test.
 shiftMuonSegments = cms.EDProducer(
@@ -45,6 +46,21 @@ shiftMuonTable = cms.EDProducer(
     hfRecHits=cms.InputTag("hfreco"),
     hoRecHits=cms.InputTag("horeco"),
     zdcRecHits=cms.InputTag("shiftZDCReco"),
+    TrackAssociatorParameters=_trackAssociatorParameters.clone(
+        useEcal=False,
+        useHcal=True,
+        useHO=True,
+        useCalo=False,
+        usePreshower=False,
+        useMuon=False,
+        truthMatch=False,
+        propagateAllDirections=True,
+        HBHERecHitCollectionLabel="hbhereco",
+        HORecHitCollectionLabel="horeco",
+        # Only exact crossed-cell products are consumed below. Keep the cone
+        # bounded as protection against accidentally retaining a full region.
+        dRHcal=0.2,
+    ),
     dtSegments=cms.InputTag("dt4DSegments"),
     pixelRecHits=cms.InputTag("siPixelRecHits"),
     stripMatchedRecHits=cms.InputTag("siStripMatchedRecHits", "matchedRecHit"),
@@ -179,6 +195,8 @@ shiftMuonTable = cms.EDProducer(
     minSharedDetIds=cms.uint32(2),
     maxDuplicateAngle=cms.double(0.03),
     maxDuplicateLineDistance=cms.double(30.0),
+    maxTrackerMuonLineDistance=cms.double(100.0),
+    maxTrackerMuonAxisAngle=cms.double(0.15),
     # Physical transverse pointing compatibility with the unbounded beam/
     # target line.  This deliberately imposes no requirement on origin z.
     maxTargetLineDca=cms.double(200.0),
