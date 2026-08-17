@@ -5,6 +5,11 @@
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegment.h"
 #include "DataFormats/DTRecHit/interface/DTRecSegment4D.h"
+#include "DataFormats/DTRecHit/interface/DTRecSegment4DCollection.h"
+#include "DataFormats/RPCRecHit/interface/RPCRecHit.h"
+#include "DataFormats/GEMRecHit/interface/GEMRecHit.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2DCollection.h"
 #include "DataFormats/MuonDetId/interface/CSCDetId.h"
 #include "DataFormats/MuonDetId/interface/DTChamberId.h"
 #include "DataFormats/MuonDetId/interface/GEMDetId.h"
@@ -350,6 +355,11 @@ namespace {
     unsigned int nRPCRefitHits = 0;
     unsigned int nGEMRefitHits = 0;
     unsigned int nPrecisionRefitStations = 0;
+    unsigned int nCompatibleDTSegments = 0;
+    unsigned int nCompatiblePixelHits = 0;
+    unsigned int nCompatibleStripHits = 0;
+    unsigned int nAddedDTRefitHits = 0;
+    unsigned int nAddedTrackerRefitHits = 0;
     double precisionRefitLeverArm = 0.;
     bool directionalRefitUsedPrecisionHits = false;
     bool directionalRefitAllHitsValid = false;
@@ -918,7 +928,8 @@ namespace {
                                           bool useSecondIteration,
                                           bool precisionHitsOnly = false,
                                           bool usePathOrdering = true,
-                                          int hitSideSelection = 0) {
+                                          int hitSideSelection = 0,
+                                          std::vector<std::pair<TransientTrackingRecHit::RecHitPointer, bool>> const* extraHits = nullptr) {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
       double path;
@@ -940,6 +951,13 @@ namespace {
         continue;
       orderedHits.push_back({transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
     }
+    if (extraHits)
+      for (auto const& [transientHit, precision] : *extraHits) {
+        if (!transientHit || !transientHit->isValid() || !transientHit->det() ||
+            (precisionHitsOnly && !precision))
+          continue;
+        orderedHits.push_back({transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
+      }
 
     DirectionalRefitResult result;
     result.inputHits = orderedHits.size();
@@ -1218,7 +1236,8 @@ namespace {
   TimingResult timingDirection(reco::Track const& track,
                                GlobalTrackingGeometry const& geometry,
                                unsigned int minMeasurements,
-                               double minDeltaChi2) {
+                               double minDeltaChi2,
+                               bool useExtendedTiming) {
     struct TimedPoint { GlobalPoint position; double time; double sigma; };
     std::vector<TimedPoint> points;
     for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit) {
@@ -1233,6 +1252,16 @@ namespace {
           continue;
         time = segment->phiSegment()->t0();
         sigma = 3.;
+      } else if (useExtendedTiming) {
+        if (auto const* rpcHit = dynamic_cast<RPCRecHit const*>(&**hit)) {
+          time = 25. * rpcHit->BunchX();
+          sigma = 12.5;
+        } else if (auto const* gemHit = dynamic_cast<GEMRecHit const*>(&**hit)) {
+          time = 25. * gemHit->BunchX();
+          sigma = 12.5;
+        } else {
+          continue;
+        }
       } else {
         continue;
       }
@@ -1487,10 +1516,20 @@ public:
         gemSimHitsToken_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("gemSimHits"))),
         hcalSimHitsToken_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("hcalSimHits"))),
         zdcSimHitsToken_(consumes<edm::PCaloHitContainer>(parameters.getParameter<edm::InputTag>("zdcSimHits"))),
+        dtSegmentsToken_(consumes<DTRecSegment4DCollection>(parameters.getParameter<edm::InputTag>("dtSegments"))),
+        pixelRecHitsToken_(consumes<SiPixelRecHitCollection>(parameters.getParameter<edm::InputTag>("pixelRecHits"))),
+        stripMatchedRecHitsToken_(consumes<SiStripMatchedRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripMatchedRecHits"))),
         magneticFieldToken_(esConsumes()),
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
+        trackerRecHitBuilderToken_(esConsumes(edm::ESInputTag(
+            "", parameters.getParameter<std::string>("trackerRecHitBuilder")))),
+        augmentDTHits_(parameters.getParameter<bool>("augmentDTHits")),
+        augmentTrackerHits_(parameters.getParameter<bool>("augmentTrackerHits")),
+        useExtendedTiming_(parameters.getParameter<bool>("useExtendedTiming")),
+        additionalHitMaxDistance_(parameters.getParameter<double>("additionalHitMaxDistance")),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         directionalRefitUseMaterialEffects_(
@@ -1622,6 +1661,9 @@ public:
     auto const gemSimHits = event.getHandle(gemSimHitsToken_);
     auto const hcalSimHits = event.getHandle(hcalSimHitsToken_);
     auto const zdcSimHits = event.getHandle(zdcSimHitsToken_);
+    auto const dtSegments = event.getHandle(dtSegmentsToken_);
+    auto const pixelRecHits = event.getHandle(pixelRecHitsToken_);
+    auto const stripMatchedRecHits = event.getHandle(stripMatchedRecHitsToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
     bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
                                              directionalRefitUseGeometryMaterialEffectsInFitter_;
@@ -1744,6 +1786,7 @@ public:
     }
     auto const& trackingGeometry = setup.getData(trackingGeometryToken_);
     auto const& muonRecHitBuilder = setup.getData(muonRecHitBuilderToken_);
+    auto const& trackerRecHitBuilder = setup.getData(trackerRecHitBuilderToken_);
     // KFTrajectoryFitter/Smoother use TkCloner as a generic rechit clone-or-
     // reuse helper. Muon transient rechits cannot improve with a tracker CPE,
     // so a default cloner simply returns their existing shared pointers and
@@ -1775,7 +1818,8 @@ public:
       auto const timing = timingDirection(*candidate.track,
                                           trackingGeometry,
                                           minTimingMeasurements_,
-                                          minTimingDeltaChi2_);
+                                          minTimingDeltaChi2_,
+                                          useExtendedTiming_);
       candidate.timingDirectionSign = timing.directionSign;
       candidate.timingMeasurements = timing.measurements;
       candidate.timingChi2 = timing.chi2;
@@ -1824,6 +1868,66 @@ public:
       candidate.nGEMRefitHits = topology.gem;
       candidate.nPrecisionRefitStations = topology.precisionStations;
 
+      // Start from the already reconstructed ShiftMuon and independently ask
+      // which unassigned DT segments and tracker rechits its field-aware
+      // trajectory actually crosses. This avoids any beam-spot/vertex or
+      // collision-track prerequisite. The accepted measurements are then
+      // included in the same two-pass directional Kalman refit below.
+      std::vector<std::pair<TransientTrackingRecHit::RecHitPointer, bool>> additionalHits;
+      std::set<uint32_t> existingDetIds;
+      for (auto hit = candidate.track->recHitsBegin(); hit != candidate.track->recHitsEnd(); ++hit)
+        if ((*hit)->isValid())
+          existingDetIds.insert((*hit)->geographicalId().rawId());
+      std::unordered_map<uint32_t, std::pair<double, TransientTrackingRecHit::RecHitPointer>> bestAdditionalHits;
+      auto considerHit = [&](TransientTrackingRecHit::RecHitPointer const& transientHit, bool precision,
+                             unsigned int& compatibleCount) {
+        if (!transientHit || !transientHit->isValid() || !transientHit->det() ||
+            existingDetIds.count(transientHit->geographicalId().rawId()))
+          return;
+        bool const useOuter = eventSourceSide * candidate.track->outerPosition().z() >
+                              eventSourceSide * candidate.track->innerPosition().z();
+        auto original = useOuter ? trajectoryStateTransform::outerFreeState(*candidate.track, &magneticField)
+                                 : trajectoryStateTransform::innerFreeState(*candidate.track, &magneticField);
+        if (!original.hasError())
+          return;
+        double const sign = directionSign == 0 ? 1. : directionSign;
+        GlobalTrajectoryParameters const parameters(
+            original.position(), sign * original.momentum(), sign * original.charge(), &magneticField);
+        FreeTrajectoryState const seed(parameters, original.curvilinearError());
+        auto const propagated = vacuumPropagator.propagate(seed, *transientHit->surface());
+        if (!propagated.isValid())
+          return;
+        double const residual = (propagated.globalPosition() - transientHit->globalPosition()).mag();
+        if (!std::isfinite(residual) || residual > additionalHitMaxDistance_)
+          return;
+        ++compatibleCount;
+        auto& best = bestAdditionalHits[transientHit->geographicalId().rawId()];
+        if (!best.second || residual < best.first)
+          best = {residual, transientHit};
+        if (precision)
+          existingDetIds.insert(transientHit->geographicalId().rawId());
+      };
+      if (augmentDTHits_ && dtSegments.isValid())
+        for (auto segment = dtSegments->begin(); segment != dtSegments->end(); ++segment)
+          considerHit(muonRecHitBuilder.build(&*segment), true, candidate.nCompatibleDTSegments);
+      auto considerTrackerCollection = [&](auto const& handle, unsigned int& compatibleCount) {
+        if (!handle.isValid())
+          return;
+        for (auto const& detSet : *handle)
+          for (auto const& hit : detSet)
+            considerHit(trackerRecHitBuilder.build(&hit), false, compatibleCount);
+      };
+      if (augmentTrackerHits_) {
+        considerTrackerCollection(pixelRecHits, candidate.nCompatiblePixelHits);
+        considerTrackerCollection(stripMatchedRecHits, candidate.nCompatibleStripHits);
+      }
+      for (auto const& [rawId, best] : bestAdditionalHits) {
+        bool const precision = DetId(rawId).det() == DetId::Muon;
+        additionalHits.emplace_back(best.second, precision);
+        candidate.nAddedDTRefitHits += precision;
+        candidate.nAddedTrackerRefitHits += !precision;
+      }
+
       // Refit the same reconstructed hits in their measured time-of-flight
       // direction.  This changes the direction in which the Kalman filter
       // applies material updates; flipping a completed fit cannot do that.
@@ -1850,7 +1954,8 @@ public:
                                 directionalRefitUseSecondIteration_,
                                 precisionHitsOnly,
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
-                                hitSideSelection);
+                                hitSideSelection,
+                                &additionalHits);
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -1882,7 +1987,7 @@ public:
                              : std::numeric_limits<double>::infinity();
         precisionHasShiftTopology = precisionTargetDca <= maxTargetLineDca_ && precisionAbsEta >= minAbsEta_;
       }
-      bool const usePrecisionRefit = useImprovedMomentumRefit_ && precisionRefit.valid &&
+      bool const usePrecisionRefit = useImprovedMomentumRefit_ && !augmentTrackerHits_ && precisionRefit.valid &&
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
@@ -2441,6 +2546,8 @@ public:
         directionalRefitValid, directionalRefitHits, directionalRefitFirstValid, directionalRefitFirstHits,
         directionalRefitSecondValid, directionalRefitSecondHits, directionalRefitSecondConverged,
         directionalRefitSelectedIteration, nDTRefitHits, nCSCRefitHits, nRPCRefitHits, nGEMRefitHits,
+        nCompatibleDTSegments, nCompatiblePixelHits, nCompatibleStripHits,
+        nAddedDTRefitHits, nAddedTrackerRefitHits,
         nPrecisionRefitStations, directionalRefitUsedPrecisionHits, directionalRefitAllHitsValid,
         directionalRefitAllHits, directionalRefitAllHitsSelectedIteration, directionalRefitPrecisionValid,
         directionalRefitPrecisionHits, directionalRefitPrecisionSecondValid,
@@ -2621,6 +2728,11 @@ public:
       nCSCRefitHits.push_back(candidate->nCSCRefitHits);
       nRPCRefitHits.push_back(candidate->nRPCRefitHits);
       nGEMRefitHits.push_back(candidate->nGEMRefitHits);
+      nCompatibleDTSegments.push_back(candidate->nCompatibleDTSegments);
+      nCompatiblePixelHits.push_back(candidate->nCompatiblePixelHits);
+      nCompatibleStripHits.push_back(candidate->nCompatibleStripHits);
+      nAddedDTRefitHits.push_back(candidate->nAddedDTRefitHits);
+      nAddedTrackerRefitHits.push_back(candidate->nAddedTrackerRefitHits);
       nPrecisionRefitStations.push_back(candidate->nPrecisionRefitStations);
       precisionRefitLeverArm.push_back(candidate->precisionRefitLeverArm);
       directionalRefitUsedPrecisionHits.push_back(candidate->directionalRefitUsedPrecisionHits);
@@ -2926,6 +3038,11 @@ public:
                             directionalRefitMaterialPath,
                             "signed Geant4e path length from the source-facing refit state to the CMS boundary");
     table->addColumn<int>("nDTRefitHits", nDTRefitHits, "valid DT inputs available to the directional refit");
+    table->addColumn<int>("nCompatibleDTSegments", nCompatibleDTSegments, "unassigned DT segments geometrically compatible with this ShiftMuon");
+    table->addColumn<int>("nCompatiblePixelHits", nCompatiblePixelHits, "pixel rechits geometrically compatible with this ShiftMuon");
+    table->addColumn<int>("nCompatibleStripHits", nCompatibleStripHits, "matched strip rechits geometrically compatible with this ShiftMuon");
+    table->addColumn<int>("nAddedDTRefitHits", nAddedDTRefitHits, "compatible DT segments supplied to the augmented refit");
+    table->addColumn<int>("nAddedTrackerRefitHits", nAddedTrackerRefitHits, "compatible tracker rechits supplied to the augmented refit");
     table->addColumn<int>("nCSCRefitHits", nCSCRefitHits, "valid CSC inputs available to the directional refit");
     table->addColumn<int>("nRPCRefitHits", nRPCRefitHits, "valid RPC inputs available to the directional refit");
     table->addColumn<int>("nGEMRefitHits", nGEMRefitHits, "valid GEM inputs available to the directional refit");
@@ -3602,7 +3719,15 @@ public:
     description.add<edm::InputTag>("gemSimHits", edm::InputTag("g4SimHits", "MuonGEMHits"));
     description.add<edm::InputTag>("hcalSimHits", edm::InputTag("g4SimHits", "HcalHits"));
     description.add<edm::InputTag>("zdcSimHits", edm::InputTag("g4SimHits", "ZDCHITS"));
+    description.add<edm::InputTag>("dtSegments", edm::InputTag("dt4DSegments"));
+    description.add<edm::InputTag>("pixelRecHits", edm::InputTag("siPixelRecHits"));
+    description.add<edm::InputTag>("stripMatchedRecHits", edm::InputTag("siStripMatchedRecHits", "matchedRecHit"));
     description.add<std::string>("muonRecHitBuilder", "MuonRecHitBuilder");
+    description.add<std::string>("trackerRecHitBuilder", "WithTrackAngle");
+    description.add<bool>("augmentDTHits", false);
+    description.add<bool>("augmentTrackerHits", false);
+    description.add<bool>("useExtendedTiming", false);
+    description.add<double>("additionalHitMaxDistance", 10.0);
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<bool>("directionalRefitUseMaterialEffects", false);
@@ -3677,9 +3802,17 @@ private:
   edm::EDGetTokenT<edm::PSimHitContainer> gemSimHitsToken_;
   edm::EDGetTokenT<edm::PCaloHitContainer> hcalSimHitsToken_;
   edm::EDGetTokenT<edm::PCaloHitContainer> zdcSimHitsToken_;
+  edm::EDGetTokenT<DTRecSegment4DCollection> dtSegmentsToken_;
+  edm::EDGetTokenT<SiPixelRecHitCollection> pixelRecHitsToken_;
+  edm::EDGetTokenT<SiStripMatchedRecHit2DCollection> stripMatchedRecHitsToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> trackingGeometryToken_;
   edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> muonRecHitBuilderToken_;
+  edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> trackerRecHitBuilderToken_;
+  bool augmentDTHits_;
+  bool augmentTrackerHits_;
+  bool useExtendedTiming_;
+  double additionalHitMaxDistance_;
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
   bool directionalRefitUseMaterialEffects_;

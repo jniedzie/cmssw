@@ -14,6 +14,10 @@
 #include "DataFormats/RPCDigi/interface/RPCDigiCollection.h"
 #include "DataFormats/RPCRecHit/interface/RPCRecHitCollection.h"
 #include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2DCollection.h"
+#include "DataFormats/EcalRecHit/interface/EcalRecHitCollections.h"
+#include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -126,6 +130,18 @@ public:
             parameters.getParameter<edm::InputTag>("cosmicGlobalLinks"))),
         traversingGlobalLinks_(consumes<reco::MuonTrackLinksCollection>(
             parameters.getParameter<edm::InputTag>("traversingGlobalLinks"))),
+        pixelRecHits_(consumes<SiPixelRecHitCollection>(parameters.getParameter<edm::InputTag>("pixelRecHits"))),
+        stripMatchedRecHits_(consumes<SiStripMatchedRecHit2DCollection>(
+            parameters.getParameter<edm::InputTag>("stripMatchedRecHits"))),
+        ecalBarrelRecHits_(consumes<EcalRecHitCollection>(parameters.getParameter<edm::InputTag>("ecalBarrelRecHits"))),
+        ecalEndcapRecHits_(consumes<EcalRecHitCollection>(parameters.getParameter<edm::InputTag>("ecalEndcapRecHits"))),
+        hbheRecHits_(consumes<HBHERecHitCollection>(parameters.getParameter<edm::InputTag>("hbheRecHits"))),
+        hfRecHits_(consumes<HFRecHitCollection>(parameters.getParameter<edm::InputTag>("hfRecHits"))),
+        hoRecHits_(consumes<HORecHitCollection>(parameters.getParameter<edm::InputTag>("hoRecHits"))),
+        zdcRecHits_(consumes<ZDCRecHitCollection>(parameters.getParameter<edm::InputTag>("zdcRecHits"))),
+        bcm1fSimHits_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("bcm1fSimHits"))),
+        bhmSimHits_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("bhmSimHits"))),
+        pltSimHits_(consumes<edm::PSimHitContainer>(parameters.getParameter<edm::InputTag>("pltSimHits"))),
         enableDTMeasurement_(parameters.getParameter<bool>("enableDTMeasurement")),
         enableGEMMeasurement_(parameters.getParameter<bool>("enableGEMMeasurement")),
         trackerMode_(parameters.getParameter<int>("trackerMode")),
@@ -184,6 +200,17 @@ public:
     add("nTraversingTrackerMatches",
         collectionSize(event.getHandle(traversingGlobalLinks_)),
         "strict-traversing tracker+muon links");
+    add("nPixelRecHits", collectionSize(event.getHandle(pixelRecHits_)), "pixel rechits available for direct association");
+    add("nStripMatchedRecHits", collectionSize(event.getHandle(stripMatchedRecHits_)), "matched strip rechits available for direct association");
+    add("nEcalBarrelRecHits", collectionSize(event.getHandle(ecalBarrelRecHits_)), "reduced ECAL barrel rechits");
+    add("nEcalEndcapRecHits", collectionSize(event.getHandle(ecalEndcapRecHits_)), "reduced ECAL endcap rechits");
+    add("nHBHERecHits", collectionSize(event.getHandle(hbheRecHits_)), "reduced HBHE rechits");
+    add("nHFRecHits", collectionSize(event.getHandle(hfRecHits_)), "reduced HF rechits");
+    add("nHORecHits", collectionSize(event.getHandle(hoRecHits_)), "reduced HO rechits");
+    add("nZDCRecHits", collectionSize(event.getHandle(zdcRecHits_)), "ZDC rechits, or -1 when unavailable");
+    add("nBCM1FSimHits", muonSimHitCount(event.getHandle(bcm1fSimHits_)), "muon SimHits in BCM1F");
+    add("nBHMSimHits", muonSimHitCount(event.getHandle(bhmSimHits_)), "muon SimHits in BHM");
+    add("nPLTSimHits", muonSimHitCount(event.getHandle(pltSimHits_)), "muon SimHits in PLT");
     add("nHcalSimHits", hcal.allHits, "all HCAL SimHits; -2 when this diagnostic is disabled");
     add("nSignalMuonHcalSimHits", hcal.signalMuonHits, "primary signal-muon HCAL SimHits");
     addFloat("signalMuonHcalSimEnergy", hcal.signalMuonEnergy, "summed primary signal-muon HCAL SimHit energy");
@@ -222,6 +249,17 @@ public:
     description.add<edm::InputTag>("dsaGlobalLinks", edm::InputTag("shiftGlobalDSAMuons"));
     description.add<edm::InputTag>("cosmicGlobalLinks", edm::InputTag("shiftGlobalCosmicMuons"));
     description.add<edm::InputTag>("traversingGlobalLinks", edm::InputTag("shiftGlobalTraversingMuons"));
+    description.add<edm::InputTag>("pixelRecHits", edm::InputTag("siPixelRecHits"));
+    description.add<edm::InputTag>("stripMatchedRecHits", edm::InputTag("siStripMatchedRecHits", "matchedRecHit"));
+    description.add<edm::InputTag>("ecalBarrelRecHits", edm::InputTag("reducedEcalRecHitsEB"));
+    description.add<edm::InputTag>("ecalEndcapRecHits", edm::InputTag("reducedEcalRecHitsEE"));
+    description.add<edm::InputTag>("hbheRecHits", edm::InputTag("reducedHcalRecHits", "hbhereco"));
+    description.add<edm::InputTag>("hfRecHits", edm::InputTag("reducedHcalRecHits", "hfreco"));
+    description.add<edm::InputTag>("hoRecHits", edm::InputTag("reducedHcalRecHits", "horeco"));
+    description.add<edm::InputTag>("zdcRecHits", edm::InputTag("zdcreco"));
+    description.add<edm::InputTag>("bcm1fSimHits", edm::InputTag("g4SimHits", "BCM1FHits"));
+    description.add<edm::InputTag>("bhmSimHits", edm::InputTag("g4SimHits", "BHMHits"));
+    description.add<edm::InputTag>("pltSimHits", edm::InputTag("g4SimHits", "PLTHits"));
     description.add<bool>("enableDTMeasurement", true);
     description.add<bool>("enableGEMMeasurement", true);
     description.add<int>("trackerMode", 1);
@@ -256,6 +294,17 @@ private:
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> dsaGlobalLinks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> cosmicGlobalLinks_;
   edm::EDGetTokenT<reco::MuonTrackLinksCollection> traversingGlobalLinks_;
+  edm::EDGetTokenT<SiPixelRecHitCollection> pixelRecHits_;
+  edm::EDGetTokenT<SiStripMatchedRecHit2DCollection> stripMatchedRecHits_;
+  edm::EDGetTokenT<EcalRecHitCollection> ecalBarrelRecHits_;
+  edm::EDGetTokenT<EcalRecHitCollection> ecalEndcapRecHits_;
+  edm::EDGetTokenT<HBHERecHitCollection> hbheRecHits_;
+  edm::EDGetTokenT<HFRecHitCollection> hfRecHits_;
+  edm::EDGetTokenT<HORecHitCollection> hoRecHits_;
+  edm::EDGetTokenT<ZDCRecHitCollection> zdcRecHits_;
+  edm::EDGetTokenT<edm::PSimHitContainer> bcm1fSimHits_;
+  edm::EDGetTokenT<edm::PSimHitContainer> bhmSimHits_;
+  edm::EDGetTokenT<edm::PSimHitContainer> pltSimHits_;
   bool enableDTMeasurement_;
   bool enableGEMMeasurement_;
   int trackerMode_;

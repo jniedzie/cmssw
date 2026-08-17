@@ -13,6 +13,9 @@ def customise(
     directionalRefitUseGeometryTargetMaterialEffects=None,
     enableHcalDiagnostics=False,
     enableZDCDiagnostics=False,
+    augmentDTHits=False,
+    augmentTrackerHits=False,
+    useExtendedTiming=False,
 ):
     process = addShiftMuonSegments(
         process,
@@ -23,6 +26,9 @@ def customise(
         directionalRefitUseGeometryTargetMaterialEffects=directionalRefitUseGeometryTargetMaterialEffects,
         enableHcalDiagnostics=enableHcalDiagnostics,
         enableZDCDiagnostics=enableZDCDiagnostics,
+        augmentDTHits=augmentDTHits,
+        augmentTrackerHits=augmentTrackerHits,
+        useExtendedTiming=useExtendedTiming,
     )
     # Standard NanoAOD already provides every generator quantity used by the
     # SHIFT TEA analysis except pz and the production vertex.  Add only those
@@ -65,10 +71,34 @@ def customiseKeepShiftTruth(
         "keep TrackingParticles_mix_MergedTrackTruth_*",
         "keep TrackingVertexs_mix_MergedTrackTruth_*",
     ]
+    # Direct tracker-hit association is performed in Step 4 without requiring
+    # a collision-style tracker track. Preserve the rechits made in Step 3.
+    truth_commands.extend((
+        "keep *_siPixelRecHits_*_*",
+        "keep *_siStripMatchedRecHits_*_*",
+        "keep *_reducedEcalRecHitsEB_*_*",
+        "keep *_reducedEcalRecHitsEE_*_*",
+        "keep *_reducedHcalRecHits_*_*",
+        "keep *_zdcreco_*_*",
+    ))
     if keepHcalSimHits:
         truth_commands.append("keep PCaloHits_g4SimHits_HcalHits_*")
     if keepZDCSimHits:
         truth_commands.append("keep PCaloHits_g4SimHits_ZDCHITS_*")
+        # Phase-I input contains legacy ZDCDataFramesSorted from
+        # simHcalUnsuppressedDigis, not the QIE10 hcalDigis:ZDC product used
+        # by the default Run-3 module.
+        from RecoLocalCalo.HcalRecProducers.HcalHitReconstructor_zdc_cfi import zdcreco
+        process.shiftZDCReco = zdcreco.clone(
+            digiLabelhcal=cms.InputTag("simHcalUnsuppressedDigis"),
+            digiLabelQIE10ZDC=cms.InputTag(""),
+        )
+        process.shiftZDCReco_step = cms.Path(process.shiftZDCReco)
+        if hasattr(process, "schedule"):
+            process.schedule.append(process.shiftZDCReco_step)
+        else:
+            raise RuntimeError("Cannot attach legacy SHIFT ZDC reconstruction: no process schedule")
+        truth_commands.append("keep *_shiftZDCReco_*_*")
     for output in process.outputModules_().values():
         if not hasattr(output, "outputCommands"):
             continue
@@ -107,6 +137,8 @@ def customiseRecoDebug(
         dtNavigationMode=dtNavigationMode,
         recoVariantCode=recoVariantCode,
     )
+    if enableZDCDiagnostics:
+        process.shiftMuonRecoDiagnostics.zdcRecHits = cms.InputTag("shiftZDCReco")
     if trackerMode == "p5":
         process.shiftMuonRecoDiagnostics.generalTracks = cms.InputTag(
             "ctfWithMaterialTracksP5"

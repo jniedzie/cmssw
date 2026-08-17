@@ -39,9 +39,10 @@ extrapolated to the full sample.
 - Primary signal muons in the enriched 100-event sample made ZDC SimHits in 39
   events, HCAL SimHits in 8, and no ECAL, PLT, BHM, or BCM1F SimHits.  ZDC times
   near -468 to -463 ns look potentially useful for direction diagnostics.
-  Neither Run-3 QIE10 nor legacy ZDC reconstruction produced RecHits because
-  both corresponding ZDC digi collections are empty; ZDC digitization must be
-  enabled or repaired before testing reconstructed observables.
+  The later product audit found legacy `ZDCDataFramesSorted` under
+  `simHcalUnsuppressedDigis`. The new `shiftZDCReco` path consumes that actual
+  Phase-I product; its crossing-conditioned occupancy must now be measured on
+  the full sample before attempting a spatial constraint.
 - GEM remains an acceptance rather than a fitting problem in this campaign:
   only 5 selected v15 muons have matched signal GEM SimHits and none has an
   attached GEM hit.
@@ -124,9 +125,8 @@ extrapolated to the full sample.
 - If available, test ZDC energy and timing as an upstream tag or time reference.
   Its coarse spatial information should not enter the main track fit without a
   demonstrated covariance-aware benefit.
-- Check PPS only geometrically. Its location and beam optics make it unlikely to
-  help source-side muons in this setup; do not add reconstruction infrastructure
-  until an actual active-volume intersection is demonstrated.
+- PPS is upstream of the SHIFT target and is outside the physical flight path.
+  It is excluded from reconstruction and from the detector-study backlog.
 
 ## BRIL detectors
 

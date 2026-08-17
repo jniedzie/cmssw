@@ -11,6 +11,9 @@
 <use name="DataFormats/MuonReco"/>
 <use name="DataFormats/MuonSeed"/>
 <use name="DataFormats/TrackReco"/>
+<use name="DataFormats/TrackerRecHit2D"/>
+<use name="DataFormats/EcalRecHit"/>
+<use name="DataFormats/HcalRecHit"/>
 <use name="DataFormats/TrajectorySeed"/>
 <use name="SimDataFormats/Track"/>
 <use name="SimDataFormats/TrackingHit"/>
