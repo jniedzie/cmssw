@@ -1657,6 +1657,8 @@ public:
         directionalRefitMaxHitChi2_(parameters.getParameter<double>("directionalRefitMaxHitChi2")),
         directionalRefitMaxRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxRelativeQoverPChange")),
+        directionalRefitMaxMomentumRatio_(
+            parameters.getParameter<double>("directionalRefitMaxMomentumRatio")),
         directionalRefitUseSecondIteration_(parameters.getParameter<bool>("directionalRefitUseSecondIteration")),
         directionalRefitMinPrecisionStations_(
             parameters.getParameter<unsigned int>("directionalRefitMinPrecisionStations")),
@@ -2389,6 +2391,22 @@ public:
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+      // A formally valid fitter/smoother trajectory can still collapse to an
+      // unrelated curvature solution, especially for nearly straight SHIFT
+      // tracks. Propagation to the target cannot change the momentum by
+      // orders of magnitude. Keep the refit diagnostics, but require broad
+      // continuity with the independently propagated input track before the
+      // refit is allowed to replace the public momentum.
+      double const preRefitP = candidate.targetLineState.valid ? candidate.targetLineState.momentum.mag() : 0.;
+      double const refitTargetP =
+          refit.valid && refit.selected.materialTargetState.valid
+              ? refit.selected.materialTargetState.momentum.mag()
+              : 0.;
+      double const refitMomentumRatio = preRefitP > 0. ? refitTargetP / preRefitP : 0.;
+      bool const refitPassesMomentumContinuity =
+          refit.valid && std::isfinite(refitMomentumRatio) && refitMomentumRatio > 0. &&
+          refitMomentumRatio >= 1. / directionalRefitMaxMomentumRatio_ &&
+          refitMomentumRatio <= directionalRefitMaxMomentumRatio_;
 
       // Produce a second, explicitly prompt-target hypothesis without ever
       // replacing the unconstrained result above.  A smoothed state is the
@@ -2397,7 +2415,7 @@ public:
       // This is the linear-Gaussian equivalent of adding the constraint to the
       // full fit, without asking KFTrajectoryFitter to treat a detId=0 prior as
       // an ordinary detector hit.
-      if (produceTargetConstrainedMomentum_ && refit.valid) {
+      if (produceTargetConstrainedMomentum_ && refitPassesMomentumContinuity) {
         double const configuredTargetZ = targetUseInferredSide_ ? eventSourceSide * std::abs(targetZ_) : targetZ_;
         TargetConstraint const constraint{
             GlobalPoint(targetX_, targetY_, configuredTargetZ), targetSigmaX_, targetSigmaY_, targetSigmaZ_};
@@ -2490,7 +2508,7 @@ public:
       // Keep the established first/second diagnostic branches tied to the
       // all-hit control fit so this production can compare it directly with
       // the new precision-only variant.
-      candidate.directionalRefitValid = refit.valid;
+      candidate.directionalRefitValid = refitPassesMomentumContinuity;
       candidate.directionalRefitFirstValid = allHitsRefit.first.valid;
       candidate.directionalRefitFirstHits = allHitsRefit.first.hits;
       candidate.directionalRefitFirstChi2 = allHitsRefit.first.chi2;
@@ -2526,7 +2544,7 @@ public:
       if (refit.selected.upstreamP > 0.)
         candidate.directionalRefitFractionalLossAcrossHits =
             (refit.selected.upstreamP - refit.selected.downstreamP) / refit.selected.upstreamP;
-      if (refit.valid) {
+      if (refitPassesMomentumContinuity) {
         candidate.targetLineState = refit.selected.materialTargetState;
         if (refit.selected.vacuumTargetState.valid) {
           candidate.directionalRefitVacuumTargetPt = refit.selected.vacuumTargetState.momentum.perp();
@@ -4368,6 +4386,7 @@ public:
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
+    description.add<double>("directionalRefitMaxMomentumRatio", 3.0);
     description.add<bool>("directionalRefitUseSecondIteration", false);
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
     description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.5);
@@ -4478,6 +4497,7 @@ private:
   double directionalRefitInitialMaxHitChi2_;
   double directionalRefitMaxHitChi2_;
   double directionalRefitMaxRelativeQoverPChange_;
+  double directionalRefitMaxMomentumRatio_;
   bool directionalRefitUseSecondIteration_;
   unsigned int directionalRefitMinPrecisionStations_;
   double directionalRefitMaxPrecisionRelativeQoverPChange_;
