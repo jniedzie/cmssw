@@ -13,7 +13,7 @@ def customise(
     directionalRefitUseGeometryTargetMaterialEffects=None,
     enableHcalDiagnostics=False,
     enableZDCDiagnostics=False,
-    augmentDTHits=False,
+    augmentDTHits=True,
     augmentTrackerHits=False,
     useExtendedTiming=False,
 ):
@@ -149,7 +149,7 @@ def customiseKeepShiftTruth(
     return process
 
 
-def customiseRecoDebug(
+def customiseRecoDiagnostics(
     process,
     enableDTMeasurement=True,
     enableGEMMeasurement=True,
@@ -157,12 +157,10 @@ def customiseRecoDebug(
     enableHcalDiagnostics=False,
     enableZDCDiagnostics=False,
     dtNavigationMode=1,
-    recoVariantCode=0,
 ):
-    """Run the reconstruction-funnel diagnostic on a dedicated end path."""
+    """Persist compact reconstruction provenance on a dedicated end path."""
     from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import (
         shiftMuonRecoDiagnostics,
-        shiftMuonSegmentsCounter,
     )
 
     tracker_mode_codes = {"none": 0, "general": 1, "p5": 2}
@@ -175,7 +173,6 @@ def customiseRecoDebug(
         enableHcalDiagnostics=enableHcalDiagnostics,
         enableZDCDiagnostics=enableZDCDiagnostics,
         dtNavigationMode=dtNavigationMode,
-        recoVariantCode=recoVariantCode,
     )
     if enableZDCDiagnostics:
         process.shiftMuonRecoDiagnostics.zdcRecHits = cms.InputTag("shiftZDCReco")
@@ -183,12 +180,9 @@ def customiseRecoDebug(
         process.shiftMuonRecoDiagnostics.generalTracks = cms.InputTag(
             "ctfWithMaterialTracksP5LHCNavigation"
         )
-    process.shiftMuonRecoDebug = shiftMuonSegmentsCounter.clone(printDetails=True)
-    process.shiftMuonRecoDebug_step = cms.EndPath(
-        process.shiftMuonRecoDiagnostics + process.shiftMuonRecoDebug
-    )
+    process.shiftMuonRecoDiagnostics_step = cms.EndPath(process.shiftMuonRecoDiagnostics)
     if hasattr(process, "schedule"):
-        process.schedule.append(process.shiftMuonRecoDebug_step)
+        process.schedule.append(process.shiftMuonRecoDiagnostics_step)
     else:
         raise RuntimeError("Cannot attach Shift muon debug analyzer: no process schedule")
     for output in process.outputModules_().values():
@@ -197,18 +191,11 @@ def customiseRecoDebug(
                 "keep nanoaodFlatTable_shiftMuonRecoDiagnostics_*_*"
             )
 
-    # LogVerbatim categories must be explicitly admitted by MessageLogger.
-    # The default INFO threshold alone does not make a custom verbatim
-    # category visible.
-    if hasattr(process, "MessageLogger"):
-        if hasattr(process.MessageLogger, "cerr"):
-            process.MessageLogger.cerr.ShiftMuonRecoDebug = cms.untracked.PSet(
-                limit=cms.untracked.int32(-1)
-            )
-    # Keep the path/module report in these intentionally small diagnostic
-    # jobs; it proves that the analyzer ran even if logger settings regress.
-    process.options.wantSummary = cms.untracked.bool(True)
     return process
+
+
+# Backward-compatible alias for archived generated configurations.
+customiseRecoDebug = customiseRecoDiagnostics
 
 
 def customiseTraversingShiftMuonReco(

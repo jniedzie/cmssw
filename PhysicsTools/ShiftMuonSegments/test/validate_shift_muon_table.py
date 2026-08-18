@@ -61,7 +61,7 @@ def main():
         "ShiftMuon_nPropagatedDTSegments", "ShiftMuon_nPropagatedPixelHits",
         "ShiftMuon_nPropagatedStripHits", "ShiftMuon_nAddedDTRefitHits",
         "ShiftMuon_nAddedTrackerRefitHits", "ShiftMuon_nAddedDTTruthChamberMatches",
-        "ShiftRecoDiag_recoVariantCode", "ShiftRecoDiag_enableDTMeasurement",
+        "ShiftRecoDiag_enableDTMeasurement",
         "ShiftRecoDiag_dtNavigationMode", "ShiftRecoDiag_enableGEMMeasurement",
         "ShiftRecoDiag_trackerMode", "ShiftRecoDiag_enableHcalDiagnostics",
         "ShiftRecoDiag_enableZDCDiagnostics", "ShiftRecoDiag_nSignalMuonHcalSimHits",

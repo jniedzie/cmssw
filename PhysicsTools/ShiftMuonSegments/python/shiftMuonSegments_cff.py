@@ -12,7 +12,7 @@ def addShiftMuonSegments(
     directionalRefitUseGeometryTargetMaterialEffects=None,
     enableHcalDiagnostics=False,
     enableZDCDiagnostics=False,
-    augmentDTHits=False,
+    augmentDTHits=True,
     augmentTrackerHits=False,
     useExtendedTiming=False,
 ):

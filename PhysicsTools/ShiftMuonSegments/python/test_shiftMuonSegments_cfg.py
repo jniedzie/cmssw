@@ -17,7 +17,7 @@ process.MessageLogger = cms.Service(
 )
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEvents))
 process.source = cms.Source("PoolSource", fileNames=cms.untracked.vstring(options.inputFile))
-process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone()
+process.shiftMuonSegmentsCounter = shiftMuonSegmentsCounter.clone(printDetails=True)
 process.shiftMuonTable = shiftMuonTable.clone()
 process.shiftMuonSegmentsTable = shiftMuonSegments.clone()
 process.p = cms.Path(process.shiftMuonSegmentsCounter + process.shiftMuonTable + process.shiftMuonSegmentsTable)

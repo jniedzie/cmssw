@@ -70,7 +70,7 @@ shiftMuonTable = cms.EDProducer(
     stripStereoUnmatchedRecHits=cms.InputTag("siStripMatchedRecHits", "stereoRecHitUnmatched"),
     muonRecHitBuilder=cms.string("MuonRecHitBuilder"),
     trackerRecHitBuilder=cms.string("WithTrackAngle"),
-    augmentDTHits=cms.bool(False),
+    augmentDTHits=cms.bool(True),
     augmentTrackerHits=cms.bool(False),
     useExtendedTiming=cms.bool(False),
     # Coarse geometry gates in cm, followed by a covariance-aware estimator.
@@ -156,8 +156,10 @@ shiftMuonTable = cms.EDProducer(
     directionalRefitMaxHitChi2=cms.double(100000.0),
     # Reject a second pass that moves too far from the first smoothed q/p.
     directionalRefitMaxRelativeQoverPChange=cms.double(0.5),
-    # Reject formally valid refits whose total momentum differs from the
-    # independently propagated input track by more than this broad factor.
+    # Optional failed-tail study. The full production degraded the dominant
+    # near-endcap-only topology, so production preserves the established
+    # pre-guard behavior. Keep the implementation for focused diagnostics.
+    directionalRefitUseMomentumContinuityGuard=cms.bool(False),
     directionalRefitMaxMomentumRatio=cms.double(3.0),
     # Muon DT/CSC RecHits cannot improve with a track hypothesis, so a second
     # pass does not relinearize them. Reusing pass one's same-hit posterior as
@@ -171,7 +173,7 @@ shiftMuonTable = cms.EDProducer(
     directionalRefitMaxPrecisionRelativeQoverPChange=cms.double(0.5),
     # Simulation-only closure columns and source/opposite-side precision
     # refits. Disabled in production because the extra fits cost CPU.
-    produceMomentumClosureDiagnostics=cms.bool(True),
+    produceMomentumClosureDiagnostics=cms.bool(False),
     # HCAL/ZDC are diagnostic truth associations in this iteration. They are
     # deliberately not treated as precision Kalman measurements.
     enableHcalDiagnostics=cms.bool(False),
@@ -236,7 +238,7 @@ shiftMuonSegmentsCounter = cms.EDAnalyzer(
     cscSimHits=cms.InputTag("g4SimHits", "MuonCSCHits"),
     rpcSimHits=cms.InputTag("g4SimHits", "MuonRPCHits"),
     gemSimHits=cms.InputTag("g4SimHits", "MuonGEMHits"),
-    printDetails=cms.bool(True),
+    printDetails=cms.bool(False),
     # MC-only, read-only transport closure probe. Keep disabled in production.
     printPropagationClosure=cms.bool(False),
 )
@@ -296,5 +298,4 @@ shiftMuonRecoDiagnostics = cms.EDProducer(
     enableHcalDiagnostics=cms.bool(False),
     enableZDCDiagnostics=cms.bool(False),
     dtNavigationMode=cms.int32(1),
-    recoVariantCode=cms.int32(0),
 )
