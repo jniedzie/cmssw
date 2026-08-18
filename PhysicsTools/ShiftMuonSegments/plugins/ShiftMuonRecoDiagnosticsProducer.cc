@@ -204,8 +204,7 @@ public:
         trackerMode_(parameters.getParameter<int>("trackerMode")),
         enableHcalDiagnostics_(parameters.getParameter<bool>("enableHcalDiagnostics")),
         enableZDCDiagnostics_(parameters.getParameter<bool>("enableZDCDiagnostics")),
-        dtNavigationMode_(parameters.getParameter<int>("dtNavigationMode")),
-        recoVariantCode_(parameters.getParameter<int>("recoVariantCode")) {
+        dtNavigationMode_(parameters.getParameter<int>("dtNavigationMode")) {
     for (auto const& tag : parameters.getParameter<std::vector<edm::InputTag>>("trackerSimHits"))
       trackerSimHits_.push_back(consumes<edm::PSimHitContainer>(tag));
     produces<nanoaod::FlatTable>();
@@ -272,7 +271,6 @@ public:
     auto const hoReco = recHitEnergySummary(hoRecHits, 0.1);
     auto const zdcReco = recHitEnergySummary(zdcRecHits, 0.01);
 
-    add("recoVariantCode", recoVariantCode_, "workflow reconstruction-variant code");
     add("enableDTMeasurement", enableDTMeasurement_, "DT measurements enabled in Shift muon reconstruction");
     add("dtNavigationMode", dtNavigationMode_, "DT navigation: 0=off, 1=Standard, 2=Direct");
     add("enableGEMMeasurement", enableGEMMeasurement_, "GEM measurements enabled in Shift DSA reconstruction");
@@ -450,7 +448,6 @@ public:
     description.add<bool>("enableHcalDiagnostics", false);
     description.add<bool>("enableZDCDiagnostics", false);
     description.add<int>("dtNavigationMode", 1);
-    description.add<int>("recoVariantCode", 0);
     descriptions.add("shiftMuonRecoDiagnostics", description);
   }
 
@@ -512,7 +509,6 @@ private:
   bool enableHcalDiagnostics_;
   bool enableZDCDiagnostics_;
   int dtNavigationMode_;
-  int recoVariantCode_;
 };
 
 DEFINE_FWK_MODULE(ShiftMuonRecoDiagnosticsProducer);

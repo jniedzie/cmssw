@@ -1657,6 +1657,8 @@ public:
         directionalRefitMaxHitChi2_(parameters.getParameter<double>("directionalRefitMaxHitChi2")),
         directionalRefitMaxRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxRelativeQoverPChange")),
+        directionalRefitUseMomentumContinuityGuard_(
+            parameters.getParameter<bool>("directionalRefitUseMomentumContinuityGuard")),
         directionalRefitMaxMomentumRatio_(
             parameters.getParameter<double>("directionalRefitMaxMomentumRatio")),
         directionalRefitUseSecondIteration_(parameters.getParameter<bool>("directionalRefitUseSecondIteration")),
@@ -2391,22 +2393,22 @@ public:
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
-      // A formally valid fitter/smoother trajectory can still collapse to an
-      // unrelated curvature solution, especially for nearly straight SHIFT
-      // tracks. Propagation to the target cannot change the momentum by
-      // orders of magnitude. Keep the refit diagnostics, but require broad
-      // continuity with the independently propagated input track before the
-      // refit is allowed to replace the public momentum.
-      double const preRefitP = candidate.targetLineState.valid ? candidate.targetLineState.momentum.mag() : 0.;
-      double const refitTargetP =
-          refit.valid && refit.selected.materialTargetState.valid
-              ? refit.selected.materialTargetState.momentum.mag()
-              : 0.;
-      double const refitMomentumRatio = preRefitP > 0. ? refitTargetP / preRefitP : 0.;
-      bool const refitPassesMomentumContinuity =
-          refit.valid && std::isfinite(refitMomentumRatio) && refitMomentumRatio > 0. &&
-          refitMomentumRatio >= 1. / directionalRefitMaxMomentumRatio_ &&
-          refitMomentumRatio <= directionalRefitMaxMomentumRatio_;
+      // Optional failed-tail study: compare the refit with the independently
+      // propagated input momentum before publishing it. The full production
+      // degraded the dominant near-endcap-only topology, so this guard is off
+      // in the canonical configuration while its implementation is retained.
+      bool refitPassesMomentumContinuity = refit.valid;
+      if (directionalRefitUseMomentumContinuityGuard_ && refit.valid) {
+        double const preRefitP = candidate.targetLineState.valid ? candidate.targetLineState.momentum.mag() : 0.;
+        double const refitTargetP = refit.selected.materialTargetState.valid
+                                        ? refit.selected.materialTargetState.momentum.mag()
+                                        : 0.;
+        double const refitMomentumRatio = preRefitP > 0. ? refitTargetP / preRefitP : 0.;
+        refitPassesMomentumContinuity =
+            std::isfinite(refitMomentumRatio) && refitMomentumRatio > 0. &&
+            refitMomentumRatio >= 1. / directionalRefitMaxMomentumRatio_ &&
+            refitMomentumRatio <= directionalRefitMaxMomentumRatio_;
+      }
 
       // Produce a second, explicitly prompt-target hypothesis without ever
       // replacing the unconstrained result above.  A smoothed state is the
@@ -4386,6 +4388,7 @@ public:
     description.add<double>("directionalRefitInitialMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxHitChi2", 100000.0);
     description.add<double>("directionalRefitMaxRelativeQoverPChange", 0.5);
+    description.add<bool>("directionalRefitUseMomentumContinuityGuard", false);
     description.add<double>("directionalRefitMaxMomentumRatio", 3.0);
     description.add<bool>("directionalRefitUseSecondIteration", false);
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
@@ -4497,6 +4500,7 @@ private:
   double directionalRefitInitialMaxHitChi2_;
   double directionalRefitMaxHitChi2_;
   double directionalRefitMaxRelativeQoverPChange_;
+  bool directionalRefitUseMomentumContinuityGuard_;
   double directionalRefitMaxMomentumRatio_;
   bool directionalRefitUseSecondIteration_;
   unsigned int directionalRefitMinPrecisionStations_;
