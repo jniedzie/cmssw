@@ -156,6 +156,9 @@ shiftMuonTable = cms.EDProducer(
     directionalRefitMaxHitChi2=cms.double(100000.0),
     # Reject a second pass that moves too far from the first smoothed q/p.
     directionalRefitMaxRelativeQoverPChange=cms.double(0.5),
+    # Reject formally valid refits whose total momentum differs from the
+    # independently propagated input track by more than this broad factor.
+    directionalRefitMaxMomentumRatio=cms.double(3.0),
     # Muon DT/CSC RecHits cannot improve with a track hypothesis, so a second
     # pass does not relinearize them. Reusing pass one's same-hit posterior as
     # a prior double-counts information and is retained only as a diagnostic.
