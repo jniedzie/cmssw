@@ -60,6 +60,9 @@ def customiseKeepShiftTruth(
     process,
     keepHcalSimHits=False,
     keepZDCSimHits=False,
+    keepMergedTrackTruth=True,
+    keepSimMuonRPCDigis=False,
+    keepPileupPlayback=False,
     zdcDigiTimePhaseOffset=0.0,
 ):
     """Retain generator and simulation truth needed for SHIFT hit attribution."""
@@ -68,10 +71,26 @@ def customiseKeepShiftTruth(
         "keep SimTracks_g4SimHits_*_*",
         "keep SimVertexs_g4SimHits_*_*",
         "keep PSimHits_g4SimHits_*_*",
-        "keep *_mix_MergedTrackTruth_*",
-        "keep TrackingParticles_mix_MergedTrackTruth_*",
-        "keep TrackingVertexs_mix_MergedTrackTruth_*",
     ]
+    if keepMergedTrackTruth:
+        # Retain this only for workflows that explicitly run RECOSIM. Pileup
+        # makes these collections much larger than the reconstructed event;
+        # canonical SHIFT reconstruction and Step 4 use g4SimHits directly.
+        truth_commands.append("keep *_mix_MergedTrackTruth_*")
+    else:
+        # AODSIM event content keeps this collection by default. Output
+        # commands are applied in order, so an explicit final drop is needed.
+        truth_commands.append("drop *_mix_MergedTrackTruth_*")
+    if keepSimMuonRPCDigis:
+        # Run-3 RAW2DIGI configures muonRPCDigis as an RPCDigiMerger whose
+        # simulation input is not packed into rawDataCollector. GENRAW keeps
+        # only its DigiSimLinks, so retain the digi collection needed by the
+        # downstream merger explicitly.
+        truth_commands.append("keep *_simMuonRPCDigis_*_*")
+    if keepPileupPlayback:
+        # Preserve the exact mixed-event identities for occupancy provenance
+        # without retaining the much larger mixed TrackingParticle graph.
+        truth_commands.append("keep CrossingFramePlaybackInfoNew_mix_*_*")
     # Direct tracker-hit association is performed in Step 4 without requiring
     # a collision-style tracker track. Preserve the rechits made in Step 3.
     truth_commands.extend((
