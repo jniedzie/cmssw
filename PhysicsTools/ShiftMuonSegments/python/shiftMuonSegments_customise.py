@@ -436,3 +436,65 @@ def customiseRecoForShiftMuons(
     process.displacedStandAloneMuons.TrackLoaderParameters.AllowNoVertex = cms.untracked.bool(True)
     process.displacedStandAloneMuons.TrackLoaderParameters.MuonUpdatorAtVertexParameters.Propagator = pcaPropagator
     return process
+
+
+def customiseShiftLssTransport(
+    process,
+    *,
+    magneticFieldLabel="",
+    baseMagneticFieldLabel="shiftLssBaseMagneticField",
+    baseMagneticFieldProducer="VolumeBasedMagneticFieldESProducer",
+    fieldElements=None,
+    addBaseField=False,
+    sumOverlaps=False,
+    materialBoundaryAbsZCm=1100.0,
+    geant4eMomentumLimitGeV=0.05,
+    geant4eMaximumStepLengthMm=2.0,
+    geant4eMaximumPathLengthCm=2500.0,
+):
+    """Configure simulation and reconstruction to share an optional LSS field."""
+    if not hasattr(process, "shiftMuonTable"):
+        raise RuntimeError("Cannot configure SHIFT LSS transport: shiftMuonTable is absent")
+    positive_values = {
+        "materialBoundaryAbsZCm": materialBoundaryAbsZCm,
+        "geant4eMomentumLimitGeV": geant4eMomentumLimitGeV,
+        "geant4eMaximumStepLengthMm": geant4eMaximumStepLengthMm,
+        "geant4eMaximumPathLengthCm": geant4eMaximumPathLengthCm,
+    }
+    invalid = [name for name, value in positive_values.items() if not value > 0.0]
+    if invalid:
+        raise ValueError("SHIFT LSS transport values must be positive: " + ", ".join(invalid))
+    if fieldElements is not None:
+        if magneticFieldLabel:
+            raise ValueError(
+                "The LSS composite field must use the empty label required by g4SimHits"
+            )
+        if magneticFieldLabel == baseMagneticFieldLabel:
+            raise ValueError("LSS composite and base magnetic-field labels must differ")
+        if not hasattr(process, baseMagneticFieldProducer):
+            raise RuntimeError(
+                "Cannot configure SHIFT LSS field: base EventSetup producer "
+                + baseMagneticFieldProducer
+                + " is absent"
+            )
+        from PhysicsTools.ShiftMuonSegments.shiftLssMagneticField_cfi import shiftLssMagneticField
+
+        getattr(process, baseMagneticFieldProducer).label = cms.untracked.string(baseMagneticFieldLabel)
+        process.shiftLssMagneticField = shiftLssMagneticField.clone(
+            baseFieldLabel=baseMagneticFieldLabel,
+            outputLabel=magneticFieldLabel,
+            addBaseField=addBaseField,
+            sumOverlaps=sumOverlaps,
+            elements=cms.VPSet(*fieldElements),
+        )
+        # g4SimHits consumes the empty-label product. The standard CMS field
+        # has been moved to baseMagneticFieldLabel, leaving the composite as
+        # the single default product consumed below by reconstruction too.
+    process.shiftMuonTable.lssTransport = cms.PSet(
+        magneticFieldLabel=cms.string(magneticFieldLabel),
+        materialBoundaryAbsZCm=cms.double(materialBoundaryAbsZCm),
+        geant4eMomentumLimitGeV=cms.double(geant4eMomentumLimitGeV),
+        geant4eMaximumStepLengthMm=cms.double(geant4eMaximumStepLengthMm),
+        geant4eMaximumPathLengthCm=cms.double(geant4eMaximumPathLengthCm),
+    )
+    return process
