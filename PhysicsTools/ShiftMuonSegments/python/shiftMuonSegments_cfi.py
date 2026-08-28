@@ -92,8 +92,19 @@ shiftMuonTable = cms.EDProducer(
     # guarded precision-only refit. Keep it enabled for the current iteration.
     useImprovedMomentumRefit=cms.bool(True),
     # Use explicitly backward Geant4e transport to recover material losses
-    # between the source-facing fitted state and the CMS material boundary.
+    # between the source-facing fitted state and the configured boundary.
     useDetailedMaterialPropagation=cms.bool(False),
+    # Shared reconstruction-side contract for an extended LSS geometry and
+    # composite magnetic field. Defaults preserve the current CMS-only setup.
+    # An LSS configuration must select the same EventSetup field used by
+    # simulation and extend both the material boundary and Geant4e path limit.
+    lssTransport=cms.PSet(
+        magneticFieldLabel=cms.string(""),
+        materialBoundaryAbsZCm=cms.double(1100.0),
+        geant4eMomentumLimitGeV=cms.double(0.05),
+        geant4eMaximumStepLengthMm=cms.double(2.0),
+        geant4eMaximumPathLengthCm=cms.double(2500.0),
+    ),
     # Keep material updates in the canonical Kalman fit. The material-free
     # v9 control remains available through this switch for focused ablations.
     directionalRefitUseMaterialEffects=cms.bool(True),

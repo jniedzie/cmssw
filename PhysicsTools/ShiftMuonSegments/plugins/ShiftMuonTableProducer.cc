@@ -711,28 +711,28 @@ namespace {
 
   PropagatedState propagateStateToTargetLine(FreeTrajectoryState const& start,
                                              Propagator const& vacuumPropagator,
-                                             Propagator const* materialPropagator = nullptr,
-                                             int sourceSide = 0) {
+                                             Propagator const* materialPropagator,
+                                             int sourceSide,
+                                             double materialBoundaryAbsZCm) {
     auto const position = start.position();
-    // Geant4e uses the detailed CMS detector geometry and material.  Stop its
-    // transport just beyond the last endcap structures, while still inside
-    // the Geant4 world, then continue through the evacuated SHIFT-to-CMS
-    // flight path with the no-material propagator.
-    constexpr double materialBoundaryZ = 1100.;
+    // Geant4e samples the active Geant4 geometry and material up to the
+    // configured boundary. Continue with vacuum transport only beyond that
+    // boundary; an LSS setup can therefore extend detailed transport toward
+    // the target without changing this code.
     FreeTrajectoryState vacuumStart = start;
     double path = 0.;
     bool materialBoundaryValid = false;
     GlobalVector materialBoundaryMomentum;
     double materialPath = 0.;
-    if (materialPropagator && sourceSide != 0 && sourceSide * position.z() < materialBoundaryZ) {
-      auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryZ),
+    if (materialPropagator && sourceSide != 0 && sourceSide * position.z() < materialBoundaryAbsZCm) {
+      auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryAbsZCm),
                                          Surface::RotationType());
       auto const toBoundary = materialPropagator->propagateWithPath(start, *boundary);
       if (!toBoundary.first.isValid() || !toBoundary.first.freeState()) {
         edm::LogWarning("ShiftMuonMaterialPropagation")
-            << "Detailed-material propagation failed before the CMS boundary: position=" << position
+            << "Detailed-material propagation failed before the configured boundary: position=" << position
             << " momentum=" << start.momentum() << " charge=" << start.charge() << " sourceSide=" << sourceSide
-            << " boundaryZ=" << sourceSide * materialBoundaryZ;
+            << " boundaryZ=" << sourceSide * materialBoundaryAbsZCm;
         return {};
       }
       vacuumStart = *toBoundary.first.freeState();
@@ -767,9 +767,10 @@ namespace {
 
   PropagatedState propagateToTargetLine(reco::Track const& track,
                                         Propagator const& vacuumPropagator,
-                                        int travelSign = 0,
-                                        Propagator const* materialPropagator = nullptr,
-                                        int sourceSide = 0) {
+                                        int travelSign,
+                                        Propagator const* materialPropagator,
+                                        int sourceSide,
+                                        double materialBoundaryAbsZCm) {
     // Once the event side is known, start from the fitted endpoint closest in
     // z to the external source.  This avoids beginning the backward transport
     // from a state that has already crossed additional detector material.
@@ -789,7 +790,8 @@ namespace {
     GlobalTrajectoryParameters const parameters(
         original.position(), momentum, sign * original.charge(), vacuumPropagator.magneticField());
     FreeTrajectoryState const physicalState(parameters, original.curvilinearError());
-    return propagateStateToTargetLine(physicalState, vacuumPropagator, materialPropagator, sourceSide);
+    return propagateStateToTargetLine(
+        physicalState, vacuumPropagator, materialPropagator, sourceSide, materialBoundaryAbsZCm);
   }
 
   struct RefitIterationResult {
@@ -987,6 +989,7 @@ namespace {
                                           double maxHitChi2,
                                           double maxRelativeQoverPChange,
                                           bool useSecondIteration,
+                                          double materialBoundaryAbsZCm,
                                           bool precisionHitsOnly = false,
                                           bool usePathOrdering = true,
                                           int hitSideSelection = 0,
@@ -1231,8 +1234,13 @@ namespace {
       PropagatedState materialTargetState;
       PropagatedState vacuumTargetState;
       materialTargetState =
-          propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, &targetMaterialPropagator, sourceSide);
-      vacuumTargetState = propagateStateToTargetLine(upstreamFreeState, vacuumPropagator, nullptr, sourceSide);
+          propagateStateToTargetLine(upstreamFreeState,
+                                     vacuumPropagator,
+                                     &targetMaterialPropagator,
+                                     sourceSide,
+                                     materialBoundaryAbsZCm);
+      vacuumTargetState = propagateStateToTargetLine(
+          upstreamFreeState, vacuumPropagator, nullptr, sourceSide, materialBoundaryAbsZCm);
       if (!materialTargetState.valid) {
         result.status = 17;
         return result;
@@ -1603,7 +1611,9 @@ public:
             parameters.getParameter<edm::InputTag>("stripStereoRecHits"))),
         stripStereoUnmatchedRecHitsToken_(consumes<SiStripRecHit2DCollection>(
             parameters.getParameter<edm::InputTag>("stripStereoUnmatchedRecHits"))),
-        magneticFieldToken_(esConsumes()),
+        magneticFieldToken_(esConsumes(edm::ESInputTag(
+            "", parameters.getParameter<edm::ParameterSet>("lssTransport").getParameter<std::string>(
+                    "magneticFieldLabel")))),
         trackingGeometryToken_(esConsumes()),
         muonRecHitBuilderToken_(esConsumes(edm::ESInputTag(
             "", parameters.getParameter<std::string>("muonRecHitBuilder")))),
@@ -1622,6 +1632,14 @@ public:
         caloMatchMinEnergy_(parameters.getParameter<double>("caloMatchMinEnergy")),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
+        lssMaterialBoundaryAbsZCm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
+                                       .getParameter<double>("materialBoundaryAbsZCm")),
+        lssGeant4eMomentumLimitGeV_(parameters.getParameter<edm::ParameterSet>("lssTransport")
+                                        .getParameter<double>("geant4eMomentumLimitGeV")),
+        lssGeant4eMaximumStepLengthMm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
+                                           .getParameter<double>("geant4eMaximumStepLengthMm")),
+        lssGeant4eMaximumPathLengthCm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
+                                           .getParameter<double>("geant4eMaximumPathLengthCm")),
         directionalRefitUseMaterialEffects_(
             parameters.getParameter<bool>("directionalRefitUseMaterialEffects")),
         directionalRefitUseFirstPrinciplesMaterialEffects_(
@@ -1731,6 +1749,16 @@ public:
     if (directionalRefitUseFirstPrinciplesMaterialEffects_ &&
         (!(directionalRefitFirstPrinciplesStepCm_ > 0.) || !std::isfinite(directionalRefitFirstPrinciplesStepCm_)))
       throw cms::Exception("Configuration") << "directionalRefitFirstPrinciplesStepCm must be finite and positive";
+    if (!(lssMaterialBoundaryAbsZCm_ > 0.) || !std::isfinite(lssMaterialBoundaryAbsZCm_))
+      throw cms::Exception("Configuration") << "lssTransport.materialBoundaryAbsZCm must be finite and positive";
+    if (!(lssGeant4eMomentumLimitGeV_ > 0.) || !std::isfinite(lssGeant4eMomentumLimitGeV_))
+      throw cms::Exception("Configuration") << "lssTransport.geant4eMomentumLimitGeV must be finite and positive";
+    if (!(lssGeant4eMaximumStepLengthMm_ > 0.) || !std::isfinite(lssGeant4eMaximumStepLengthMm_))
+      throw cms::Exception("Configuration")
+          << "lssTransport.geant4eMaximumStepLengthMm must be finite and positive";
+    if (!(lssGeant4eMaximumPathLengthCm_ > 0.) || !std::isfinite(lssGeant4eMaximumPathLengthCm_))
+      throw cms::Exception("Configuration")
+          << "lssTransport.geant4eMaximumPathLengthCm must be finite and positive";
     if (!(directionalRefitSecondSeedErrorRescale_ > 0.) ||
         !std::isfinite(directionalRefitSecondSeedErrorRescale_))
       throw cms::Exception("Configuration")
@@ -1836,7 +1864,12 @@ public:
       // This leg is geometrically behind the incoming muon's momentum, so use
       // an explicit direction instead of Geant4e's ambiguous anyDirection.
       detailedMaterialPropagator =
-          std::make_unique<Geant4ePropagator>(&magneticField, "mu", oppositeToMomentum, 0.05, 2.0, 2500.0);
+          std::make_unique<Geant4ePropagator>(&magneticField,
+                                              "mu",
+                                              oppositeToMomentum,
+                                              lssGeant4eMomentumLimitGeV_,
+                                              lssGeant4eMaximumStepLengthMm_,
+                                              lssGeant4eMaximumPathLengthCm_);
     }
     if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
       preRefitMaterialPropagator = detailedMaterialPropagator.get();
@@ -1896,7 +1929,12 @@ public:
       // smoothing pass.  Supplying an explicitly forward Geant4e prototype
       // thus gives the two Kalman roles physically correct material signs.
       detailedRefitMaterialPropagator =
-          std::make_unique<Geant4ePropagator>(&magneticField, "mu", alongMomentum, 0.05, 2.0, 2500.0);
+          std::make_unique<Geant4ePropagator>(&magneticField,
+                                              "mu",
+                                              alongMomentum,
+                                              lssGeant4eMomentumLimitGeV_,
+                                              lssGeant4eMaximumStepLengthMm_,
+                                              lssGeant4eMaximumPathLengthCm_);
       directionalRefitFitterPropagator = detailedRefitMaterialPropagator.get();
       directionalRefitSmootherPropagator = detailedRefitMaterialPropagator.get();
     } else if (useImprovedMomentumRefit_ && directionalRefitUseMaterialEffects_) {
@@ -1916,7 +1954,7 @@ public:
     TkClonerImpl const hitCloner;
 
     std::vector<Candidate> candidates;
-    auto append = [&candidates, &vacuumPropagator](auto const& handle, int source) {
+    auto append = [&candidates, &vacuumPropagator, this](auto const& handle, int source) {
       if (!handle.isValid())
         return;
       unsigned int index = 0;
@@ -1926,7 +1964,8 @@ public:
         candidate.source = source;
         candidate.sourceIndex = index++;
         candidate.hitFingerprints = hitFingerprints(track);
-        candidate.targetLineState = propagateToTargetLine(track, vacuumPropagator);
+        candidate.targetLineState =
+            propagateToTargetLine(track, vacuumPropagator, 0, nullptr, 0, lssMaterialBoundaryAbsZCm_);
         candidates.push_back(std::move(candidate));
       }
     };
@@ -1979,7 +2018,12 @@ public:
                                     : shiftDirectionSign(candidate.targetLineState.momentum, eventSourceSide);
       candidate.physicalDirectionSign = directionSign;
       auto const preRefitState = propagateToTargetLine(
-          *candidate.track, vacuumPropagator, directionSign, preRefitMaterialPropagator, eventSourceSide);
+          *candidate.track,
+          vacuumPropagator,
+          directionSign,
+          preRefitMaterialPropagator,
+          eventSourceSide,
+          lssMaterialBoundaryAbsZCm_);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
       candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
@@ -2350,6 +2394,7 @@ public:
                                 useImprovedMomentumRefit_ ? directionalRefitMaxHitChi2_ : 100000.,
                                 useImprovedMomentumRefit_ ? directionalRefitMaxRelativeQoverPChange_ : 0.5,
                                 directionalRefitUseSecondIteration_,
+                                lssMaterialBoundaryAbsZCm_,
                                 precisionHitsOnly,
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
@@ -3119,7 +3164,12 @@ public:
       PropagatedState combinedTarget;
       if (hasCombined)
         combinedTarget = propagateToTargetLine(
-            *matchedLink->globalTrack(), vacuumPropagator, sign, preRefitMaterialPropagator, eventSourceSide);
+            *matchedLink->globalTrack(),
+            vacuumPropagator,
+            sign,
+            preRefitMaterialPropagator,
+            eventSourceSide,
+            lssMaterialBoundaryAbsZCm_);
       combinedTargetPt.push_back(combinedTarget.valid ? combinedTarget.momentum.perp() : 0.);
       combinedTargetPz.push_back(combinedTarget.valid ? combinedTarget.momentum.z() : 0.);
       combinedTargetDca.push_back(combinedTarget.valid ? combinedTarget.position.perp() : -1.);
@@ -3581,16 +3631,16 @@ public:
                             "selected material-aware target pT minus vacuum-only target pT");
     table->addColumn<int>("directionalRefitMaterialBoundaryValid",
                           directionalRefitMaterialBoundaryValid,
-                          "1 when detailed Geant4e propagation reached the outer CMS boundary");
+                          "1 when detailed Geant4e propagation reached the configured material boundary");
     table->addColumn<float>("directionalRefitMaterialBoundaryPt",
                             directionalRefitMaterialBoundaryPt,
-                            "pT at the outer CMS boundary after detailed Geant4e back-propagation");
+                            "pT at the configured material boundary after detailed Geant4e back-propagation");
     table->addColumn<float>("directionalRefitMaterialBoundaryPz",
                             directionalRefitMaterialBoundaryPz,
-                            "pz at the outer CMS boundary after detailed Geant4e back-propagation");
+                            "pz at the configured material boundary after detailed Geant4e back-propagation");
     table->addColumn<float>("directionalRefitMaterialPath",
                             directionalRefitMaterialPath,
-                            "signed Geant4e path length from the source-facing refit state to the CMS boundary");
+                            "signed Geant4e path length from the source-facing refit state to the configured boundary");
     table->addColumn<int>("nDTRefitHits", nDTRefitHits, "valid DT inputs available to the directional refit");
     table->addColumn<int>("nCompatibleDTSegments", nCompatibleDTSegments, "unassigned DT segments geometrically compatible with this ShiftMuon");
     table->addColumn<int>("nCompatiblePixelHits", nCompatiblePixelHits, "pixel rechits geometrically compatible with this ShiftMuon");
@@ -4368,6 +4418,13 @@ public:
     description.add<double>("caloMatchMinEnergy", 0.01);
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
+    edm::ParameterSetDescription lssTransportDescription;
+    lssTransportDescription.add<std::string>("magneticFieldLabel", "");
+    lssTransportDescription.add<double>("materialBoundaryAbsZCm", 1100.0);
+    lssTransportDescription.add<double>("geant4eMomentumLimitGeV", 0.05);
+    lssTransportDescription.add<double>("geant4eMaximumStepLengthMm", 2.0);
+    lssTransportDescription.add<double>("geant4eMaximumPathLengthCm", 2500.0);
+    description.add<edm::ParameterSetDescription>("lssTransport", lssTransportDescription);
     description.add<bool>("directionalRefitUseMaterialEffects", false);
     description.add<bool>("directionalRefitUseFirstPrinciplesMaterialEffects", false);
     description.add<double>("directionalRefitFirstPrinciplesStepCm", 0.2);
@@ -4480,6 +4537,10 @@ private:
   double caloMatchMinEnergy_;
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
+  double lssMaterialBoundaryAbsZCm_;
+  double lssGeant4eMomentumLimitGeV_;
+  double lssGeant4eMaximumStepLengthMm_;
+  double lssGeant4eMaximumPathLengthCm_;
   bool directionalRefitUseMaterialEffects_;
   bool directionalRefitUseFirstPrinciplesMaterialEffects_;
   double directionalRefitFirstPrinciplesStepCm_;
