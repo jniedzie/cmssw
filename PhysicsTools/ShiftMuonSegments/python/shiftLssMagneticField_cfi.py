@@ -22,6 +22,11 @@ def shiftLssUniformFieldElement(
     fieldTesla,
     originCm=(0.0, 0.0, 0.0),
     localToGlobal=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+    boundsShape="box",
+    boundsCenterCm=(0.0, 0.0, 0.0),
+    innerRadiusCm=0.0,
+    outerRadiusCm=0.0,
+    excludedCylindersCm=(),
 ):
     return cms.PSet(
         name=cms.string(name),
@@ -29,9 +34,16 @@ def shiftLssUniformFieldElement(
         minimumCm=cms.vdouble(*minimumCm),
         maximumCm=cms.vdouble(*maximumCm),
         originCm=cms.vdouble(*originCm),
+        boundsShape=cms.string(boundsShape),
+        boundsCenterCm=cms.vdouble(*boundsCenterCm),
+        innerRadiusCm=cms.double(innerRadiusCm),
+        outerRadiusCm=cms.double(outerRadiusCm),
+        excludedCylindersCm=cms.vdouble(*excludedCylindersCm),
         localToGlobal=cms.vdouble(*localToGlobal),
         fieldTesla=cms.vdouble(*fieldTesla),
         gradientTeslaPerCm=cms.double(0.0),
+        mapFile=cms.string(""),
+        fieldScaleTesla=cms.double(1.0),
     )
 
 
@@ -42,6 +54,11 @@ def shiftLssQuadrupoleFieldElement(
     gradientTeslaPerCm,
     originCm=(0.0, 0.0, 0.0),
     localToGlobal=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+    boundsShape="box",
+    boundsCenterCm=(0.0, 0.0, 0.0),
+    innerRadiusCm=0.0,
+    outerRadiusCm=0.0,
+    excludedCylindersCm=(),
 ):
     return cms.PSet(
         name=cms.string(name),
@@ -49,7 +66,47 @@ def shiftLssQuadrupoleFieldElement(
         minimumCm=cms.vdouble(*minimumCm),
         maximumCm=cms.vdouble(*maximumCm),
         originCm=cms.vdouble(*originCm),
+        boundsShape=cms.string(boundsShape),
+        boundsCenterCm=cms.vdouble(*boundsCenterCm),
+        innerRadiusCm=cms.double(innerRadiusCm),
+        outerRadiusCm=cms.double(outerRadiusCm),
+        excludedCylindersCm=cms.vdouble(*excludedCylindersCm),
         localToGlobal=cms.vdouble(*localToGlobal),
         fieldTesla=cms.vdouble(0.0, 0.0, 0.0),
         gradientTeslaPerCm=cms.double(gradientTeslaPerCm),
+        mapFile=cms.string(""),
+        fieldScaleTesla=cms.double(1.0),
+    )
+
+
+def shiftLssFlukaMap2DFieldElement(
+    name,
+    minimumCm,
+    maximumCm,
+    mapFile,
+    fieldScaleTesla,
+    originCm=(0.0, 0.0, 0.0),
+    localToGlobal=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+    boundsShape="box",
+    boundsCenterCm=(0.0, 0.0, 0.0),
+    innerRadiusCm=0.0,
+    outerRadiusCm=0.0,
+    excludedCylindersCm=(),
+):
+    return cms.PSet(
+        name=cms.string(name),
+        type=cms.string("flukaMap2D"),
+        minimumCm=cms.vdouble(*minimumCm),
+        maximumCm=cms.vdouble(*maximumCm),
+        originCm=cms.vdouble(*originCm),
+        boundsShape=cms.string(boundsShape),
+        boundsCenterCm=cms.vdouble(*boundsCenterCm),
+        innerRadiusCm=cms.double(innerRadiusCm),
+        outerRadiusCm=cms.double(outerRadiusCm),
+        excludedCylindersCm=cms.vdouble(*excludedCylindersCm),
+        localToGlobal=cms.vdouble(*localToGlobal),
+        fieldTesla=cms.vdouble(0.0, 0.0, 0.0),
+        gradientTeslaPerCm=cms.double(0.0),
+        mapFile=cms.string(mapFile),
+        fieldScaleTesla=cms.double(fieldScaleTesla),
     )

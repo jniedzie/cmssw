@@ -833,7 +833,8 @@ namespace {
                                                int sourceSide,
                                                Propagator const& vacuumPropagator,
                                                Propagator const& materialPropagator,
-                                               TargetConstraint const& constraint) {
+                                               TargetConstraint const& constraint,
+                                               double materialBoundaryAbsZCm) {
     TargetConstraintResult result;
     if (!upstream.isValid() || !upstream.freeState()) {
       result.status = -1;
@@ -841,9 +842,9 @@ namespace {
     }
 
     FreeTrajectoryState transported = *upstream.freeState();
-    constexpr double materialBoundaryZ = 1100.;
-    if (sourceSide != 0 && sourceSide * transported.position().z() < materialBoundaryZ) {
-      auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryZ), Surface::RotationType());
+    if (sourceSide != 0 && sourceSide * transported.position().z() < materialBoundaryAbsZCm) {
+      auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryAbsZCm),
+                                         Surface::RotationType());
       auto const toBoundary = materialPropagator.propagate(transported, *boundary);
       if (!toBoundary.isValid() || !toBoundary.freeState()) {
         result.status = -2;
@@ -2470,7 +2471,8 @@ public:
                                                        eventSourceSide,
                                                        vacuumPropagator,
                                                        *sourceFacingTargetMaterialPropagator,
-                                                       constraint);
+                                                       constraint,
+                                                       lssMaterialBoundaryAbsZCm_);
         candidate.constrainedStatus = constrained.status;
         if (constrained.valid) {
           candidate.constrainedValid = true;
