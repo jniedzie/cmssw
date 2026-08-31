@@ -1,0 +1,13 @@
+<use name="CondFormats/Common"/>
+<use name="DetectorDescription/DDCMS"/>
+<use name="FWCore/Concurrency"/>
+<use name="FWCore/Framework"/>
+<use name="FWCore/MessageLogger"/>
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/Utilities"/>
+<use name="Geometry/Records"/>
+<use name="dd4hep"/>
+<use name="rootgeom"/>
+<library file="*.cc" name="PhysicsToolsShiftLssGeometryPlugins">
+  <flags EDM_PLUGIN="1"/>
+</library>

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<gdml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="http://cern.ch/service-spi/app/releases/GDML/schema/gdml.xsd">
+  <materials>
+    <material name="G4_Galactic" Z="1">
+      <D value="1e-25" unit="g/cm3"/>
+      <atom value="1.00794" unit="g/mole"/>
+    </material>
+  </materials>
+  <solids>
+    <box name="bounded_external_box" x="100" y="100" z="100" lunit="mm"/>
+  </solids>
+  <structure>
+    <volume name="bounded_external_volume">
+      <materialref ref="G4_Galactic"/>
+      <solidref ref="bounded_external_box"/>
+    </volume>
+  </structure>
+  <setup name="Default" version="1.0">
+    <world ref="bounded_external_volume"/>
+  </setup>
+</gdml>
