@@ -15,7 +15,11 @@ from PhysicsTools.ShiftMuonSegments.shiftLssIr1AtlasProxy_cff import (
     shiftLssIr1AtlasProxyFieldElements,
 )
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonTable
-from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_customise import customiseShiftLssTransport
+from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cff import addShiftMuonSegments
+from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_customise import (
+    customiseShiftLssMagneticField,
+    customiseShiftLssTransport,
+)
 
 
 class ShiftLssConfigurationTest(unittest.TestCase):
@@ -53,6 +57,30 @@ class ShiftLssConfigurationTest(unittest.TestCase):
         self.assertEqual(len(process.shiftLssMagneticField.elements), 2)
         self.assertEqual(process.baseField.label.value(), "shiftLssBaseMagneticField")
         self.assertEqual(process.shiftLssMagneticField.outputLabel.value(), "")
+        self.assertEqual(process.shiftLssFieldContract.elementCount.value(), 2)
+
+    def test_simulation_field_does_not_require_reconstruction_table(self):
+        process = self.process()
+        del process.shiftMuonTable
+        elements = [
+            shiftLssUniformFieldElement(
+                "dipole", (-10.0, -10.0, -100.0), (10.0, 10.0, 100.0), (0.0, 1.2, 0.0)
+            )
+        ]
+        customiseShiftLssMagneticField(
+            process,
+            baseMagneticFieldProducer="baseField",
+            fieldElements=elements,
+        )
+        self.assertEqual(len(process.shiftLssMagneticField.elements), 1)
+        self.assertFalse(hasattr(process, "shiftMuonTable"))
+
+    def test_detailed_target_material_is_selected_before_sequence_construction(self):
+        process = cms.Process("TEST")
+        process.nanoAOD_step = cms.Path()
+        addShiftMuonSegments(process, useDetailedMaterialPropagation=True)
+        self.assertTrue(process.shiftMuonTable.useDetailedMaterialPropagation.value())
+        self.assertTrue(hasattr(process, "shiftMuonGeant4Geometry"))
 
     def test_fluka_map_element_keeps_all_runtime_inputs(self):
         element = shiftLssFlukaMap2DFieldElement(
@@ -74,6 +102,12 @@ class ShiftLssConfigurationTest(unittest.TestCase):
             customiseShiftLssTransport(
                 process,
                 magneticFieldLabel="namedComposite",
+                baseMagneticFieldProducer="baseField",
+                fieldElements=[],
+            )
+        with self.assertRaises(ValueError):
+            customiseShiftLssMagneticField(
+                process,
                 baseMagneticFieldProducer="baseField",
                 fieldElements=[],
             )

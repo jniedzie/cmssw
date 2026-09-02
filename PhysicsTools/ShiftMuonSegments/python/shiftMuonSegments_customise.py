@@ -16,9 +16,11 @@ def customise(
     augmentDTHits=True,
     augmentTrackerHits=False,
     useExtendedTiming=False,
+    useDetailedMaterialPropagation=None,
 ):
     process = addShiftMuonSegments(
         process,
+        useDetailedMaterialPropagation=useDetailedMaterialPropagation,
         directionalRefitUseDetailedMaterialEffects=directionalRefitUseDetailedMaterialEffects,
         directionalRefitUseGeometryMaterialEffects=directionalRefitUseGeometryMaterialEffects,
         directionalRefitUseGeometryMaterialEffectsInFitter=directionalRefitUseGeometryMaterialEffectsInFitter,
@@ -438,6 +440,53 @@ def customiseRecoForShiftMuons(
     return process
 
 
+def customiseShiftLssMagneticField(
+    process,
+    *,
+    magneticFieldLabel="",
+    baseMagneticFieldLabel="shiftLssBaseMagneticField",
+    baseMagneticFieldProducer="VolumeBasedMagneticFieldESProducer",
+    fieldElements,
+    addBaseField=False,
+    sumOverlaps=False,
+):
+    """Publish one fail-closed LSS/CMS field for simulation or reconstruction."""
+    if magneticFieldLabel:
+        raise ValueError(
+            "The LSS composite field must use the empty label required by g4SimHits"
+        )
+    if magneticFieldLabel == baseMagneticFieldLabel:
+        raise ValueError("LSS composite and base magnetic-field labels must differ")
+    if not fieldElements:
+        raise ValueError("The LSS composite field requires at least one field element")
+    if not hasattr(process, baseMagneticFieldProducer):
+        raise RuntimeError(
+            "Cannot configure SHIFT LSS field: base EventSetup producer "
+            + baseMagneticFieldProducer
+            + " is absent"
+        )
+    if hasattr(process, "shiftLssMagneticField"):
+        raise RuntimeError("SHIFT LSS magnetic field is already configured")
+    from PhysicsTools.ShiftMuonSegments.shiftLssMagneticField_cfi import shiftLssMagneticField
+
+    getattr(process, baseMagneticFieldProducer).label = cms.untracked.string(baseMagneticFieldLabel)
+    process.shiftLssMagneticField = shiftLssMagneticField.clone(
+        baseFieldLabel=baseMagneticFieldLabel,
+        outputLabel=magneticFieldLabel,
+        addBaseField=addBaseField,
+        sumOverlaps=sumOverlaps,
+        elements=cms.VPSet(*fieldElements),
+    )
+    process.shiftLssFieldContract = cms.PSet(
+        compositeFieldLabel=cms.string(magneticFieldLabel),
+        baseFieldLabel=cms.string(baseMagneticFieldLabel),
+        addBaseField=cms.bool(addBaseField),
+        sumOverlaps=cms.bool(sumOverlaps),
+        elementCount=cms.uint32(len(fieldElements)),
+    )
+    return process
+
+
 def customiseShiftLssTransport(
     process,
     *,
@@ -465,27 +514,14 @@ def customiseShiftLssTransport(
     if invalid:
         raise ValueError("SHIFT LSS transport values must be positive: " + ", ".join(invalid))
     if fieldElements is not None:
-        if magneticFieldLabel:
-            raise ValueError(
-                "The LSS composite field must use the empty label required by g4SimHits"
-            )
-        if magneticFieldLabel == baseMagneticFieldLabel:
-            raise ValueError("LSS composite and base magnetic-field labels must differ")
-        if not hasattr(process, baseMagneticFieldProducer):
-            raise RuntimeError(
-                "Cannot configure SHIFT LSS field: base EventSetup producer "
-                + baseMagneticFieldProducer
-                + " is absent"
-            )
-        from PhysicsTools.ShiftMuonSegments.shiftLssMagneticField_cfi import shiftLssMagneticField
-
-        getattr(process, baseMagneticFieldProducer).label = cms.untracked.string(baseMagneticFieldLabel)
-        process.shiftLssMagneticField = shiftLssMagneticField.clone(
-            baseFieldLabel=baseMagneticFieldLabel,
-            outputLabel=magneticFieldLabel,
+        process = customiseShiftLssMagneticField(
+            process,
+            magneticFieldLabel=magneticFieldLabel,
+            baseMagneticFieldLabel=baseMagneticFieldLabel,
+            baseMagneticFieldProducer=baseMagneticFieldProducer,
+            fieldElements=fieldElements,
             addBaseField=addBaseField,
             sumOverlaps=sumOverlaps,
-            elements=cms.VPSet(*fieldElements),
         )
         # g4SimHits consumes the empty-label product. The standard CMS field
         # has been moved to baseMagneticFieldLabel, leaving the composite as
