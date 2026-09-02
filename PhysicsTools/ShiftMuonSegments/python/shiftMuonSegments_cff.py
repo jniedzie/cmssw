@@ -15,6 +15,7 @@ def addShiftMuonSegments(
     augmentDTHits=True,
     augmentTrackerHits=False,
     useExtendedTiming=False,
+    useDetailedMaterialPropagation=None,
 ):
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.load("RecoTracker.TransientTrackingRecHit.TransientTrackingRecHitBuilder_cfi")
@@ -29,6 +30,10 @@ def addShiftMuonSegments(
     process.shiftMuonTable.augmentDTHits = cms.bool(augmentDTHits)
     process.shiftMuonTable.augmentTrackerHits = cms.bool(augmentTrackerHits)
     process.shiftMuonTable.useExtendedTiming = cms.bool(useExtendedTiming)
+    if useDetailedMaterialPropagation is not None:
+        process.shiftMuonTable.useDetailedMaterialPropagation = cms.bool(
+            useDetailedMaterialPropagation
+        )
     if directionalRefitUseDetailedMaterialEffects is not None:
         process.shiftMuonTable.directionalRefitUseDetailedMaterialEffects = cms.bool(
             directionalRefitUseDetailedMaterialEffects
