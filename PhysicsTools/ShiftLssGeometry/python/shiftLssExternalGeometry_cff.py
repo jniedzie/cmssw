@@ -5,6 +5,7 @@ def customiseShiftLssExternalGeometry(
     process,
     *,
     gdmlFile,
+    artifactOriginInModelCm,
     modelOriginCm,
     modelToCms,
     minimumAbsZCm,
@@ -20,8 +21,10 @@ def customiseShiftLssExternalGeometry(
         )
     if hasattr(process, "shiftLssGeometryESSource"):
         raise RuntimeError("SHIFT LSS external geometry is already configured")
-    if len(modelOriginCm) != 3 or len(modelToCms) != 9:
-        raise ValueError("modelOriginCm and modelToCms require 3 and 9 values")
+    if len(artifactOriginInModelCm) != 3 or len(modelOriginCm) != 3 or len(modelToCms) != 9:
+        raise ValueError(
+            "artifactOriginInModelCm, modelOriginCm, and modelToCms require 3, 3, and 9 values"
+        )
     if minimumAbsZCm <= 0.0 or overlapToleranceCm <= 0.0:
         raise ValueError("minimumAbsZCm and overlapToleranceCm must be positive")
 
@@ -38,6 +41,7 @@ def customiseShiftLssExternalGeometry(
         gdmlFile=cms.FileInPath(gdmlFile),
         geometryLabel=cms.string(geometryLabel),
         detectorElementName=cms.string(detectorElementName),
+        artifactOriginInModelCm=cms.vdouble(*artifactOriginInModelCm),
         modelOriginCm=cms.vdouble(*modelOriginCm),
         modelToCms=cms.vdouble(*modelToCms),
         minimumAbsZCm=cms.double(minimumAbsZCm),
@@ -50,6 +54,9 @@ def customiseShiftLssExternalGeometry(
         externalExtensionOnly=cms.bool(True),
         geometryConditionsLabel=cms.string(geometryLabel),
         gdmlFile=cms.string(gdmlFile),
+        artifactOriginInModelCm=cms.vdouble(*artifactOriginInModelCm),
+        modelOriginCm=cms.vdouble(*modelOriginCm),
+        modelToCms=cms.vdouble(*modelToCms),
         minimumAbsZCm=cms.double(minimumAbsZCm),
     )
     return process

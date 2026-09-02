@@ -172,7 +172,7 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
     const int absPdg = std::abs(theTrack->GetParticleDefinition()->GetPDGEncoding());
     const bool insideDeadRegion = isInsideDeadRegion(theRegion);
     const bool forZDC = isForZDC(lv, absPdg);
-    const bool forSHIFT = isForSHIFT(lv, theTrack);
+    const bool forSHIFT = isForSHIFT(theRegion, theTrack);
 
     // Kill in dead regions, except particles allowed through the shared
     // CMS<->ZDC/SHIFT transport corridor.

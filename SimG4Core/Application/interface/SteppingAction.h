@@ -32,7 +32,7 @@ private:
   inline bool isInsideDeadRegion(const G4Region* reg) const;
   inline bool isOutOfTimeWindow(const G4Region* reg, const double& time) const;
   inline bool isForZDC(const G4LogicalVolume* lv, int pdg) const;
-  inline bool isForSHIFT(const G4LogicalVolume* lv, const G4Track* track) const;
+  inline bool isForSHIFT(const G4Region* reg, const G4Track* track) const;
 
   bool isLowEnergy(const G4LogicalVolume*, const G4Track*) const;
   void PrintKilledTrack(const G4Track*, const TrackStatus&) const;
@@ -98,8 +98,8 @@ inline bool SteppingAction::isForZDC(const G4LogicalVolume* lv, int pdg) const {
   return (m_CMStoZDCtransport && lv == m_CMStoZDC && (pdg == 22 || pdg == 2112));
 }
 
-inline bool SteppingAction::isForSHIFT(const G4LogicalVolume* lv, const G4Track* track) const {
-  return (m_CMStoZDCtransport && lv == m_CMStoZDC &&
+inline bool SteppingAction::isForSHIFT(const G4Region* reg, const G4Track* track) const {
+  return (m_CMStoZDCtransport && isInsideDeadRegion(reg) &&
           std::abs(track->GetDefinition()->GetPDGEncoding()) == 13 && track->GetParentID() == 0 &&
           track->GetVertexPosition().z() * track->GetMomentumDirection().z() < 0.0);
 }

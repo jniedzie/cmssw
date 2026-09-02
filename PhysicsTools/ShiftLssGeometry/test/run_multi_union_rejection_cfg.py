@@ -16,6 +16,7 @@ process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(1))
 customiseShiftLssExternalGeometry(
     process,
     gdmlFile="PhysicsTools/ShiftLssGeometry/test/fixtures/multi_union_external.gdml",
+    artifactOriginInModelCm=(0.0, 0.0, 0.0),
     modelOriginCm=(0.0, 0.0, 3000.0),
     modelToCms=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     minimumAbsZCm=2750.0,
