@@ -39,9 +39,10 @@ cmsRun PhysicsTools/ShiftLssGeometry/test/run_multi_union_rejection_cfg.py
 The last two commands must fail with `UnsupportedGeometry`.
 
 The frozen IR1/ATLAS proxy is not a Run-3 IR5 model. The audited converter can
-now produce a self-contained, ROOT-compatible full diagnostic GDML, and that
-artifact has passed a parser-only CMSSW/DD4hep import while placed artificially
-far from CMS. It remains unbounded, has no authoritative IR1-to-IR5/CMS
-transform, and does not implement the FLUKA magnetic fields. It must therefore
+now produce a self-contained, ROOT-compatible bounded GDML that passes its
+standalone ROOT overlap, extrusion, gap, and source-containment gates. Full
+CMSSW/DD4hep attachment, protected-region, and overlap checks pass at an
+artificial +1 km placement. The proxy still has no authoritative IR1-to-IR5/CMS
+transform and does not implement the FLUKA magnetic fields. It must therefore
 not be enabled for detector simulation or reconstruction. The bounded fixture
 is for software validation only, not physics.

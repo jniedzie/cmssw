@@ -25,7 +25,6 @@
 #include "FWCore/Utilities/interface/FileInPath.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
 #include "TGeoManager.h"
-#include "TGeoMatrix.h"
 #include "TGeoShape.h"
 #include "TGeoVolume.h"
 #include "TObjArray.h"
@@ -207,12 +206,11 @@ private:
 
     dd4hep::Volume mother = description->worldVolume();
     mother.ptr()->RemoveNode(oldPlacement.ptr());
-    auto* transform = new TGeoHMatrix("shiftLssModelToCms");
-    transform->SetRotation(rotation_.data());
-    transform->SetTranslation(translation.data());
-    manager.AddTransformation(transform);
-    TGeoNode* placed = mother.ptr()->AddNode(importedVolume.ptr(), 1, transform);
-    child.setPlacement(dd4hep::PlacedVolume(placed));
+    dd4hep::Rotation3D modelRotation(rotation_.begin(), rotation_.end());
+    dd4hep::Transform3D modelTransform(
+        modelRotation, dd4hep::Position(translation[0], translation[1], translation[2]));
+    dd4hep::PlacedVolume placed = mother.placeVolume(importedVolume, 1, modelTransform);
+    child.setPlacement(placed);
 
     if (cmsWorld->GetNdaughters() != baselineWorldDaughters + 1) {
       throw cms::Exception("GeometryVerification")
