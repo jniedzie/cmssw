@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "status": "provisional-ir1-atlas-proxy-software-regression-only",
+  "gdml": "lhc_ir1_atlas_proxy_bounded.gdml",
+  "gdml_sha256": "c749bb96434552ceb2ed959a866d1ac4d5c08e5342ff315bacdf8ab251c25392",
+  "source_deck_sha256": "958f1d2b36302c52f730aed4a2bc9fe4941d5c5582c0756cdae25b0e7cbebe13",
+  "field_routine_sha256": "0b0bfb8b57b726dcfc463054f6e27200705f80707dff2028fd0af4322f8d6bfa",
+  "conversion_report_sha256": "3fc0c6f33f33742adb1582a9dbe264e10f35185b6c666ba86a4e2357dff11c3f",
+  "artifact_origin_in_model_cm": [0.0, 4299.5, 14575.200000105498],
+  "model_bounds_cm": [
+    [-2400.0, -1400.0, 2260.0],
+    [2400.0, 9999.0, 26890.400000210997]
+  ],
+  "root_placement_count": 2763,
+  "root_overlap_count_at_0p01_mm": 0,
+  "internal_world_gap_count": 0,
+  "source_model": "legacy LineBuilder revision 432/FEDB1566 IR1 ATLAS Beam 2 at 6.5 TeV",
+  "limitations": [
+    "Not an IR5 or CMS model and not authoritative for Run 3.",
+    "No approved IR1-to-IR5 transverse orientation or CMS magnet polarity.",
+    "May be used only for converter and explicitly labelled model-frame software closure."
+  ]
+}

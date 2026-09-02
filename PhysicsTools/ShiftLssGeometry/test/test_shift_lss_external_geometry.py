@@ -24,6 +24,7 @@ class ShiftLssExternalGeometryTest(unittest.TestCase):
         customiseShiftLssExternalGeometry(
             process,
             gdmlFile="PhysicsTools/ShiftLssGeometry/test/fixtures/bounded_external.gdml",
+            artifactOriginInModelCm=(0.0, 0.0, 0.0),
             modelOriginCm=(0.0, 0.0, 3000.0),
             modelToCms=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
             minimumAbsZCm=2750.0,
@@ -41,6 +42,7 @@ class ShiftLssExternalGeometryTest(unittest.TestCase):
             customiseShiftLssExternalGeometry(
                 process,
                 gdmlFile="missing.gdml",
+                artifactOriginInModelCm=(0.0, 0.0, 0.0),
                 modelOriginCm=(0.0, 0.0, 3000.0),
                 modelToCms=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
                 minimumAbsZCm=2750.0,
@@ -48,10 +50,11 @@ class ShiftLssExternalGeometryTest(unittest.TestCase):
 
     def test_rejects_incomplete_coordinate_contract(self):
         process = self.process()
-        with self.assertRaisesRegex(ValueError, "require 3 and 9"):
+        with self.assertRaisesRegex(ValueError, "require 3, 3, and 9"):
             customiseShiftLssExternalGeometry(
                 process,
                 gdmlFile="missing.gdml",
+                artifactOriginInModelCm=(0.0, 0.0, 0.0),
                 modelOriginCm=(0.0, 0.0),
                 modelToCms=(1.0,) * 9,
                 minimumAbsZCm=2750.0,

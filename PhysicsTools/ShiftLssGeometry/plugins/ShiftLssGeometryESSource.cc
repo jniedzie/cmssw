@@ -122,13 +122,14 @@ public:
       : gdmlFile_(parameters.getParameter<edm::FileInPath>("gdmlFile").fullPath()),
         geometryLabel_(parameters.getParameter<std::string>("geometryLabel")),
         detectorElementName_(parameters.getParameter<std::string>("detectorElementName")),
-        translationCm_(parameters.getParameter<std::vector<double>>("modelOriginCm")),
+        artifactOriginInModelCm_(parameters.getParameter<std::vector<double>>("artifactOriginInModelCm")),
+        modelOriginCm_(parameters.getParameter<std::vector<double>>("modelOriginCm")),
         rotation_(checkedRotation(parameters.getParameter<std::vector<double>>("modelToCms"))),
         minimumAbsZCm_(parameters.getParameter<double>("minimumAbsZCm")),
         overlapToleranceCm_(parameters.getParameter<double>("overlapToleranceCm")),
         checkOverlaps_(parameters.getParameter<bool>("checkOverlaps")) {
-    if (translationCm_.size() != 3) {
-      throw cms::Exception("Configuration") << "modelOriginCm must contain three values";
+    if (artifactOriginInModelCm_.size() != 3 || modelOriginCm_.size() != 3) {
+      throw cms::Exception("Configuration") << "artifactOriginInModelCm and modelOriginCm must contain three values";
     }
     if (!(minimumAbsZCm_ > 0.0) || !(overlapToleranceCm_ > 0.0)) {
       throw cms::Exception("Configuration") << "minimumAbsZCm and overlapToleranceCm must be positive";
@@ -147,6 +148,7 @@ public:
     description.add<edm::FileInPath>("gdmlFile");
     description.add<std::string>("geometryLabel", "Extended");
     description.add<std::string>("detectorElementName", "shiftLssExternal");
+    description.add<std::vector<double>>("artifactOriginInModelCm");
     description.add<std::vector<double>>("modelOriginCm");
     description.add<std::vector<double>>("modelToCms");
     description.add<double>("minimumAbsZCm");
@@ -191,11 +193,17 @@ private:
     }
     dd4hep::PlacedVolume oldPlacement = child.placement();
     dd4hep::Volume importedVolume = oldPlacement.volume();
-    std::array<double, 3> translation = {
-        translationCm_[0] * dd4hep::cm,
-        translationCm_[1] * dd4hep::cm,
-        translationCm_[2] * dd4hep::cm,
-    };
+    // The bounded converter recentres the source model around an artifact
+    // origin.  Place that artifact origin at the transformed source-model
+    // coordinate; fields use the same modelOrigin + R * modelPoint contract.
+    std::array<double, 3> translation;
+    for (unsigned int row = 0; row < 3; ++row) {
+      translation[row] = modelOriginCm_[row];
+      for (unsigned int column = 0; column < 3; ++column) {
+        translation[row] += rotation_[3 * row + column] * artifactOriginInModelCm_[column];
+      }
+      translation[row] *= dd4hep::cm;
+    }
     auto const bounds = transformedBounds(importedVolume, rotation_, translation);
     double const boundary = minimumAbsZCm_ * dd4hep::cm;
     if (!(bounds[4] >= boundary || bounds[5] <= -boundary)) {
@@ -249,7 +257,8 @@ private:
   std::string gdmlFile_;
   std::string geometryLabel_;
   std::string detectorElementName_;
-  std::vector<double> translationCm_;
+  std::vector<double> artifactOriginInModelCm_;
+  std::vector<double> modelOriginCm_;
   std::array<double, 9> rotation_;
   double minimumAbsZCm_;
   double overlapToleranceCm_;
