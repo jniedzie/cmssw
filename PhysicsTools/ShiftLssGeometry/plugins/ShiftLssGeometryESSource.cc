@@ -25,6 +25,7 @@
 #include "FWCore/Utilities/interface/FileInPath.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
 #include "TGeoManager.h"
+#include "TGeoMatrix.h"
 #include "TGeoShape.h"
 #include "TGeoVolume.h"
 #include "TObjArray.h"
@@ -114,6 +115,25 @@ namespace {
     }
     return bounds;
   }
+
+  TGeoVolume* findUniqueVolume(TGeoManager const& manager, std::string const& name) {
+    TGeoVolume* result = nullptr;
+    TObjArray const* volumes = manager.GetListOfVolumes();
+    for (int index = 0; index < volumes->GetEntriesFast(); ++index) {
+      auto* volume = dynamic_cast<TGeoVolume*>(volumes->UncheckedAt(index));
+      if (!volume || name != volume->GetName()) {
+        continue;
+      }
+      if (result && result != volume) {
+        throw cms::Exception("GeometryVerification") << "CMS geometry contains multiple volumes named " << name;
+      }
+      result = volume;
+    }
+    if (!result) {
+      throw cms::Exception("GeometryVerification") << "CMS geometry has no volume named " << name;
+    }
+    return result;
+  }
 }  // namespace
 
 class ShiftLssGeometryESSource : public edm::ESProducer, public edm::EventSetupRecordIntervalFinder {
@@ -122,6 +142,7 @@ public:
       : gdmlFile_(parameters.getParameter<edm::FileInPath>("gdmlFile").fullPath()),
         geometryLabel_(parameters.getParameter<std::string>("geometryLabel")),
         detectorElementName_(parameters.getParameter<std::string>("detectorElementName")),
+        externalMotherVolumeName_(parameters.getParameter<std::string>("externalMotherVolumeName")),
         artifactOriginInModelCm_(parameters.getParameter<std::vector<double>>("artifactOriginInModelCm")),
         modelOriginCm_(parameters.getParameter<std::vector<double>>("modelOriginCm")),
         rotation_(checkedRotation(parameters.getParameter<std::vector<double>>("modelToCms"))),
@@ -137,6 +158,9 @@ public:
     if (detectorElementName_.empty() || detectorElementName_ == "world") {
       throw cms::Exception("Configuration") << "detectorElementName must be a non-world child name";
     }
+    if (externalMotherVolumeName_.empty()) {
+      throw cms::Exception("Configuration") << "externalMotherVolumeName must not be empty";
+    }
     usesResources({edm::ESSharedResourceNames::kDD4hep});
     auto collector = setWhatProduced(this, &ShiftLssGeometryESSource::produce);
     geometryToken_ = collector.consumes(edm::ESInputTag("", geometryLabel_));
@@ -148,6 +172,7 @@ public:
     description.add<edm::FileInPath>("gdmlFile");
     description.add<std::string>("geometryLabel", "Extended");
     description.add<std::string>("detectorElementName", "shiftLssExternal");
+    description.add<std::string>("externalMotherVolumeName", "cms:CMSE");
     description.add<std::vector<double>>("artifactOriginInModelCm");
     description.add<std::vector<double>>("modelOriginCm");
     description.add<std::vector<double>>("modelToCms");
@@ -169,7 +194,9 @@ private:
     TGeoManager& manager = const_cast<TGeoManager&>(detector->manager());
     GlobalGeoManagerGuard managerGuard(&manager);
     TGeoVolume* cmsWorld = detector->worldVolume().ptr();
+    TGeoVolume* externalMother = findUniqueVolume(manager, externalMotherVolumeName_);
     int const baselineWorldDaughters = cmsWorld->GetNdaughters();
+    int const baselineMotherDaughters = externalMother->GetNdaughters();
     if (baselineWorldDaughters < 1) {
       throw cms::Exception("GeometryVerification") << "Standard CMSSW geometry payload has no world daughters";
     }
@@ -177,6 +204,11 @@ private:
     baselineWorldNodes.reserve(baselineWorldDaughters);
     for (int index = 0; index < baselineWorldDaughters; ++index) {
       baselineWorldNodes.push_back(cmsWorld->GetNode(index));
+    }
+    std::vector<TGeoNode*> baselineMotherNodes;
+    baselineMotherNodes.reserve(baselineMotherDaughters);
+    for (int index = 0; index < baselineMotherDaughters; ++index) {
+      baselineMotherNodes.push_back(externalMother->GetNode(index));
     }
     int baselineOverlaps = 0;
     if (checkOverlaps_) {
@@ -212,18 +244,37 @@ private:
           << "] cm cross the protected |z| < " << minimumAbsZCm_ << " cm CMS region";
     }
 
-    dd4hep::Volume mother = description->worldVolume();
-    mother.ptr()->RemoveNode(oldPlacement.ptr());
+    cmsWorld->RemoveNode(oldPlacement.ptr());
+    dd4hep::Assembly importedAssembly(detectorElementName_ + "_assembly");
+    for (int index = 0; index < importedVolume.ptr()->GetNdaughters(); ++index) {
+      TGeoNode* sourceNode = importedVolume.ptr()->GetNode(index);
+      importedAssembly.ptr()->AddNode(sourceNode->GetVolume(),
+                                      sourceNode->GetNumber(),
+                                      new TGeoHMatrix(*sourceNode->GetMatrix()));
+    }
     dd4hep::Rotation3D modelRotation(rotation_.begin(), rotation_.end());
     dd4hep::Transform3D modelTransform(
         modelRotation, dd4hep::Position(translation[0], translation[1], translation[2]));
-    dd4hep::PlacedVolume placed = mother.placeVolume(importedVolume, 1, modelTransform);
+    dd4hep::PlacedVolume placed =
+        dd4hep::Volume(externalMother).placeVolume(importedAssembly, 1, modelTransform);
     child.setPlacement(placed);
 
-    if (cmsWorld->GetNdaughters() != baselineWorldDaughters + 1) {
+    if (cmsWorld->GetNdaughters() != baselineWorldDaughters) {
       throw cms::Exception("GeometryVerification")
-          << "External attachment changed the CMS world daughter count unexpectedly: " << baselineWorldDaughters
-          << " before, " << cmsWorld->GetNdaughters() << " after";
+          << "External attachment changed the CMS world daughter count: " << baselineWorldDaughters << " before, "
+          << cmsWorld->GetNdaughters() << " after";
+    }
+    if (externalMother->GetNdaughters() != baselineMotherDaughters + 1) {
+      throw cms::Exception("GeometryVerification")
+          << "External attachment did not add exactly one assembly below " << externalMotherVolumeName_ << ": "
+          << baselineMotherDaughters << " daughters before, " << externalMother->GetNdaughters() << " after";
+    }
+    for (int index = 0; index < baselineMotherDaughters; ++index) {
+      if (externalMother->GetNode(index) != baselineMotherNodes[index]) {
+        throw cms::Exception("GeometryVerification")
+            << "External attachment replaced or reordered existing " << externalMotherVolumeName_ << " daughter "
+            << index;
+      }
     }
     for (int index = 0; index < baselineWorldDaughters; ++index) {
       if (cmsWorld->GetNode(index) != baselineWorldNodes[index]) {
@@ -241,10 +292,11 @@ private:
             << overlapToleranceCm_ << " cm";
       }
     }
-    edm::LogInfo("ShiftLssGeometry") << "Preserved the standard CMSSW Extended geometry and attached external element "
-                                     << detectorElementName_ << " with transformed z bounds [" << bounds[4] / dd4hep::cm
-                                     << ", " << bounds[5] / dd4hep::cm << "] cm; all " << baselineWorldDaughters
-                                     << " pre-existing CMS world daughter(s) remain unchanged";
+    edm::LogInfo("ShiftLssGeometry")
+        << "Preserved the standard CMSSW Extended geometry and attached the unwrapped external assembly below "
+        << externalMotherVolumeName_ << " with transformed z bounds [" << bounds[4] / dd4hep::cm << ", "
+        << bounds[5] / dd4hep::cm << "] cm; all " << baselineWorldDaughters << " pre-existing CMS world daughter(s) and "
+        << baselineMotherDaughters << " pre-existing mother-volume daughter(s) remain unchanged";
     return detector;
   }
 
@@ -257,6 +309,7 @@ private:
   std::string gdmlFile_;
   std::string geometryLabel_;
   std::string detectorElementName_;
+  std::string externalMotherVolumeName_;
   std::vector<double> artifactOriginInModelCm_;
   std::vector<double> modelOriginCm_;
   std::array<double, 9> rotation_;

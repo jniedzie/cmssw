@@ -11,6 +11,7 @@ def customiseShiftLssExternalGeometry(
     minimumAbsZCm,
     geometryLabel="Extended",
     detectorElementName="shiftLssExternal",
+    externalMotherVolumeName="cms:CMSE",
     overlapToleranceCm=0.001,
     checkOverlaps=True,
 ):
@@ -41,6 +42,7 @@ def customiseShiftLssExternalGeometry(
         gdmlFile=cms.FileInPath(gdmlFile),
         geometryLabel=cms.string(geometryLabel),
         detectorElementName=cms.string(detectorElementName),
+        externalMotherVolumeName=cms.string(externalMotherVolumeName),
         artifactOriginInModelCm=cms.vdouble(*artifactOriginInModelCm),
         modelOriginCm=cms.vdouble(*modelOriginCm),
         modelToCms=cms.vdouble(*modelToCms),
@@ -53,6 +55,7 @@ def customiseShiftLssExternalGeometry(
         standardCmsGeometryPreserved=cms.bool(True),
         externalExtensionOnly=cms.bool(True),
         geometryConditionsLabel=cms.string(geometryLabel),
+        externalMotherVolumeName=cms.string(externalMotherVolumeName),
         gdmlFile=cms.string(gdmlFile),
         artifactOriginInModelCm=cms.vdouble(*artifactOriginInModelCm),
         modelOriginCm=cms.vdouble(*modelOriginCm),

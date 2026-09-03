@@ -33,6 +33,9 @@ class ShiftLssExternalGeometryTest(unittest.TestCase):
         self.assertFalse(hasattr(process, "DDDetectorESProducerFromDB"))
         self.assertTrue(hasattr(process, "shiftLssGeometryESSource"))
         self.assertEqual(process.shiftLssGeometryESSource.geometryLabel.value(), "Extended")
+        self.assertEqual(
+            process.shiftLssGeometryESSource.externalMotherVolumeName.value(), "cms:CMSE"
+        )
         self.assertTrue(process.shiftLssGeometryContract.standardCmsGeometryPreserved.value())
         self.assertTrue(process.shiftLssGeometryContract.externalExtensionOnly.value())
 

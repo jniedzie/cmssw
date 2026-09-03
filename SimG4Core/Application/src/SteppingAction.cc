@@ -42,6 +42,8 @@ SteppingAction::SteppingAction(const CMSSteppingVerbose* sv, const edm::Paramete
   caloName_ = p.getParameter<std::string>("CaloName");
   cms2ZDCName_ = p.getParameter<std::string>("CMS2ZDCName");
   debugMuonTracking_ = p.getUntrackedParameter<bool>("DebugMuonTracking", false);
+  tracePrimaryTracksForVisualization_ =
+      p.getUntrackedParameter<bool>("TracePrimaryTracksForVisualization", false);
 
   edm::LogVerbatim("SimG4CoreApplication")
       << "SteppingAction:: KillBeamPipe = " << killBeamPipe
@@ -121,6 +123,20 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
 
   const G4StepPoint* preStep = aStep->GetPreStepPoint();
   const G4StepPoint* postStep = aStep->GetPostStepPoint();
+  const auto* traceTrackInfo = dynamic_cast<const TrackInformation*>(theTrack->GetUserInformation());
+  if (tracePrimaryTracksForVisualization_ && traceTrackInfo && traceTrackInfo->isPrimary()) {
+    const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
+    const G4ThreeVector& position = postStep->GetPosition();
+    const G4VProcess* process = postStep->GetProcessDefinedStep();
+    std::cout << "[ShiftEventDisplay][G4Point] event=" << (event ? event->GetEventID() : -1)
+              << " track_id=" << theTrack->GetTrackID()
+              << " pdg_id=" << theTrack->GetDefinition()->GetPDGEncoding()
+              << " step=" << theTrack->GetCurrentStepNumber()
+              << " position_mm=(" << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << ","
+              << position.z() / CLHEP::mm << ")"
+              << " kinetic_energy_GeV=" << ekin / CLHEP::GeV
+              << " process=" << (process ? process->GetProcessName() : "none") << std::endl;
+  }
   const bool debugMuon = debugMuonTracking_ && std::abs(theTrack->GetDefinition()->GetPDGEncoding()) == 13;
   bool killedByConfiguredDeadRegion = false;
   bool killedLeavingZDC = false;
