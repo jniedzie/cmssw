@@ -10,6 +10,7 @@
 #include "G4UnitsTable.hh"
 #include "G4Event.hh"
 #include "G4EventManager.hh"
+#include "G4Material.hh"
 #include "G4VProcess.hh"
 #include <CLHEP/Units/SystemOfUnits.h>
 
@@ -124,17 +125,22 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
   const G4StepPoint* preStep = aStep->GetPreStepPoint();
   const G4StepPoint* postStep = aStep->GetPostStepPoint();
   const auto* traceTrackInfo = dynamic_cast<const TrackInformation*>(theTrack->GetUserInformation());
-  if (tracePrimaryTracksForVisualization_ && traceTrackInfo && traceTrackInfo->isPrimary()) {
+  int const tracePdgId = theTrack->GetDefinition()->GetPDGEncoding();
+  if (tracePrimaryTracksForVisualization_ && traceTrackInfo && traceTrackInfo->isPrimary() &&
+      std::abs(tracePdgId) == 13) {
     const G4Event* event = G4EventManager::GetEventManager()->GetConstCurrentEvent();
     const G4ThreeVector& position = postStep->GetPosition();
     const G4VProcess* process = postStep->GetProcessDefinedStep();
+    const G4Material* material = preStep->GetMaterial();
     std::cout << "[ShiftEventDisplay][G4Point] event=" << (event ? event->GetEventID() : -1)
               << " track_id=" << theTrack->GetTrackID()
-              << " pdg_id=" << theTrack->GetDefinition()->GetPDGEncoding()
+              << " pdg_id=" << tracePdgId
               << " step=" << theTrack->GetCurrentStepNumber()
               << " position_mm=(" << position.x() / CLHEP::mm << "," << position.y() / CLHEP::mm << ","
               << position.z() / CLHEP::mm << ")"
               << " kinetic_energy_GeV=" << ekin / CLHEP::GeV
+              << " step_length_mm=" << aStep->GetStepLength() / CLHEP::mm
+              << " material=" << (material ? material->GetName() : "unknown")
               << " process=" << (process ? process->GetProcessName() : "none") << std::endl;
   }
   const bool debugMuon = debugMuonTracking_ && std::abs(theTrack->GetDefinition()->GetPDGEncoding()) == 13;
