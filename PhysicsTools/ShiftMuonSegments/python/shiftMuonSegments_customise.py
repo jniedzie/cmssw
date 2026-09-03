@@ -230,19 +230,19 @@ def customiseTraversingShiftMuonReco(
     from RecoMuon.CosmicMuonProducer.globalCosmicMuons_cfi import globalCosmicMuons
 
     process.shiftCosmicMuonSeed = CosmicMuonSeed.clone(
-        ForcePointDown=False,
-        TryBothDirections=True,
-        KeepAllSegments=True,
-        MaxCSCChi2=1000.0,
-        MaxDTChi2=1000.0,
+        ForcePointDown=cms.bool(False),
+        TryBothDirections=cms.bool(True),
+        KeepAllSegments=cms.bool(True),
+        MaxCSCChi2=cms.double(1000.0),
+        MaxDTChi2=cms.double(1000.0),
         # A one-segment seed needs a non-zero momentum to define a valid
         # trajectory state, but this is only an initial hypothesis, not a cut.
-        SingleSegmentPt=0.01,
+        SingleSegmentPt=cms.double(0.01),
         # Forward SHIFT muons can have tiny pT while retaining large |pz|.
-        MinPairPt=0.0,
-        PairSegmentPt=0.01,
-        UsePairPtEstimate=False,
-        TryBothPairCharges=True,
+        MinPairPt=cms.double(0.0),
+        PairSegmentPt=cms.double(0.01),
+        UsePairPtEstimate=cms.bool(False),
+        TryBothPairCharges=cms.bool(True),
     )
     process.shiftCosmicMuons = cosmicMuons.clone(
         MuonSeedCollectionLabel="shiftCosmicMuonSeed",
@@ -415,19 +415,19 @@ def customiseRecoForShiftMuons(
     builder.BWFilterParameters.EnableDTMeasurement = enableDTMeasurement
     builder.FilterParameters.EnableGEMMeasurement = enableGEMMeasurement
     builder.BWFilterParameters.EnableGEMMeasurement = enableGEMMeasurement
-    builder.SeedPosition = seedPosition
-    builder.DoBackwardFilter = doBackwardFilter
-    builder.NavigationType = navigationType
-    process.displacedMuonSeeds.KeepAllSegments = keepAllSeedSegments
+    builder.SeedPosition = cms.string(seedPosition)
+    builder.DoBackwardFilter = cms.bool(doBackwardFilter)
+    builder.NavigationType = cms.string(navigationType)
+    process.displacedMuonSeeds.KeepAllSegments = cms.bool(keepAllSeedSegments)
     # The cosmic seed producer otherwise assigns 10 GeV to every one-segment
     # seed and rejects curvature estimates below 10 GeV.  Neither behavior is
     # appropriate for the very low-pT SHIFT signal.
-    process.displacedMuonSeeds.SingleSegmentPt = 0.01
-    process.displacedMuonSeeds.MinPairPt = 0.0
-    process.displacedMuonSeeds.PairSegmentPt = 0.01
-    process.displacedMuonSeeds.UsePairPtEstimate = False
-    process.displacedMuonSeeds.TryBothPairCharges = True
-    process.displacedMuonSeeds.TryBothDirections = True
+    process.displacedMuonSeeds.SingleSegmentPt = cms.double(0.01)
+    process.displacedMuonSeeds.MinPairPt = cms.double(0.0)
+    process.displacedMuonSeeds.PairSegmentPt = cms.double(0.01)
+    process.displacedMuonSeeds.UsePairPtEstimate = cms.bool(False)
+    process.displacedMuonSeeds.TryBothPairCharges = cms.bool(True)
+    process.displacedMuonSeeds.TryBothDirections = cms.bool(True)
     if hasattr(process, "displacedMuonReducedTrackExtras"):
         process.displacedMuonReducedTrackExtras.cut = cms.string("pt > 0")
 
