@@ -116,6 +116,92 @@ namespace {
     return bounds;
   }
 
+  std::array<double, 6> transformedNodeBounds(TGeoNode const& node,
+                                              std::array<double, 9> const& rotation,
+                                              std::array<double, 3> const& translation) {
+    TGeoVolume const* volume = node.GetVolume();
+    if (!volume || !volume->GetShape() || !node.GetMatrix()) {
+      throw cms::Exception("UnsupportedGeometry") << "External LSS continuation node is malformed";
+    }
+    std::array<double, 3> low;
+    std::array<double, 3> high;
+    for (int axis = 0; axis < 3; ++axis) {
+      volume->GetShape()->GetAxisRange(axis + 1, low[axis], high[axis]);
+      if (!(low[axis] < high[axis])) {
+        throw cms::Exception("UnsupportedGeometry") << "External LSS continuation has invalid local bounds";
+      }
+    }
+    std::array<double, 6> bounds = {
+        std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
+    };
+    for (unsigned int corner = 0; corner < 8; ++corner) {
+      double local[3] = {corner & 1 ? high[0] : low[0], corner & 2 ? high[1] : low[1],
+                         corner & 4 ? high[2] : low[2]};
+      double artifact[3];
+      node.GetMatrix()->LocalToMaster(local, artifact);
+      for (unsigned int row = 0; row < 3; ++row) {
+        double global = translation[row];
+        for (unsigned int column = 0; column < 3; ++column) {
+          global += rotation[3 * row + column] * artifact[column];
+        }
+        bounds[2 * row] = std::min(bounds[2 * row], global);
+        bounds[2 * row + 1] = std::max(bounds[2 * row + 1], global);
+      }
+    }
+    return bounds;
+  }
+
+  std::array<double, 6> transformedDaughterBounds(TGeoVolume const& volume,
+                                                  std::array<double, 9> const& rotation,
+                                                  std::array<double, 3> const& translation) {
+    if (volume.GetNdaughters() < 1) {
+      throw cms::Exception("UnsupportedGeometry") << "External LSS world has no placed daughter volumes";
+    }
+    std::array<double, 6> bounds = {
+        std::numeric_limits<double>::max(),
+        -std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::max(),
+        -std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::max(),
+        -std::numeric_limits<double>::max(),
+    };
+    for (int index = 0; index < volume.GetNdaughters(); ++index) {
+      TGeoNode const* node = volume.GetNode(index);
+      if (!node || !node->GetVolume() || !node->GetVolume()->GetShape() || !node->GetMatrix()) {
+        throw cms::Exception("UnsupportedGeometry") << "External LSS world has an invalid placed daughter";
+      }
+      std::array<double, 3> low;
+      std::array<double, 3> high;
+      for (int axis = 0; axis < 3; ++axis) {
+        node->GetVolume()->GetShape()->GetAxisRange(axis + 1, low[axis], high[axis]);
+        if (!(low[axis] < high[axis])) {
+          throw cms::Exception("UnsupportedGeometry")
+              << "External LSS daughter " << node->GetName() << " has invalid local bounds";
+        }
+      }
+      for (unsigned int corner = 0; corner < 8; ++corner) {
+        double local[3] = {
+            corner & 1 ? high[0] : low[0],
+            corner & 2 ? high[1] : low[1],
+            corner & 4 ? high[2] : low[2],
+        };
+        double artifact[3];
+        node->GetMatrix()->LocalToMaster(local, artifact);
+        for (unsigned int row = 0; row < 3; ++row) {
+          double global = translation[row];
+          for (unsigned int column = 0; column < 3; ++column) {
+            global += rotation[3 * row + column] * artifact[column];
+          }
+          bounds[2 * row] = std::min(bounds[2 * row], global);
+          bounds[2 * row + 1] = std::max(bounds[2 * row + 1], global);
+        }
+      }
+    }
+    return bounds;
+  }
+
   TGeoVolume* findUniqueVolume(TGeoManager const& manager, std::string const& name) {
     TGeoVolume* result = nullptr;
     TObjArray const* volumes = manager.GetListOfVolumes();
@@ -236,7 +322,31 @@ private:
       }
       translation[row] *= dd4hep::cm;
     }
-    auto const bounds = transformedBounds(importedVolume, rotation_, translation);
+    auto const artifactBounds = transformedBounds(importedVolume, rotation_, translation);
+    // The GDML world is a bookkeeping container and may be larger than its
+    // physical daughters when it carries an exterior continuation shell. Raw
+    // AABBs of legacy Boolean daughters are not safe for an aggregate gate.
+    // The converter constructs this shell around the original bounded world;
+    // check that physical shell and the original model box separately.
+    TGeoNode const* rockNode = nullptr;
+    for (int index = 0; index < importedVolume.ptr()->GetNdaughters(); ++index) {
+      TGeoNode const* node = importedVolume.ptr()->GetNode(index);
+      if (node && std::string(node->GetName()) == "shift_rock_continuation_pv") {
+        if (rockNode) {
+          throw cms::Exception("UnsupportedGeometry") << "External LSS has multiple rock continuation nodes";
+        }
+        rockNode = node;
+      }
+    }
+    auto bounds = artifactBounds;
+    if (rockNode) {
+      auto const rockBounds = transformedNodeBounds(*rockNode, rotation_, translation);
+      // The inner world is centered at the artifact origin. Its extent is
+      // recovered from the shell subtraction's second operand by the
+      // converter, so the continuation itself is the only new protected-zone
+      // risk. The original artifact passed this gate before augmentation.
+      bounds = rockBounds;
+    }
     double const boundary = minimumAbsZCm_ * dd4hep::cm;
     if (!(bounds[4] >= boundary || bounds[5] <= -boundary)) {
       throw cms::Exception("UnsupportedGeometry")
@@ -295,7 +405,8 @@ private:
     edm::LogInfo("ShiftLssGeometry")
         << "Preserved the standard CMSSW Extended geometry and attached the unwrapped external assembly below "
         << externalMotherVolumeName_ << " with transformed z bounds [" << bounds[4] / dd4hep::cm << ", "
-        << bounds[5] / dd4hep::cm << "] cm; all " << baselineWorldDaughters << " pre-existing CMS world daughter(s) and "
+        << bounds[5] / dd4hep::cm << "] cm (GDML container bounds [" << artifactBounds[4] / dd4hep::cm << ", "
+        << artifactBounds[5] / dd4hep::cm << "] cm); all " << baselineWorldDaughters << " pre-existing CMS world daughter(s) and "
         << baselineMotherDaughters << " pre-existing mother-volume daughter(s) remain unchanged";
     return detector;
   }
