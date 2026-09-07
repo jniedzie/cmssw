@@ -30,7 +30,7 @@ process = customiseShiftLssExternalGeometry(
     process,
     gdmlFile=(
         "PhysicsTools/ShiftLssGeometry/data/ir1_atlas_proxy/"
-        "lhc_ir1_atlas_proxy_bounded.gdml"
+        "lhc_ir1_atlas_proxy_rock_continuation_bounded.gdml"
     ),
     artifactOriginInModelCm=(0.0, 4299.5, 14575.200000105498),
     modelOriginCm=(0.0, 0.0, 0.0),
