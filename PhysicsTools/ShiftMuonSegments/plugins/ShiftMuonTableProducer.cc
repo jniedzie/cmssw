@@ -79,6 +79,7 @@
 
 #include <algorithm>
 #include "PhysicsTools/ShiftMuonSegments/interface/SeedCovariance.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/CommonVertexRefit.h"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -1634,6 +1635,88 @@ namespace {
     double const distance = (firstClosest - secondClosest).mag();
     return {std::isfinite(distance) && std::isfinite(midpoint.z()), midpoint, distance};
   }
+  struct VertexRefitResult {
+    int status = 0;
+    unsigned int iterations = 0;
+    GlobalPoint position;
+    std::array<GlobalVector, 2> momenta;
+    std::array<GlobalVector, 2> predictedMomenta;
+    shift::CommonVertexRefit fit;
+  };
+
+  VertexRefitResult vertexConstrainedRefit(std::array<FreeTrajectoryState, 2> const& detectorStates,
+                                          Propagator const& propagator,
+                                          Propagator const& vacuumPropagator,
+                                          double approximateMaterialBoundaryAbsZCm,
+                                          GlobalPoint const& initialVertex,
+                                          double beamLineSigma) {
+    VertexRefitResult result;
+    double z = initialVertex.z();
+    for (unsigned int iteration = 0; iteration < 16; ++iteration) {
+      result.iterations = iteration + 1;
+      std::array<shift::VertexTrack, 2> inputs;
+      for (unsigned int i = 0; i < 2; ++i) {
+        // Always transport the original posterior from the measured detector
+        // surface. Reusing an already vertex-updated state double counts hits.
+        auto start = detectorStates[i];
+        Propagator const* finalPropagator = &propagator;
+        // The CMS-only R-Z material approximation extends iron volumes far
+        // outside CMS. Respect its established material boundary, then use
+        // vacuum. Detailed geometry must instead cover the entire vertex leg.
+        if (approximateMaterialBoundaryAbsZCm > 0. && std::abs(z) > approximateMaterialBoundaryAbsZCm) {
+          double const boundaryZ = std::copysign(approximateMaterialBoundaryAbsZCm, z);
+          if (std::copysign(1., z) * start.position().z() < approximateMaterialBoundaryAbsZCm) {
+            auto const boundary = materialStateAtZ(start, propagator, boundaryZ);
+            if (!finiteTrajectoryState(boundary.first)) {
+              result.status = -2;
+              return result;
+            }
+            start = *boundary.first.freeState();
+          }
+          finalPropagator = &vacuumPropagator;
+        }
+        auto const transported = materialStateAtZ(start, *finalPropagator, z);
+        if (!finiteTrajectoryState(transported.first)) {
+          result.status = -2;
+          return result;
+        }
+        auto const& parameters = transported.first.localParameters().vector();
+        result.predictedMomenta[i] = transported.first.globalMomentum();
+        auto const& covariance = transported.first.localError().matrix();
+        for (unsigned int row = 0; row < 5; ++row) {
+          inputs[i].parameters[row] = parameters[row];
+          for (unsigned int column = 0; column < 5; ++column)
+            inputs[i].covariance(row, column) = covariance(row, column);
+        }
+      }
+      result.fit = shift::refitCommonVertex(inputs, beamLineSigma);
+      if (!result.fit.valid) {
+        result.status = -3;
+        return result;
+      }
+      double const dz = result.fit.displacement[2];
+      if (std::abs(dz) < 0.1) {
+        result.position = GlobalPoint(result.fit.displacement[0], result.fit.displacement[1], z + dz);
+        for (unsigned int i = 0; i < 2; ++i) {
+          auto const& parameters = result.fit.tracks[i].parameters;
+          double const pz = std::copysign(1. / (std::abs(parameters[0]) *
+                                               std::sqrt(1. + parameters[1] * parameters[1] +
+                                                         parameters[2] * parameters[2])),
+                                          detectorStates[i].momentum().z());
+          result.momenta[i] = GlobalVector(parameters[1] * pz, parameters[2] * pz, pz);
+          if (!std::isfinite(result.momenta[i].mag2()) || !(result.momenta[i].perp() > 0.)) {
+            result.status = -3;
+            return result;
+          }
+        }
+        result.status = 1;
+        return result;
+      }
+      z += std::clamp(dz, -2000., 2000.);
+    }
+    result.status = -4;
+    return result;
+  }
 }  // namespace
 
 class ShiftMuonTableProducer : public edm::stream::EDProducer<> {
@@ -1701,6 +1784,7 @@ public:
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         targetUseConsistentBackwardCovariance_(parameters.getParameter<bool>("targetUseConsistentBackwardCovariance")),
         useMaterialAwareVertexTransport_(parameters.getParameter<bool>("useMaterialAwareVertexTransport")),
+        useVertexConstrainedRefit_(parameters.getParameter<bool>("useVertexConstrainedRefit")),
         lssMaterialBoundaryAbsZCm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
                                        .getParameter<double>("materialBoundaryAbsZCm")),
         lssGeant4eMomentumLimitGeV_(parameters.getParameter<edm::ParameterSet>("lssTransport")
@@ -4198,7 +4282,10 @@ public:
                             "true fractional momentum loss between first and last precision SimHits");
     table->addColumn<float>(
         "simFirstPrecisionPath", simFirstPrecisionPath, "projected path from SimVertex to first precision SimHit in cm");
-    event.put(std::move(table));
+    // Keep this table until pair fitting has attached the pair-specific refit.
+    std::vector<int> muonVertexRefitIdx(selected.size(), -1), muonVertexRefitStatus(selected.size(), 0);
+    std::vector<float> muonVertexRefittedPt(selected.size(), 0.), muonVertexRefittedPz(selected.size(), 0.),
+        muonVertexRefittedEta(selected.size(), 0.), muonVertexRefittedPhi(selected.size(), 0.);
 
     // Fit every cleaned pair directly from its retained source tracks.  The
     // resulting indices always refer to ShiftMuon rows and therefore do not
@@ -4219,6 +4306,10 @@ public:
         vertexConstrainedDca, vertexConstrainedDcaX, vertexConstrainedDcaY, vertexConstrainedDcaZ,
         vertexConstrainedOriginCompatibilityChi2, vertexConstrainedOriginCompatibilityNormalizedChi2;
     constexpr double muonMass = 0.105658;
+    std::vector<int> vertexRefitStatus, vertexRefitIterations;
+    std::vector<float> vertexRefittedMass, vertexRefittedPt, vertexRefittedPz, vertexRefittedEta,
+        vertexRefittedPhi, vertexRefittedVx, vertexRefittedVy, vertexRefittedVz,
+        vertexRefittedVxErr, vertexRefittedVyErr, vertexRefittedVzErr, vertexRefittedChi2;
 
     struct PairChoice {
       unsigned int first;
@@ -4393,6 +4484,54 @@ public:
                                       : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
       vertexPhi.push_back(std::atan2(pairPy, pairPx));
 
+      VertexRefitResult vertexRefit;
+      if (useVertexConstrainedRefit_) {
+        vertexRefit.status = -1;
+        if (selected[first]->detectorStateValid && selected[second]->detectorStateValid)
+          vertexRefit = vertexConstrainedRefit({selected[first]->detectorState, selected[second]->detectorState},
+                                               *sourceFacingTargetMaterialPropagator,
+                                               vacuumPropagator,
+                                               (useDetailedMaterialPropagation_ || directionalRefitUseFirstPrinciplesMaterialEffects_ ||
+                                                directionalRefitUseGeometryTargetMaterialEffects_) ? 0. : lssMaterialBoundaryAbsZCm_,
+                                               choice.fit.position, commonVertexBeamLineResolution_);
+      }
+      bool const vertexRefitValid = vertexRefit.status == 1;
+      if (produceMomentumClosureDiagnostics_ && vertexRefitValid)
+        edm::LogVerbatim("ShiftVertexRefit")
+            << "event=" << event.id() << " vertex=" << retainedVertices - 1
+            << " input=" << firstState.momentum << " ; " << secondState.momentum
+            << " transported=" << vertexRefit.predictedMomenta[0] << " ; " << vertexRefit.predictedMomenta[1]
+            << " refitted=" << vertexRefit.momenta[0] << " ; " << vertexRefit.momenta[1]
+            << " chi2=" << vertexRefit.fit.chi2 << " vertex=" << vertexRefit.position;
+      vertexRefitStatus.push_back(vertexRefit.status);
+      vertexRefitIterations.push_back(vertexRefit.iterations);
+      vertexRefittedVx.push_back(vertexRefitValid ? vertexRefit.position.x() : 0.);
+      vertexRefittedVy.push_back(vertexRefitValid ? vertexRefit.position.y() : 0.);
+      vertexRefittedVz.push_back(vertexRefitValid ? vertexRefit.position.z() : 0.);
+      vertexRefittedVxErr.push_back(vertexRefitValid ? std::sqrt(vertexRefit.fit.covariance(0, 0)) : 0.);
+      vertexRefittedVyErr.push_back(vertexRefitValid ? std::sqrt(vertexRefit.fit.covariance(1, 1)) : 0.);
+      vertexRefittedVzErr.push_back(vertexRefitValid ? std::sqrt(vertexRefit.fit.covariance(2, 2)) : 0.);
+      vertexRefittedChi2.push_back(vertexRefitValid ? vertexRefit.fit.chi2 : 0.);
+      auto const refittedMomentum = vertexRefitValid ? vertexRefit.momenta[0] + vertexRefit.momenta[1] : GlobalVector();
+      double const refittedEnergy = vertexRefitValid
+          ? std::hypot(vertexRefit.momenta[0].mag(), muonMass) + std::hypot(vertexRefit.momenta[1].mag(), muonMass) : 0.;
+      vertexRefittedMass.push_back(std::sqrt(std::max(0., refittedEnergy * refittedEnergy - refittedMomentum.mag2())));
+      vertexRefittedPt.push_back(refittedMomentum.perp());
+      vertexRefittedPz.push_back(refittedMomentum.z());
+      vertexRefittedEta.push_back(refittedMomentum.perp() > 0. ? refittedMomentum.eta() : 0.);
+      vertexRefittedPhi.push_back(vertexRefitValid ? static_cast<double>(refittedMomentum.phi()) : 0.);
+      for (unsigned int i = 0; i < 2; ++i) {
+        auto const muonIndex = i == 0 ? first : second;
+        muonVertexRefitIdx[muonIndex] = retainedVertices - 1;
+        muonVertexRefitStatus[muonIndex] = vertexRefit.status;
+        if (vertexRefitValid) {
+          muonVertexRefittedPt[muonIndex] = vertexRefit.momenta[i].perp();
+          muonVertexRefittedPz[muonIndex] = vertexRefit.momenta[i].z();
+          muonVertexRefittedEta[muonIndex] = vertexRefit.momenta[i].eta();
+          muonVertexRefittedPhi[muonIndex] = vertexRefit.momenta[i].phi();
+        }
+      }
+
       // The pair identity is fixed by the unconstrained reconstruction above.
       // Build exactly one alternative from the two constrained muon states;
       // deliberately do not create constrained-unconstrained combinations.
@@ -4487,6 +4626,30 @@ public:
     }
 
     auto vertexTable = std::make_unique<nanoaod::FlatTable>(vertexMuonIdx1.size(), "ShiftDimuonVertex", false, false);
+    std::string const vertexRefitStatusDoc =
+        "joint vertex refit: 1 valid, 0 disabled/unpaired, -1 missing detector state, -2 transport failure, "
+        "-3 invalid covariance/update, -4 no convergence";
+    table->addColumn<int>("vertexRefitIdx", muonVertexRefitIdx, "associated ShiftDimuonVertex row; -1 unpaired");
+    table->addColumn<int>("vertexRefitStatus", muonVertexRefitStatus, vertexRefitStatusDoc);
+    table->addColumn<float>("vertexRefittedPt", muonVertexRefittedPt, "muon pT from joint reconstructed-vertex refit; status must be 1");
+    table->addColumn<float>("vertexRefittedPz", muonVertexRefittedPz, "muon pz from joint reconstructed-vertex refit; status must be 1");
+    table->addColumn<float>("vertexRefittedEta", muonVertexRefittedEta, "muon eta from joint reconstructed-vertex refit; status must be 1");
+    table->addColumn<float>("vertexRefittedPhi", muonVertexRefittedPhi, "muon phi from joint reconstructed-vertex refit; status must be 1");
+    event.put(std::move(table));
+    vertexTable->addColumn<int>("refitStatus", vertexRefitStatus, vertexRefitStatusDoc);
+    vertexTable->addColumn<int>("refitIterations", vertexRefitIterations, "number of joint vertex transport iterations");
+    vertexTable->addColumn<float>("refittedMass", vertexRefittedMass, "dimuon mass from joint reconstructed-vertex-refitted tracks; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedPt", vertexRefittedPt, "joint vertex refitted dimuon pT; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedPz", vertexRefittedPz, "joint vertex refitted dimuon pz; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedEta", vertexRefittedEta, "joint vertex refitted dimuon eta; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedPhi", vertexRefittedPhi, "joint vertex refitted dimuon phi; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedVx", vertexRefittedVx, "joint refit vertex x; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedVy", vertexRefittedVy, "joint refit vertex y; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedVz", vertexRefittedVz, "joint refit vertex z, without a target-z prior; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedVxErr", vertexRefittedVxErr, "linearized joint vertex x uncertainty; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedVyErr", vertexRefittedVyErr, "linearized joint vertex y uncertainty; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedVzErr", vertexRefittedVzErr, "linearized joint vertex z uncertainty; refitStatus must be 1");
+    vertexTable->addColumn<float>("refittedChi2", vertexRefittedChi2, "joint vertex fit chi2 with 3 degrees of freedom; refitStatus must be 1");
     vertexTable->addColumn<int>("muonIdx1", vertexMuonIdx1, "index of first muon in ShiftMuon");
     vertexTable->addColumn<int>("muonIdx2", vertexMuonIdx2, "index of second muon in ShiftMuon");
     vertexTable->addColumn<int>("isOS", vertexIsOS, "1 for an opposite-sign pair");
@@ -4648,6 +4811,7 @@ public:
     description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<bool>("targetUseConsistentBackwardCovariance", false);
     description.add<bool>("useMaterialAwareVertexTransport", false);
+    description.add<bool>("useVertexConstrainedRefit", false);
     edm::ParameterSetDescription lssTransportDescription;
     lssTransportDescription.add<std::string>("magneticFieldLabel", "");
     lssTransportDescription.add<double>("materialBoundaryAbsZCm", 1100.0);
@@ -4769,6 +4933,7 @@ private:
   bool useDetailedMaterialPropagation_;
   bool targetUseConsistentBackwardCovariance_;
   bool useMaterialAwareVertexTransport_;
+  bool useVertexConstrainedRefit_;
   double lssMaterialBoundaryAbsZCm_;
   double lssGeant4eMomentumLimitGeV_;
   double lssGeant4eMaximumStepLengthMm_;

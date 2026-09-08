@@ -2,3 +2,7 @@
   <use name="DataFormats/CLHEP"/>
 </bin>
 <test name="testShiftSeedCovarianceRun" command="testShiftSeedCovariance"/>
+<bin file="testCommonVertexRefit.cc" name="testShiftCommonVertexRefit">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftCommonVertexRefitRun" command="testShiftCommonVertexRefit"/>

@@ -16,6 +16,7 @@ def addShiftMuonSegments(
     augmentTrackerHits=False,
     useExtendedTiming=False,
     useDetailedMaterialPropagation=None,
+    useVertexConstrainedRefit=None,
 ):
     process.load("RecoMuon.TransientTrackingRecHit.MuonTransientTrackingRecHitBuilder_cfi")
     process.load("RecoTracker.TransientTrackingRecHit.TransientTrackingRecHitBuilder_cfi")
@@ -25,6 +26,8 @@ def addShiftMuonSegments(
     if enableHcalDiagnostics:
         process.load("TrackingTools.TrackAssociator.DetIdAssociatorESProducer_cff")
     process.shiftMuonTable = shiftMuonTable.clone()
+    if useVertexConstrainedRefit is not None:
+        process.shiftMuonTable.useVertexConstrainedRefit = cms.bool(useVertexConstrainedRefit)
     process.shiftMuonTable.enableHcalDiagnostics = cms.bool(enableHcalDiagnostics)
     process.shiftMuonTable.enableZDCDiagnostics = cms.bool(enableZDCDiagnostics)
     process.shiftMuonTable.augmentDTHits = cms.bool(augmentDTHits)

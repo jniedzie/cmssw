@@ -17,10 +17,12 @@ def customise(
     augmentTrackerHits=False,
     useExtendedTiming=False,
     useDetailedMaterialPropagation=None,
+    useVertexConstrainedRefit=None,
 ):
     process = addShiftMuonSegments(
         process,
         useDetailedMaterialPropagation=useDetailedMaterialPropagation,
+        useVertexConstrainedRefit=useVertexConstrainedRefit,
         directionalRefitUseDetailedMaterialEffects=directionalRefitUseDetailedMaterialEffects,
         directionalRefitUseGeometryMaterialEffects=directionalRefitUseGeometryMaterialEffects,
         directionalRefitUseGeometryMaterialEffectsInFitter=directionalRefitUseGeometryMaterialEffectsInFitter,
