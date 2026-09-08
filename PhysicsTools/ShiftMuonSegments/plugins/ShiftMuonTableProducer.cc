@@ -78,6 +78,7 @@
 #include "G4VPhysicalVolume.hh"
 
 #include <algorithm>
+#include "PhysicsTools/ShiftMuonSegments/interface/SeedCovariance.h"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -306,6 +307,9 @@ namespace {
     unsigned int sourceIndex;
     std::vector<HitFingerprint> hitFingerprints;
     PropagatedState targetLineState;
+    FreeTrajectoryState detectorState;
+    bool detectorStateValid = false;
+    uint32_t detectorStateDetId = 0;
     int timingDirectionSign = 0;
     unsigned int timingMeasurements = 0;
     double timingChi2 = 0.;
@@ -709,11 +713,66 @@ namespace {
     return result;
   }
 
+  std::pair<TrajectoryStateOnSurface, double> materialStateAtZ(FreeTrajectoryState const& start,
+                                                             Propagator const& propagator,
+                                                             double z) {
+    if (!std::isfinite(z) || std::abs(start.momentum().z()) < 1.e-9)
+      return {};
+    auto plane = Plane::build(GlobalPoint(0., 0., z), Surface::RotationType());
+    if (std::abs(z - start.position().z()) < 1.e-5)
+      return {TrajectoryStateOnSurface(start, *plane), 0.};
+    std::unique_ptr<Propagator> directed(propagator.clone());
+    directed->setPropagationDirection((z - start.position().z()) * start.momentum().z() > 0.
+                                         ? alongMomentum : oppositeToMomentum);
+    return directed->propagateWithPath(start, *plane);
+  }
+
+  PropagatedState materialPca(FreeTrajectoryState const& start,
+                              Propagator const& vacuumPropagator,
+                              Propagator const& materialPropagator) {
+    // The material-free PCA supplies only a starting plane, never a published
+    // state. Every trial is transported afresh from the detector likelihood.
+    auto seed = vacuumPropagator.propagateWithPath(
+        start, GlobalPoint(0., 0., -1.), GlobalPoint(0., 0., 1.));
+    if (seed.first.charge() == 0)
+      return {};
+    double z = seed.first.position().z();
+    for (unsigned int iteration = 0; iteration < 16; ++iteration) {
+      auto transported = materialStateAtZ(start, materialPropagator, z);
+      if (!transported.first.isValid() || !transported.first.freeState())
+        return {};
+      auto const position = transported.first.globalPosition();
+      auto const momentum = transported.first.globalMomentum();
+      double const transverse2 = momentum.perp2();
+      if (!(transverse2 > 1.e-12) || !std::isfinite(momentum.mag2()))
+        return {};
+      double const correction = -(position.x() * momentum.x() + position.y() * momentum.y()) *
+                                  momentum.z() / transverse2;
+      if (!std::isfinite(correction))
+        return {};
+      if (std::abs(correction) < 0.1) {
+        PropagatedState result;
+        result.valid = true;
+        result.position = position;
+        result.momentum = momentum;
+        result.path = transported.second;
+        // No fixed-boundary diagnostic is claimed for direct PCA transport.
+        return result;
+      }
+      // A numerical trust step, not a vertex-location or physics selection.
+      z += std::clamp(correction, -2000., 2000.);
+    }
+    return {};
+  }
+
   PropagatedState propagateStateToTargetLine(FreeTrajectoryState const& start,
                                              Propagator const& vacuumPropagator,
                                              Propagator const* materialPropagator,
                                              int sourceSide,
-                                             double materialBoundaryAbsZCm) {
+                                             double materialBoundaryAbsZCm,
+                                             bool fullMaterial = false) {
+    if (fullMaterial && materialPropagator)
+      return materialPca(start, vacuumPropagator, *materialPropagator);
     auto const position = start.position();
     // Geant4e samples the active Geant4 geometry and material up to the
     // configured boundary. Continue with vacuum transport only beyond that
@@ -770,7 +829,8 @@ namespace {
                                         int travelSign,
                                         Propagator const* materialPropagator,
                                         int sourceSide,
-                                        double materialBoundaryAbsZCm) {
+                                        double materialBoundaryAbsZCm,
+                                        bool fullMaterial = false) {
     // Once the event side is known, start from the fitted endpoint closest in
     // z to the external source.  This avoids beginning the backward transport
     // from a state that has already crossed additional detector material.
@@ -789,13 +849,15 @@ namespace {
     GlobalVector const momentum(sign * endpointMomentum.x(), sign * endpointMomentum.y(), sign * endpointMomentum.z());
     GlobalTrajectoryParameters const parameters(
         original.position(), momentum, sign * original.charge(), vacuumPropagator.magneticField());
-    FreeTrajectoryState const physicalState(parameters, original.curvilinearError());
+    FreeTrajectoryState const physicalState(
+        parameters, CurvilinearTrajectoryError(shift::seedCovariance(original.curvilinearError().matrix(), sign)));
     return propagateStateToTargetLine(
-        physicalState, vacuumPropagator, materialPropagator, sourceSide, materialBoundaryAbsZCm);
+        physicalState, vacuumPropagator, materialPropagator, sourceSide, materialBoundaryAbsZCm, fullMaterial);
   }
 
   struct RefitIterationResult {
     bool valid = false;
+    uint32_t upstreamDetId = 0;
     int status = 0;
     unsigned int hits = 0;
     double chi2 = 0.;
@@ -994,7 +1056,8 @@ namespace {
                                           bool precisionHitsOnly = false,
                                           bool usePathOrdering = true,
                                           int hitSideSelection = 0,
-                                          std::vector<std::pair<TransientTrackingRecHit::RecHitPointer, bool>> const* extraHits = nullptr) {
+                                          std::vector<std::pair<TransientTrackingRecHit::RecHitPointer, bool>> const* extraHits = nullptr,
+                                          bool fullMaterial = false) {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
       double path;
@@ -1052,7 +1115,9 @@ namespace {
                                 sign * seedMomentumScale * rawMomentum.z());
     GlobalTrajectoryParameters const parameters(
         original.position(), momentum, sign * original.charge(), &magneticField);
-    FreeTrajectoryState const originalSeed(parameters, original.curvilinearError());
+    FreeTrajectoryState const originalSeed(
+        parameters, CurvilinearTrajectoryError(
+                        shift::seedCovariance(original.curvilinearError().matrix(), sign, seedMomentumScale)));
     FreeTrajectoryState iterationSeed = originalSeed;
     if (usePathOrdering) {
       // Order measurements by actual propagated path from the source-facing
@@ -1239,7 +1304,7 @@ namespace {
                                      vacuumPropagator,
                                      &targetMaterialPropagator,
                                      sourceSide,
-                                     materialBoundaryAbsZCm);
+                                     materialBoundaryAbsZCm, fullMaterial);
       vacuumTargetState = propagateStateToTargetLine(
           upstreamFreeState, vacuumPropagator, nullptr, sourceSide, materialBoundaryAbsZCm);
       if (!materialTargetState.valid) {
@@ -1257,6 +1322,7 @@ namespace {
       result.downstreamP = downstreamMomentum.mag();
       result.signedInverseMomentum = upstream->signedInverseMomentum();
       result.upstreamState = *upstream;
+      result.upstreamDetId = smoothed.lastMeasurement().recHitR().geographicalId().rawId();
       result.materialTargetState = materialTargetState;
       result.vacuumTargetState = vacuumTargetState;
       return result;
@@ -1633,6 +1699,8 @@ public:
         caloMatchMinEnergy_(parameters.getParameter<double>("caloMatchMinEnergy")),
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
+        targetUseConsistentBackwardCovariance_(parameters.getParameter<bool>("targetUseConsistentBackwardCovariance")),
+        useMaterialAwareVertexTransport_(parameters.getParameter<bool>("useMaterialAwareVertexTransport")),
         lssMaterialBoundaryAbsZCm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
                                        .getParameter<double>("materialBoundaryAbsZCm")),
         lssGeant4eMomentumLimitGeV_(parameters.getParameter<edm::ParameterSet>("lssTransport")
@@ -1718,6 +1786,9 @@ public:
         maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
+    if (useMaterialAwareVertexTransport_ && !useDetailedMaterialPropagation_)
+      throw cms::Exception("Configuration")
+          << "useMaterialAwareVertexTransport requires useDetailedMaterialPropagation";
     auto collector = consumesCollector();
     hcalAssociatorParameters_.loadParameters(
         parameters.getParameter<edm::ParameterSet>("TrackAssociatorParameters"), collector);
@@ -1872,6 +1943,8 @@ public:
                                               lssGeant4eMaximumStepLengthMm_,
                                               lssGeant4eMaximumPathLengthCm_);
     }
+    if (detailedMaterialPropagator)
+      detailedMaterialPropagator->setUseConsistentBackwardCovariance(targetUseConsistentBackwardCovariance_);
     if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
       preRefitMaterialPropagator = detailedMaterialPropagator.get();
       sourceFacingTargetMaterialPropagator = detailedMaterialPropagator.get();
@@ -2024,7 +2097,7 @@ public:
           directionSign,
           preRefitMaterialPropagator,
           eventSourceSide,
-          lssMaterialBoundaryAbsZCm_);
+          lssMaterialBoundaryAbsZCm_, useMaterialAwareVertexTransport_);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
       candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
@@ -2399,7 +2472,7 @@ public:
                                 precisionHitsOnly,
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
-                                &additionalHits);
+                                &additionalHits, useMaterialAwareVertexTransport_);
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -2595,6 +2668,9 @@ public:
             (refit.selected.upstreamP - refit.selected.downstreamP) / refit.selected.upstreamP;
       if (refitPassesMomentumContinuity) {
         candidate.targetLineState = refit.selected.materialTargetState;
+        candidate.detectorState = *refit.selected.upstreamState.freeState();
+        candidate.detectorStateValid = true;
+        candidate.detectorStateDetId = refit.selected.upstreamDetId;
         if (refit.selected.vacuumTargetState.valid) {
           candidate.directionalRefitVacuumTargetPt = refit.selected.vacuumTargetState.momentum.perp();
           candidate.directionalRefitVacuumTargetPz = refit.selected.vacuumTargetState.momentum.z();
@@ -2807,6 +2883,11 @@ public:
     // direction contracts. Missing simulation products leave sentinels and
     // therefore keep this producer usable on data.
     std::vector<int> simTruthMatched(selected.size(), 0), simTrackId(selected.size(), -1);
+    std::vector<float> simPAtFittedSurface(selected.size(), -1.f), simFittedSurfaceBracketCm(selected.size(), -1.f);
+    std::vector<int> simIdealConstraintValid(selected.size(), 0);
+    std::vector<float> simIdealConstraintEta(selected.size(), 0.f), simIdealConstraintPhi(selected.size(), 0.f);
+    std::vector<float> simMeanRoundTripDistance(selected.size(), -1.f), simMeanRoundTripRelativeP(selected.size(), -1.f),
+        simMeanRoundTripAngle(selected.size(), -1.f);
     std::vector<int> simPixelHits(selected.size(), 0), simStripHits(selected.size(), 0),
         simDTHits(selected.size(), 0), simCSCHits(selected.size(), 0),
         simRPCHits(selected.size(), 0), simGEMHits(selected.size(), 0), simMuonDetectorMask(selected.size(), 0);
@@ -3002,6 +3083,43 @@ public:
           return pathFromVertex(first) < pathFromVertex(second);
         });
         auto const* firstHit = hits.front();
+        // Compare the fit to truth on its own retained detector surface, not
+        // at an earlier SimHit which may precede unmeasured material.
+        auto const& candidate = *selected[selectedIndex];
+        auto const* fittedDet = candidate.detectorStateValid && candidate.detectorStateDetId
+                                    ? trackingGeometry.idToDet(DetId(candidate.detectorStateDetId)) : nullptr;
+        if (candidate.detectorStateValid && fittedDet) {
+          auto chamberKey = [](DetId id) -> uint32_t {
+            if (id.det() != DetId::Muon)
+              return id.rawId();
+            if (id.subdetId() == MuonSubdetId::CSC)
+              return CSCDetId(id).chamberId().rawId();
+            if (id.subdetId() == MuonSubdetId::DT)
+              return DTWireId(id).chamberId().rawId();
+            if (id.subdetId() == MuonSubdetId::GEM)
+              return GEMDetId(id).chamberId().rawId();
+            return id.rawId();
+          };
+          double low = -std::numeric_limits<double>::infinity(), high = std::numeric_limits<double>::infinity();
+          double lowP = 0., highP = 0.;
+          for (auto const* hit : hits) {
+            if (chamberKey(DetId(hit->detUnitId())) != chamberKey(DetId(candidate.detectorStateDetId)))
+              continue;
+            auto const* hitDet = trackingGeometry.idToDetUnit(DetId(hit->detUnitId()));
+            if (!hitDet)
+              continue;
+            for (auto const& local : {hit->entryPoint(), hit->exitPoint()}) {
+              double const z = fittedDet->surface().toLocal(hitDet->surface().toGlobal(local)).z();
+              if (z <= 0. && z > low) { low = z; lowP = hit->pabs(); }
+              if (z >= 0. && z < high) { high = z; highP = hit->pabs(); }
+            }
+          }
+          if (std::isfinite(low) && std::isfinite(high)) {
+            double const fraction = high > low ? -low / (high - low) : 0.;
+            simPAtFittedSurface[selectedIndex] = lowP + fraction * (highP - lowP);
+            simFittedSurfaceBracketCm[selectedIndex] = high - low;
+          }
+        }
         auto const* lastHit = hits.back();
         auto const* firstDet = trackingGeometry.idToDetUnit(DetId(firstHit->detUnitId()));
         if (!firstDet || !(firstHit->pabs() > 0.) || !(lastHit->pabs() > 0.))
@@ -3012,6 +3130,47 @@ public:
             (matchedSimTrack->momentum().P() - firstHit->pabs()) / matchedSimTrack->momentum().P();
         simLossAcrossPrecisionHits[selectedIndex] = (firstHit->pabs() - lastHit->pabs()) / firstHit->pabs();
         simFirstPrecisionPath[selectedIndex] = pathFromVertex(firstHit);
+        // Validation only: exact simulated detector state and exact production
+        // vertex isolate transport/scattering from detector-fit uncertainty.
+        // This result never participates in candidate selection or fitting.
+        if (sourceFacingTargetMaterialPropagator) {
+          auto const point = firstDet->surface().toGlobal(firstHit->entryPoint());
+          auto const momentum = firstDet->surface().toGlobal(firstHit->momentumAtEntry());
+          AlgebraicSymMatrix55 covariance;
+          for (unsigned int index = 0; index < 5; ++index)
+            covariance(index, index) = 1.e-12;
+          FreeTrajectoryState truthState(
+              GlobalTrajectoryParameters(point, momentum, firstHit->particleType() > 0 ? -1 : 1, &magneticField),
+              CurvilinearTrajectoryError(covariance));
+          auto plane = Plane::build(point, Surface::RotationType());
+          auto const ideal = applyTargetConstraint(TrajectoryStateOnSurface(truthState, *plane),
+                                                   vertexPosition.z() > 0. ? 1 : -1,
+                                                   vacuumPropagator, *sourceFacingTargetMaterialPropagator,
+                                                   TargetConstraint{vertexPosition, 1.e-4, 1.e-4, 0.},
+                                                   lssMaterialBoundaryAbsZCm_);
+          if (ideal.valid) {
+            simIdealConstraintValid[selectedIndex] = 1;
+            simIdealConstraintEta[selectedIndex] = ideal.state.momentum.eta();
+            simIdealConstraintPhi[selectedIndex] = ideal.state.momentum.phi();
+          }
+          FreeTrajectoryState productionState(
+              GlobalTrajectoryParameters(vertexPosition, truthMomentum,
+                                         firstHit->particleType() > 0 ? -1 : 1, &magneticField),
+              CurvilinearTrajectoryError(covariance));
+          auto outward = materialStateAtZ(productionState, *sourceFacingTargetMaterialPropagator, point.z());
+          if (outward.first.isValid() && outward.first.freeState()) {
+            auto returned = materialStateAtZ(*outward.first.freeState(), *sourceFacingTargetMaterialPropagator,
+                                             vertexPosition.z());
+            if (returned.first.isValid()) {
+              simMeanRoundTripDistance[selectedIndex] = (returned.first.globalPosition() - vertexPosition).mag();
+              simMeanRoundTripRelativeP[selectedIndex] = returned.first.globalMomentum().mag() / truthMomentum.mag() - 1.;
+              auto const returnedDirection = returned.first.globalMomentum().unit();
+              auto const originalDirection = truthMomentum.unit();
+              simMeanRoundTripAngle[selectedIndex] = std::atan2(returnedDirection.cross(originalDirection).mag(),
+                                                               returnedDirection.dot(originalDirection));
+            }
+          }
+        }
       }
     }
 
@@ -3983,6 +4142,22 @@ public:
                           simTruthMatched,
                           "MC closure diagnostic: selected row matched to a primary SimTrack with precision SimHits");
     table->addColumn<int>("simTrackId", simTrackId, "matched Geant4 SimTrack id, or -1");
+    table->addColumn<float>("simPAtFittedSurface", simPAtFittedSurface,
+                           "validation only: true p interpolated between SimHits bracketing the retained upstream fit surface in its chamber; -1 if unavailable");
+    table->addColumn<float>("simFittedSurfaceBracketCm", simFittedSurfaceBracketCm,
+                           "validation only: local-z gap of truth interpolation at the fitted surface in cm; -1 if unavailable");
+    table->addColumn<int>("simIdealConstraintValid", simIdealConstraintValid,
+                         "validation only: target update from exact simulated first-hit state and vertex succeeded");
+    table->addColumn<float>("simIdealConstraintEta", simIdealConstraintEta,
+                           "validation only: eta from exact simulated first-hit state constrained to true vertex");
+    table->addColumn<float>("simIdealConstraintPhi", simIdealConstraintPhi,
+                           "validation only: phi from exact simulated first-hit state constrained to true vertex");
+    table->addColumn<float>("simMeanRoundTripDistance", simMeanRoundTripDistance,
+                           "validation only: deterministic material forward/backward position closure in cm; -1 if invalid");
+    table->addColumn<float>("simMeanRoundTripRelativeP", simMeanRoundTripRelativeP,
+                           "validation only: deterministic material forward/backward p ratio minus one; -1 if invalid");
+    table->addColumn<float>("simMeanRoundTripAngle", simMeanRoundTripAngle,
+                           "validation only: deterministic material forward/backward opening angle in rad; -1 if invalid");
     table->addColumn<int>("simPixelHits", simPixelHits, "matched muon Geant4 hits in pixel sensitive volumes");
     table->addColumn<int>("simStripHits", simStripHits, "matched muon Geant4 hits in strip sensitive volumes");
     table->addColumn<float>("simTrackP", simTrackP, "matched SimTrack momentum at the production vertex");
@@ -4052,6 +4227,8 @@ public:
       CommonLineVertex fit;
       double originChi2;
       double score;
+      PropagatedState firstAtVertex;
+      PropagatedState secondAtVertex;
     };
     std::vector<PairChoice> pairChoices;
     for (unsigned int first = 0; first < selected.size(); ++first) {
@@ -4082,15 +4259,62 @@ public:
         constexpr double originNdof = 3.;
         if (originChi2 / originNdof > maxPairOriginNormalizedChi2_)
           continue;
-        auto const fit = commonLineVertex(firstState,
+        auto fit = commonLineVertex(firstState,
                                           secondState,
                                           commonVertexLineResolution_,
                                           commonVertexBeamLineResolution_);
         if (!fit.valid)
           continue;
+        auto firstAtVertex = firstState;
+        auto secondAtVertex = secondState;
+        if (useMaterialAwareVertexTransport_) {
+          if (!selected[first]->detectorStateValid || !selected[second]->detectorStateValid)
+            continue;
+          bool converged = false;
+          for (unsigned int iteration = 0; iteration < 16; ++iteration) {
+            double const trialZ = fit.position.z();
+            auto firstTransport = materialStateAtZ(selected[first]->detectorState,
+                                                   *sourceFacingTargetMaterialPropagator, trialZ);
+            auto secondTransport = materialStateAtZ(selected[second]->detectorState,
+                                                    *sourceFacingTargetMaterialPropagator, trialZ);
+            if (!firstTransport.first.isValid() || !secondTransport.first.isValid())
+              break;
+            firstAtVertex.position = firstTransport.first.globalPosition();
+            firstAtVertex.momentum = firstTransport.first.globalMomentum();
+            secondAtVertex.position = secondTransport.first.globalPosition();
+            secondAtVertex.momentum = secondTransport.first.globalMomentum();
+            auto updated = commonLineVertex(firstAtVertex, secondAtVertex,
+                                            commonVertexLineResolution_, commonVertexBeamLineResolution_);
+            if (!updated.valid)
+              break;
+            double const deltaZ = updated.position.z() - trialZ;
+            if (std::abs(deltaZ) < 0.1) {
+              // Evaluate the momenta on the final common plane as well.
+              auto finalFirst = materialStateAtZ(selected[first]->detectorState,
+                                                 *sourceFacingTargetMaterialPropagator, updated.position.z());
+              auto finalSecond = materialStateAtZ(selected[second]->detectorState,
+                                                  *sourceFacingTargetMaterialPropagator, updated.position.z());
+              if (!finalFirst.first.isValid() || !finalSecond.first.isValid())
+                break;
+              firstAtVertex.position = finalFirst.first.globalPosition();
+              firstAtVertex.momentum = finalFirst.first.globalMomentum();
+              secondAtVertex.position = finalSecond.first.globalPosition();
+              secondAtVertex.momentum = finalSecond.first.globalMomentum();
+              fit = updated;
+              converged = true;
+              break;
+            }
+            updated.position = GlobalPoint(updated.position.x(), updated.position.y(),
+                                            trialZ + std::clamp(deltaZ, -2000., 2000.));
+            fit = updated;
+          }
+          if (!converged)
+            continue;
+        }
         double const score = originChi2 / originNdof +
                              std::pow(lineApproach.distance / commonVertexLineResolution_, 2) + fit.chi2 / fit.ndof;
-        pairChoices.push_back({first, second, lineApproach, fit, originChi2, score});
+        pairChoices.push_back({first, second, lineApproach, fit, originChi2, score,
+                               firstAtVertex, secondAtVertex});
       }
     }
     std::stable_sort(pairChoices.begin(), pairChoices.end(), [](PairChoice const& first, PairChoice const& second) {
@@ -4110,17 +4334,16 @@ public:
       muonAlreadyUsed[second] = true;
       ++retainedVertices;
 
-      auto const& firstState = selected[first]->targetLineState;
-      auto const& secondState = selected[second]->targetLineState;
+      auto const& firstState = choice.firstAtVertex;
+      auto const& secondState = choice.secondAtVertex;
       int const firstCharge = candidateDirectionSign(*selected[first]) * selected[first]->track->charge();
       int const secondCharge = candidateDirectionSign(*selected[second]) * selected[second]->track->charge();
 
-      auto canonicalMomentum = [](Candidate const& candidate) {
-        auto const& state = candidate.targetLineState;
+      auto canonicalMomentum = [](PropagatedState const& state) {
         return std::array<double, 3>{state.momentum.x(), state.momentum.y(), state.momentum.z()};
       };
-      auto const firstP = canonicalMomentum(*selected[first]);
-      auto const secondP = canonicalMomentum(*selected[second]);
+      auto const firstP = canonicalMomentum(firstState);
+      auto const secondP = canonicalMomentum(secondState);
       double const pairPx = firstP[0] + secondP[0];
       double const pairPy = firstP[1] + secondP[1];
       double const pairPz = firstP[2] + secondP[2];
@@ -4305,7 +4528,10 @@ public:
                                 "1 when the unconstrained far-vertex Kalman fit converged near its line seed");
     vertexTable->addColumn<int>("usesLineFallback",
                                 vertexUsesLineFallback,
-                                "1 when position comes from straight-line closest approach after Kalman failure");
+                                "1 when position uses a common-line model rather than a Kalman vertex fit");
+    vertexTable->addColumn<int>("materialAwareTransport",
+                                std::vector<int>(vertexVx.size(), useMaterialAwareVertexTransport_),
+                                "1 when material transport is iterated to the common vertex plane for both muons");
     vertexTable->addColumn<float>("vx", vertexVx, "unbounded common-line fit vertex x");
     vertexTable->addColumn<float>("vy", vertexVy, "unbounded common-line fit vertex y");
     vertexTable->addColumn<float>("vz", vertexVz, "unbounded common-line fit vertex z");
@@ -4420,6 +4646,8 @@ public:
     description.add<double>("caloMatchMinEnergy", 0.01);
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
+    description.add<bool>("targetUseConsistentBackwardCovariance", false);
+    description.add<bool>("useMaterialAwareVertexTransport", false);
     edm::ParameterSetDescription lssTransportDescription;
     lssTransportDescription.add<std::string>("magneticFieldLabel", "");
     lssTransportDescription.add<double>("materialBoundaryAbsZCm", 1100.0);
@@ -4539,6 +4767,8 @@ private:
   double caloMatchMinEnergy_;
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
+  bool targetUseConsistentBackwardCovariance_;
+  bool useMaterialAwareVertexTransport_;
   double lssMaterialBoundaryAbsZCm_;
   double lssGeant4eMomentumLimitGeV_;
   double lssGeant4eMaximumStepLengthMm_;

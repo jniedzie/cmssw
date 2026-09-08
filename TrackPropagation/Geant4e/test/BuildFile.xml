@@ -11,10 +11,15 @@
 <use name="Geometry/RPCGeometry"/>
 <use name="Geometry/CSCGeometry"/>
 <use name="DataFormats/MuonDetId"/>
-<library file="*.cc" name="Geant4ePropagatorTests">
+<library file="*Propagator*.cc" name="Geant4ePropagatorTests">
   <flags EDM_PLUGIN="1"/>
 </library>
 
 <test name="testG4Refitter" command="cmsRun ${LOCALTOP}/src/TrackPropagation/Geant4e/test/Geant4e_example_cfg.py"/>
 <test name="testG4SimplePropagator" command="cmsRun ${LOCALTOP}/src/TrackPropagation/Geant4e/test/simpleTestPropagator_cfg.py"/>
 <test name="testG4PropagatorAnalyzer" command="cmsRun ${LOCALTOP}/src/TrackPropagation/Geant4e/test/testPropagatorAnalyzer_cfg.py"/>
+
+<bin file="testBackwardCovariance.cc" name="testG4BackwardCovariance">
+  <use name="DataFormats/GeometryVector"/>
+</bin>
+<test name="testG4BackwardCovarianceRun" command="testG4BackwardCovariance"/>

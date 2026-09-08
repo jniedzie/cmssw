@@ -283,6 +283,8 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   if (ftsStart.hasError()) {
     CurvilinearTrajectoryError initErr;
     initErr = ftsStart.curvilinearError();
+    if (consistentBackwardCovariance_ && mode == G4ErrorMode_PropBackwards)
+      initErr = CurvilinearTrajectoryError(TrackPropagation::reverseMomentumCovariance(initErr.matrix()));
     g4error = TrackPropagation::algebraicSymMatrix55ToG4ErrorTrajErr(initErr, ftsStart.charge());
     LogDebug("Geant4e") << "CMS -  Error matrix: " << std::endl << initErr.matrix();
   } else {
@@ -294,7 +296,9 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
 
   // in CMSSW, the state errors are deflated when performing the backward
   // propagation
-  if (mode == G4ErrorMode_PropForwards) {
+  if (mode == G4ErrorMode_PropForwards || consistentBackwardCovariance_) {
+    // With an explicitly reversed frame, Geant4 advances along its own
+    // momentum. Deflation would reverse the Jacobian a second time.
     G4ErrorPropagatorData::GetErrorPropagatorData()->SetStage(G4ErrorStage_Inflation);
   } else if (mode == G4ErrorMode_PropBackwards) {
     G4ErrorPropagatorData::GetErrorPropagatorData()->SetStage(G4ErrorStage_Deflation);
@@ -395,6 +399,8 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
       TrackPropagation::g4ErrorTrajErrToAlgebraicSymMatrix55(g4errorEnd, ftsStart.charge()));
 
   if (mode == G4ErrorMode_PropBackwards) {
+    if (consistentBackwardCovariance_)
+      curvError = CurvilinearTrajectoryError(TrackPropagation::reverseMomentumCovariance(curvError.matrix()));
     GlobalTrajectoryParameters endParm(
         posEndGV, momEndGV, ftsStart.parameters().charge(), &ftsStart.parameters().magneticField());
 

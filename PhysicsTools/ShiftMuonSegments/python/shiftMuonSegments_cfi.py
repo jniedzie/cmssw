@@ -94,6 +94,12 @@ shiftMuonTable = cms.EDProducer(
     # Use explicitly backward Geant4e transport to recover material losses
     # between the source-facing fitted state and the configured boundary.
     useDetailedMaterialPropagation=cms.bool(False),
+    # Experimental backward covariance correction; validate paired target fits
+    # before enabling in production. Does not change geometry or mean transport.
+    targetUseConsistentBackwardCovariance=cms.bool(False),
+    # Direct material transport to free PCA and iterated common vertex.
+    # Requires detailed transport; keep guarded until paired closure passes.
+    useMaterialAwareVertexTransport=cms.bool(False),
     # Shared reconstruction-side contract for an extended LSS geometry and
     # composite magnetic field. Defaults preserve the current CMS-only setup.
     # An LSS configuration must select the same EventSetup field used by

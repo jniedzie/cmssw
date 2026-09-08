@@ -1,0 +1,4 @@
+<bin file="testSeedCovariance.cc" name="testShiftSeedCovariance">
+  <use name="DataFormats/CLHEP"/>
+</bin>
+<test name="testShiftSeedCovarianceRun" command="testShiftSeedCovariance"/>
