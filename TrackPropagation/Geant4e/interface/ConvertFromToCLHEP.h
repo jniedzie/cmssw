@@ -100,6 +100,18 @@ namespace TrackPropagation {
     return TkRotation<float>(r.xx(), r.xy(), r.xz(), r.yx(), r.yy(), r.yz(), r.zx(), r.zy(), r.zz());
   }
 
+  // Reverse momentum at fixed charge: (q/p, lambda, phi, xT, yT)
+  // transforms with diag(1, -1, 1, -1, 1). In particular, the transverse
+  // x axis changes sign while y does not. Apply C' = J C J^T.
+  inline AlgebraicSymMatrix55 reverseMomentumCovariance(const AlgebraicSymMatrix55 &error) {
+    constexpr double signs[5] = {1., -1., 1., -1., 1.};
+    auto result = error;
+    for (unsigned int i = 0; i < 5; ++i)
+      for (unsigned int j = 0; j <= i; ++j)
+        result(i, j) *= signs[i] * signs[j];
+    return result;
+  }
+
   /** Convert a G4 Trajectory Error Matrix to the CMS Algebraic Sym Matrix
  CMS uses q/p as first parameter, G4 uses 1/p
  */

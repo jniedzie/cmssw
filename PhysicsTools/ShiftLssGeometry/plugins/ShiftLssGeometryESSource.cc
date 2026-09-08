@@ -24,6 +24,7 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "FWCore/Utilities/interface/FileInPath.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
+#include "PhysicsTools/ShiftLssGeometry/interface/BooleanFrameNormalizer.h"
 #include "TGeoManager.h"
 #include "TGeoMatrix.h"
 #include "TGeoShape.h"
@@ -311,6 +312,12 @@ private:
     }
     dd4hep::PlacedVolume oldPlacement = child.placement();
     dd4hep::Volume importedVolume = oldPlacement.volume();
+    shift::BooleanFrameNormalizer normalizer;
+    auto const importedFrame = normalizer.volume(importedVolume.ptr());
+    if (!importedFrame.IsIdentity())
+      throw cms::Exception("UnsupportedGeometry") << "External GDML world must have an untransformed solid frame";
+    edm::LogInfo("ShiftLssGeometry") << "Normalized " << normalizer.changed()
+                                    << " Boolean frames for faithful DDG4 conversion";
     // The bounded converter recentres the source model around an artifact
     // origin.  Place that artifact origin at the transformed source-model
     // coordinate; fields use the same modelOrigin + R * modelPoint contract.

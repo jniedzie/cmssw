@@ -57,6 +57,11 @@ public:
 
   const MagneticField *magneticField() const override { return theField; }
 
+  // Opt-in physical backward covariance transport. The momentum reversed for
+  // Geant4 must carry its own curvilinear frame; propagation follows that
+  // frame with a positive step and the returned covariance is reversed back.
+  void setUseConsistentBackwardCovariance(bool value) { consistentBackwardCovariance_ = value; }
+
 private:
   typedef std::pair<TrajectoryStateOnSurface, double> TsosPP;
   typedef std::pair<bool, std::shared_ptr<G4ErrorTarget>> ErrorTargetPair;
@@ -70,6 +75,7 @@ private:
   // The Geant4e manager. Does the real propagation
   G4ErrorPropagatorManager *theG4eManager;
   G4ErrorPropagatorData *theG4eData;
+  bool consistentBackwardCovariance_ = false;
   double plimit_;
   double maximumStepLengthMm_;
   double maximumPathLengthCm_;
