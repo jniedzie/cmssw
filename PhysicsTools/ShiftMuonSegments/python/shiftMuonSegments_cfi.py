@@ -100,6 +100,9 @@ shiftMuonTable = cms.EDProducer(
     # Direct material transport to free PCA and iterated common vertex.
     # Requires detailed transport; keep guarded until paired closure passes.
     useMaterialAwareVertexTransport=cms.bool(False),
+    # Joint reconstructed-vertex fit and track smoothing; separate from the
+    # prompt-target hypothesis. Enable for bounded validation before production.
+    useVertexConstrainedRefit=cms.bool(False),
     # Shared reconstruction-side contract for an extended LSS geometry and
     # composite magnetic field. Defaults preserve the current CMS-only setup.
     # An LSS configuration must select the same EventSetup field used by
