@@ -4516,14 +4516,27 @@ public:
       vertexRefittedVyErr.push_back(vertexRefitValid ? std::sqrt(vertexRefit.fit.covariance(1, 1)) : 0.);
       vertexRefittedVzErr.push_back(vertexRefitValid ? std::sqrt(vertexRefit.fit.covariance(2, 2)) : 0.);
       vertexRefittedChi2.push_back(vertexRefitValid ? vertexRefit.fit.chi2 : 0.);
-      auto const refittedMomentum = vertexRefitValid ? vertexRefit.momenta[0] + vertexRefit.momenta[1] : GlobalVector();
-      double const refittedEnergy = vertexRefitValid
-          ? std::hypot(vertexRefit.momenta[0].mag(), muonMass) + std::hypot(vertexRefit.momenta[1].mag(), muonMass) : 0.;
-      vertexRefittedMass.push_back(std::sqrt(std::max(0., refittedEnergy * refittedEnergy - refittedMomentum.mag2())));
-      vertexRefittedPt.push_back(refittedMomentum.perp());
-      vertexRefittedPz.push_back(refittedMomentum.z());
-      vertexRefittedEta.push_back(refittedMomentum.perp() > 0. ? refittedMomentum.eta() : 0.);
-      vertexRefittedPhi.push_back(vertexRefitValid ? static_cast<double>(refittedMomentum.phi()) : 0.);
+      // GlobalVector stores floats. Promote each component before forming
+      // energies or adding momenta: E^2 - p^2 otherwise loses precision for
+      // boosted pairs and disagrees with the persisted individual tracks.
+      double refittedPx = 0., refittedPy = 0., refittedPz = 0., refittedEnergy = 0.;
+      if (vertexRefitValid) {
+        for (auto const& momentum : vertexRefit.momenta) {
+          double const px = momentum.x(), py = momentum.y(), pz = momentum.z();
+          refittedPx += px;
+          refittedPy += py;
+          refittedPz += pz;
+          refittedEnergy += std::sqrt(px * px + py * py + pz * pz + muonMass * muonMass);
+        }
+      }
+      double const refittedPt = std::hypot(refittedPx, refittedPy);
+      vertexRefittedMass.push_back(std::sqrt(std::max(0., refittedEnergy * refittedEnergy -
+                                                         refittedPx * refittedPx - refittedPy * refittedPy -
+                                                         refittedPz * refittedPz)));
+      vertexRefittedPt.push_back(refittedPt);
+      vertexRefittedPz.push_back(refittedPz);
+      vertexRefittedEta.push_back(refittedPt > 0. ? std::asinh(refittedPz / refittedPt) : 0.);
+      vertexRefittedPhi.push_back(vertexRefitValid ? std::atan2(refittedPy, refittedPx) : 0.);
       for (unsigned int i = 0; i < 2; ++i) {
         auto const muonIndex = i == 0 ? first : second;
         muonVertexRefitIdx[muonIndex] = retainedVertices - 1;
