@@ -6,3 +6,5 @@
   <use name="eigen"/>
 </bin>
 <test name="testShiftCommonVertexRefitRun" command="testShiftCommonVertexRefit"/>
+<bin file="testHitTruthAssociation.cc" name="testShiftHitTruthAssociation"/>
+<test name="testShiftHitTruthAssociationRun" command="testShiftHitTruthAssociation"/>
