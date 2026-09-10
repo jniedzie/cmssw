@@ -194,6 +194,8 @@ shiftMuonTable = cms.EDProducer(
     # Simulation-only closure columns and source/opposite-side precision
     # refits. Disabled in production because the extra fits cost CPU.
     produceMomentumClosureDiagnostics=cms.bool(False),
+    # Optional material/energy trace of the truth-only mean round trip.
+    produceTransportClosureAudit=cms.bool(False),
     # HCAL/ZDC are diagnostic truth associations in this iteration. They are
     # deliberately not treated as precision Kalman measurements.
     enableHcalDiagnostics=cms.bool(False),

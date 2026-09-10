@@ -61,6 +61,7 @@ public:
   // Geant4 must carry its own curvilinear frame; propagation follows that
   // frame with a positive step and the returned covariance is reversed back.
   void setUseConsistentBackwardCovariance(bool value) { consistentBackwardCovariance_ = value; }
+  void setTransportAudit(bool value) { transportAudit_ = value; }
 
 private:
   typedef std::pair<TrajectoryStateOnSurface, double> TsosPP;
@@ -76,6 +77,7 @@ private:
   G4ErrorPropagatorManager *theG4eManager;
   G4ErrorPropagatorData *theG4eData;
   bool consistentBackwardCovariance_ = false;
+  bool transportAudit_ = false;
   double plimit_;
   double maximumStepLengthMm_;
   double maximumPathLengthCm_;

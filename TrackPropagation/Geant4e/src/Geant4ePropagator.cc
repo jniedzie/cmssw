@@ -1,4 +1,7 @@
 #include <sstream>
+#include <array>
+#include <map>
+#include <iomanip>
 
 // Geant4e
 #include "TrackPropagation/Geant4e/interface/ConvertFromToCLHEP.h"
@@ -33,6 +36,9 @@
 #include "G4ErrorPropagationNavigator.hh"
 #include "G4RunManagerKernel.hh"
 #include "G4StateManager.hh"
+#include "G4Step.hh"
+#include "G4Material.hh"
+#include "G4VPhysicalVolume.hh"
 
 // CLHEP
 #include <CLHEP/Units/SystemOfUnits.h>
@@ -311,6 +317,11 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   // Propagate
   int iterations = 0;
   double finalPathLength = 0;
+  std::map<std::string, std::array<double, 3>> materialAudit;
+  if (transportAudit_)
+    edm::LogVerbatim("Geant4eTransportAudit") << std::setprecision(12)
+        << "BEGIN mode=" << int(mode) << " charge=" << ftsStart.charge()
+        << " position=" << cmsInitPos << " momentum=" << cmsInitMom;
 
   HepGeom::Point3D<double> finalRecoPos;
 
@@ -335,7 +346,30 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
 
     const int ierr = theG4eManager->PropagateOneStep(&g4eTrajState, mode);
 
+    if (transportAudit_ && g4eTrajState.GetG4Track()) {
+      auto const* step = g4eTrajState.GetG4Track()->GetStep();
+      if (step && step->GetPreStepPoint()->GetMaterial()) {
+        if (step->GetPreStepPoint()->GetMaterial() != step->GetPostStepPoint()->GetMaterial()) {
+          auto const* before = step->GetPreStepPoint();
+          auto const* after = step->GetPostStepPoint();
+          edm::LogVerbatim("Geant4eTransportAudit") << std::setprecision(12)
+              << "BOUNDARY from=" << before->GetMaterial()->GetName()
+              << " volume=" << (before->GetPhysicalVolume() ? before->GetPhysicalVolume()->GetName() : "none")
+              << " to=" << (after->GetMaterial() ? after->GetMaterial()->GetName() : "none")
+              << " volume=" << (after->GetPhysicalVolume() ? after->GetPhysicalVolume()->GetName() : "none")
+              << " preMm=" << before->GetPosition() << " postMm=" << after->GetPosition();
+        }
+        auto& audit = materialAudit[step->GetPreStepPoint()->GetMaterial()->GetName()];
+        audit[0] += step->GetStepLength() / CLHEP::cm;
+        audit[1] += (step->GetPreStepPoint()->GetKineticEnergy() -
+                     step->GetPostStepPoint()->GetKineticEnergy()) / CLHEP::GeV;
+        audit[2] += 1.;
+      }
+    }
+
     if (ierr != 0) {
+      if (transportAudit_)
+        edm::LogVerbatim("Geant4eTransportAudit") << "FAILED code=" << ierr;
       // propagation failed, return invalid track state
       return TsosPP(TrajectoryStateOnSurface(), 0.0f);
     }
@@ -383,6 +417,15 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   // CMS uses cm and GeV while Geant4 uses mm and MeV
   //
   const HepGeom::Vector3D<double> momEnd = g4eTrajState.GetMomentum();
+  if (transportAudit_) {
+    for (auto const& [material, values] : materialAudit)
+      edm::LogVerbatim("Geant4eTransportAudit") << std::setprecision(12)
+          << "MATERIAL name=" << material << " lengthCm=" << values[0]
+          << " lossGeV=" << values[1] << " steps=" << values[2];
+    edm::LogVerbatim("Geant4eTransportAudit") << std::setprecision(12)
+        << "END positionMm=" << finalRecoPos << " momentumMeV=" << momEnd
+        << " pathCm=" << finalPathLength;
+  }
 
   // use the hit on the the RECO plane as the final position to be d'accor with
   // the RecHit measurements
