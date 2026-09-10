@@ -1,0 +1,21 @@
+{
+  "schema": "shift-versioned-geometry-validation-artifact-v1",
+  "model_status": "provisional-ir1-atlas-proxy",
+  "production_default": false,
+  "gdml": "lhc_ir1_halfspace_repaired_20260910.gdml",
+  "gdml_sha256": "d6f9f6fa5658a55e365d5a80025522cac7bcab1ce6fb006ca27b5120f5f41f66",
+  "converter_repository": "shift_cmssw_workflow",
+  "converter_commit": "4041561",
+  "artifact_origin_in_model_cm": [0.0, 4299.5, 14575.200000105498],
+  "validation_directory": "validation/lss_reco_20260910",
+  "conversion_report_sha256": "7c15188e172941126894ba2c95c0128ac6f29729091e539f214c0b3681d0c1ac",
+  "bounded_audit_sha256": "476d3b5dc2c63f3b3476077de750ebf82db4f1c2fc05db1652ff6efeb2027e30",
+  "source_bounds_audit_sha256": "b420b67de25b0b0a71cfa392ebf9aeb9da5f447077e36aae9abfacf4ce34c786",
+  "placed_volume_count": 2764,
+  "root_overlap_count": 0,
+  "persistent_internal_source_gap_count": 0,
+  "boundary_sensitive_interval_count": 30,
+  "envelope_interface_interval_count": 162,
+  "merged_cmssw_overlap_and_field_test": "passed",
+  "canonical_reconstruction_reference": "SHIFT_RECONSTRUCTION.md"
+}
