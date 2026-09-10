@@ -80,6 +80,7 @@
 #include <algorithm>
 #include "PhysicsTools/ShiftMuonSegments/interface/SeedCovariance.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/CommonVertexRefit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/HitTruthAssociation.h"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -1447,6 +1448,22 @@ namespace {
             static_cast<unsigned int>(points.size()),
             std::min(alongChi2, oppositeChi2),
             delta};
+  }
+
+  void appendTruthMeasurements(TrackingRecHit const& hit, std::vector<shift::TruthMeasurement>& result) {
+    auto const components = hit.recHits();
+    if (!components.empty()) {
+      for (auto const* component : components)
+        if (component && component->isValid())
+          appendTruthMeasurements(*component, result);
+      return;
+    }
+    DetId const id(hit.rawId());
+    if (id.det() != DetId::Muon || id.subdetId() != MuonSubdetId::CSC || CSCDetId(id).layer() == 0)
+      return;
+    auto const p = hit.localPosition();
+    auto const e = hit.localPositionError();
+    result.push_back({id.rawId(), p.x(), p.y(), p.z(), e.xx(), e.xy(), e.yy()});
   }
 
   void appendHitFingerprints(TrackingRecHit const& hit, std::vector<HitFingerprint>& result) {
@@ -2968,6 +2985,10 @@ public:
     // direction contracts. Missing simulation products leave sentinels and
     // therefore keep this producer usable on data.
     std::vector<int> simTruthMatched(selected.size(), 0), simTrackId(selected.size(), -1);
+    std::vector<int> hitSimTrackId(selected.size(), -1), hitGenPartIdx(selected.size(), -1),
+        hitTruthLayers(selected.size(), 0), hitTruthMatchedLayers(selected.size(), 0),
+        hitTruthAmbiguousLayers(selected.size(), 0);
+    std::vector<float> hitTruthPurity(selected.size(), 0.f);
     std::vector<float> simPAtFittedSurface(selected.size(), -1.f), simFittedSurfaceBracketCm(selected.size(), -1.f);
     std::vector<int> simIdealConstraintValid(selected.size(), 0);
     std::vector<float> simIdealConstraintEta(selected.size(), 0.f), simIdealConstraintPhi(selected.size(), 0.f);
@@ -3009,6 +3030,47 @@ public:
       collectHits(cscSimHits, 1, true);
       collectHits(rpcSimHits, 2, false);
       collectHits(gemSimHits, 3, true);
+      std::vector<shift::TruthCrossing> cscCrossings;
+      if (cscSimHits.isValid())
+        for (auto const& hit : *cscSimHits) {
+          auto const p = hit.entryPoint();
+          auto const m = hit.momentumAtEntry();
+          cscCrossings.push_back({hit.detUnitId(), hit.trackId(), p.x(), p.y(), p.z(), m.x(), m.y(), m.z()});
+        }
+      for (unsigned int i = 0; i < selected.size(); ++i) {
+        std::vector<shift::TruthMeasurement> measurements;
+        auto const& track = *selected[i]->track;
+        for (auto hit = track.recHitsBegin(); hit != track.recHitsEnd(); ++hit)
+          if ((*hit)->isValid())
+            appendTruthMeasurements(**hit, measurements);
+        auto const association = shift::associateHits(measurements, cscCrossings);
+        hitSimTrackId[i] = association.track;
+        hitTruthLayers[i] = association.total;
+        hitTruthMatchedLayers[i] = association.matched;
+        hitTruthAmbiguousLayers[i] = association.ambiguous;
+        hitTruthPurity[i] = association.purity;
+        // Link truth to truth only. Never use reconstructed angles or charge.
+        for (auto const& sim : *simTracks) {
+          if (association.track < 0 || sim.trackId() != static_cast<unsigned int>(association.track) ||
+              sim.vertIndex() < 0 || static_cast<std::size_t>(sim.vertIndex()) >= simVertices->size())
+            continue;
+          auto const& v = (*simVertices)[sim.vertIndex()].position();
+          int match = -1;
+          for (unsigned int j = 0; j < genParticles->size(); ++j) {
+            auto const& g = (*genParticles)[j];
+            if (g.status() != 1 || g.pdgId() != sim.type() || !(g.p() > 0.))
+              continue;
+            double const dp = std::hypot(std::hypot(g.px() - sim.momentum().px(), g.py() - sim.momentum().py()),
+                                         g.pz() - sim.momentum().pz()) / g.p();
+            double const dv = std::hypot(std::hypot(g.vx() - v.x(), g.vy() - v.y()), g.vz() - v.z());
+            if (dp < 1.e-5 && dv < 1.e-3) {
+              if (match >= 0) { match = -2; break; }
+              match = j;
+            }
+          }
+          hitGenPartIdx[i] = match >= 0 ? match : -1;
+        }
+      }
       if (dtSimHits.isValid())
         for (auto const& hit : *dtSimHits)
           if (std::abs(hit.particleType()) == 13)
@@ -4226,6 +4288,12 @@ public:
     table->addColumn<int>("genPartIdx", genPartIdx, "index in GenPart, or -1 when unmatched or on data");
     table->addColumn<float>(
         "genPartDeltaR", genPartDeltaR, "direction-ambiguous deltaR to matched GenPart, or -1 when unmatched/on data");
+    table->addColumn<int>("hitSimTrackId", hitSimTrackId, "diagnostic CSC layer association, SimTrack id or -1; independent of fitted angles");
+    table->addColumn<int>("hitGenPartIdx", hitGenPartIdx, "unique status-1 truth match to hit-associated SimTrack: relative vector momentum <1e-5 and vertex distance <1e-3 cm, or -1");
+    table->addColumn<int>("hitTruthLayers", hitTruthLayers, "distinct measured CSC layers in truth association");
+    table->addColumn<int>("hitTruthMatchedLayers", hitTruthMatchedLayers, "layers voting for the leading SimTrack, even if association rejected");
+    table->addColumn<int>("hitTruthAmbiguousLayers", hitTruthAmbiguousLayers, "CSC layers with multiple measurements or compatible SimTracks");
+    table->addColumn<float>("hitTruthPurity", hitTruthPurity, "leading SimTrack votes / all measured CSC layers; requires >=3 votes and >=0.75", 10);
     table->addColumn<int>("simTruthMatched",
                           simTruthMatched,
                           "MC closure diagnostic: selected row matched to a primary SimTrack with precision SimHits");
