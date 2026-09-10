@@ -1838,6 +1838,7 @@ public:
         directionalRefitMaxPrecisionRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxPrecisionRelativeQoverPChange")),
         produceMomentumClosureDiagnostics_(parameters.getParameter<bool>("produceMomentumClosureDiagnostics")),
+        produceTransportClosureAudit_(parameters.getParameter<bool>("produceTransportClosureAudit")),
         enableHcalDiagnostics_(parameters.getParameter<bool>("enableHcalDiagnostics")),
         enableZDCDiagnostics_(parameters.getParameter<bool>("enableZDCDiagnostics")),
         produceSplitLegRefits_(parameters.getParameter<bool>("produceSplitLegRefits")),
@@ -3241,9 +3242,12 @@ public:
               GlobalTrajectoryParameters(vertexPosition, truthMomentum,
                                          firstHit->particleType() > 0 ? -1 : 1, &magneticField),
               CurvilinearTrajectoryError(covariance));
-          auto outward = materialStateAtZ(productionState, *sourceFacingTargetMaterialPropagator, point.z());
+          std::unique_ptr<Propagator> closurePropagator(sourceFacingTargetMaterialPropagator->clone());
+          if (auto* detailed = dynamic_cast<Geant4ePropagator*>(closurePropagator.get()))
+            detailed->setTransportAudit(produceTransportClosureAudit_);
+          auto outward = materialStateAtZ(productionState, *closurePropagator, point.z());
           if (outward.first.isValid() && outward.first.freeState()) {
-            auto returned = materialStateAtZ(*outward.first.freeState(), *sourceFacingTargetMaterialPropagator,
+            auto returned = materialStateAtZ(*outward.first.freeState(), *closurePropagator,
                                              vertexPosition.z());
             if (returned.first.isValid()) {
               simMeanRoundTripDistance[selectedIndex] = (returned.first.globalPosition() - vertexPosition).mag();
@@ -4845,6 +4849,7 @@ public:
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
     description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.5);
     description.add<bool>("produceMomentumClosureDiagnostics", false);
+    description.add<bool>("produceTransportClosureAudit", false);
     description.add<bool>("enableHcalDiagnostics", false);
     description.add<bool>("enableZDCDiagnostics", false);
     description.add<bool>("produceSplitLegRefits", false);
@@ -4964,6 +4969,7 @@ private:
   unsigned int directionalRefitMinPrecisionStations_;
   double directionalRefitMaxPrecisionRelativeQoverPChange_;
   bool produceMomentumClosureDiagnostics_;
+  bool produceTransportClosureAudit_;
   bool enableHcalDiagnostics_;
   bool enableZDCDiagnostics_;
   bool produceSplitLegRefits_;

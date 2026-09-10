@@ -5,3 +5,10 @@
   <use name="geant4"/>
 </bin>
 <test name="testShiftBooleanFramesRun" command="testShiftBooleanFrames"/>
+<bin file="testExternalVolumeClipper.cc" name="testShiftExternalVolumeClipper">
+  <use name="rootgeom"/>
+  <use name="rootmath"/>
+  <use name="dd4hep-geant4"/>
+  <use name="geant4"/>
+</bin>
+<test name="testShiftExternalVolumeClipperRun" command="testShiftExternalVolumeClipper"/>
