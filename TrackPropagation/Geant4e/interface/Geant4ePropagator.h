@@ -61,6 +61,7 @@ public:
   // Geant4 must carry its own curvilinear frame; propagation follows that
   // frame with a positive step and the returned covariance is reversed back.
   void setUseConsistentBackwardCovariance(bool value) { consistentBackwardCovariance_ = value; }
+  void setUseMeanEnergyLossJacobian(bool value) { meanEnergyLossJacobian_ = value; }
   void setTransportAudit(bool value) { transportAudit_ = value; }
 
 private:
@@ -78,6 +79,7 @@ private:
   G4ErrorPropagatorData *theG4eData;
   bool consistentBackwardCovariance_ = false;
   bool transportAudit_ = false;
+  bool meanEnergyLossJacobian_ = false;
   double plimit_;
   double maximumStepLengthMm_;
   double maximumPathLengthCm_;

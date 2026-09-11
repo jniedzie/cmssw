@@ -37,8 +37,11 @@
 #include "G4RunManagerKernel.hh"
 #include "G4StateManager.hh"
 #include "G4Step.hh"
+#include "G4EnergyLossForExtrapolator.hh"
 #include "G4Material.hh"
 #include "G4VPhysicalVolume.hh"
+#include "G4TouchableHistory.hh"
+#include "G4VSolid.hh"
 
 // CLHEP
 #include <CLHEP/Units/SystemOfUnits.h>
@@ -336,6 +339,10 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   theG4eManager->GetErrorPropagationNavigator()->LocateGlobalPointAndSetup(
       g4InitPos, &g4InitMom, /*pRelativeSearch = */ false, /*ignoreDirection = */ false);
 
+  std::unique_ptr<G4EnergyLossForExtrapolator> energyLoss;
+  if (meanEnergyLossJacobian_)
+    energyLoss = std::make_unique<G4EnergyLossForExtrapolator>(0);
+  G4ErrorTrajErr previousError(5, 0);
   bool continuePropagation = true;
   while (continuePropagation) {
     iterations++;
@@ -344,7 +351,97 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
     // re-initialize navigator to avoid mismatches and/or segfaults
     theG4eManager->GetErrorPropagationNavigator()->LocateGlobalPointWithinVolume(g4eTrajState.GetPosition());
 
+    if (meanEnergyLossJacobian_) previousError = g4eTrajState.GetError();
     const int ierr = theG4eManager->PropagateOneStep(&g4eTrajState, mode);
+    if (ierr == 0 && energyLoss && g4eTrajState.GetG4Track()) {
+      auto const* track = g4eTrajState.GetG4Track();
+      auto const* step = track->GetStep();
+      auto const* before = step->GetPreStepPoint();
+      auto const* after = step->GetPostStepPoint();
+      double const e0 = before->GetKineticEnergy(), e1 = after->GetKineticEnergy();
+      double const length = step->GetStepLength();
+      if (length > 0. && e0 > 0. && e1 > 0. && std::abs(e1-e0) > 1.e-12 * e0) {
+        // G4ErrorFreeTrajState's helix Jacobian has unit inverse-momentum
+        // derivative in field-free material, omitting the changing mean
+        // energy. Differentiate G4ErrorEnergyLoss's SAME midpoint rule.
+        // Reference: Geant4 v11.4.1, source/processes/electromagnetic/muons/
+        // src/G4ErrorEnergyLoss.cc. Mean transport and process noise stay fixed.
+        auto meanEnergy = [&](double e) {
+          auto advance = [&](double v) {
+            return mode == G4ErrorMode_PropBackwards
+                ? energyLoss->EnergyBeforeStep(v, length, before->GetMaterial(), track->GetParticleDefinition())
+                : energyLoss->EnergyAfterStep(v, length, before->GetMaterial(), track->GetParticleDefinition());
+          };
+          double const half = .5 * (e + advance(e));
+          return e - (half - advance(half));
+        };
+        double const h = e0 * 1.e-4;
+        double const derivative = (meanEnergy(e0+h) - meanEnergy(e0-h)) / (2.*h);
+        double const mass = track->GetParticleDefinition()->GetPDGMass();
+        double const p0 = std::sqrt(e0*(e0+2.*mass)), p1 = std::sqrt(e1*(e1+2.*mass));
+        double const jacobian = std::pow(p0/p1,3) * (e1+mass)/(e0+mass) * derivative;
+        auto const transport = g4eTrajState.GetTransfMat();
+        double const delta = jacobian - transport(1,1);
+        if (!std::isfinite(jacobian) || !(jacobian > 0.))
+          return TsosPP(TrajectoryStateOnSurface(), 0.0f);
+        auto corrected = g4eTrajState.GetError();
+        // T' = T + delta e0 e0^T. Keep Q exactly, instead of rescaling it
+        // together with the transported covariance.
+        for (int j = 1; j <= 5; ++j) {
+          double cross = 0.;
+          for (int k = 1; k <= 5; ++k) cross += previousError(1,k) * transport(j,k);
+          corrected(1,j) += delta * cross * (j == 1 ? 2. : 1.);
+        }
+        corrected(1,1) += delta*delta*previousError(1,1);
+        g4eTrajState.SetError(corrected);
+      }
+      if (after->GetStepStatus() == fGeomBoundary && before->GetMaterial() && after->GetMaterial() &&
+          before->GetMaterial() != after->GetMaterial()) {
+        // At a material interface the crossing distance itself varies with
+        // the incoming state. The fixed-length helix Jacobian omits this
+        // term. At fixed path coordinate the interface map is
+        // S = I + (f_after - f_before) n^T / (n.u).
+        // Only d(1/p)/ds jumps at a material-only interface. Apply S to the
+        // full covariance, including noise acquired before the boundary.
+        // This is the same derivative for either orientation of the normal.
+        G4bool foundNormal = false;
+        G4ThreeVector normal = theG4eManager->GetErrorPropagationNavigator()->GetGlobalExitNormal(
+            after->GetPosition(), &foundNormal);
+        for (auto const* point : {before, after}) {
+          if (foundNormal) break;
+          auto const* touchable = dynamic_cast<G4TouchableHistory const*>(point->GetTouchable());
+          if (!touchable || !point->GetPhysicalVolume()) continue;
+          auto const& transform = touchable->GetHistory()->GetTopTransform();
+          auto const local = transform.TransformPoint(after->GetPosition());
+          auto const* solid = point->GetPhysicalVolume()->GetLogicalVolume()->GetSolid();
+          if (solid->Inside(local) != kSurface) continue;
+          normal = transform.Inverse().TransformAxis(solid->SurfaceNormal(local));
+          foundNormal = normal.mag2() > 0.;
+          if (foundNormal) break;
+        }
+        auto const direction = after->GetMomentumDirection();
+        double const incidence = normal.dot(direction);
+        if (!foundNormal || std::abs(incidence) < 1.e-9) {
+          edm::LogWarning("Geant4eBoundaryCovariance") << "Undefined material-interface derivative at "
+              << after->GetPosition() << "; rejecting propagation";
+          return TsosPP(TrajectoryStateOnSurface(), 0.0f);
+        }
+        double const mass = track->GetParticleDefinition()->GetPDGMass();
+        double const momentum = std::sqrt(e1 * (e1 + 2. * mass));
+        double const stoppingBefore = energyLoss->ComputeDEDX(e1, track->GetParticleDefinition(), before->GetMaterial());
+        double const stoppingAfter = energyLoss->ComputeDEDX(e1, track->GetParticleDefinition(), after->GetMaterial());
+        // Geant4 error coordinates use 1/GeV and cm; stopping powers use
+        // MeV/mm. Backward transport gains energy, hence the opposite sign.
+        double const jump = (mode == G4ErrorMode_PropBackwards ? -1. : 1.) *
+            (e1 + mass) / std::pow(momentum, 3) * (stoppingAfter - stoppingBefore) * CLHEP::GeV * CLHEP::cm;
+        G4ThreeVector const transverse = G4ThreeVector(-direction.y(), direction.x(), 0.).unit();
+        G4ThreeVector const vertical = direction.cross(transverse);
+        G4ErrorMatrix interfaceMap(5, 5, 1);
+        interfaceMap(1, 4) = jump * normal.dot(transverse) / incidence;
+        interfaceMap(1, 5) = jump * normal.dot(vertical) / incidence;
+        g4eTrajState.SetError(g4eTrajState.GetError().similarity(interfaceMap));
+      }
+    }
 
     if (transportAudit_ && g4eTrajState.GetG4Track()) {
       auto const* step = g4eTrajState.GetG4Track()->GetStep();
