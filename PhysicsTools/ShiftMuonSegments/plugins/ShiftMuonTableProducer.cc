@@ -1854,6 +1854,7 @@ public:
             parameters.getParameter<unsigned int>("directionalRefitMinPrecisionStations")),
         directionalRefitMaxPrecisionRelativeQoverPChange_(
             parameters.getParameter<double>("directionalRefitMaxPrecisionRelativeQoverPChange")),
+        produceHitTruthAssociation_(parameters.getParameter<bool>("produceHitTruthAssociation")),
         produceMomentumClosureDiagnostics_(parameters.getParameter<bool>("produceMomentumClosureDiagnostics")),
         produceTransportClosureAudit_(parameters.getParameter<bool>("produceTransportClosureAudit")),
         enableHcalDiagnostics_(parameters.getParameter<bool>("enableHcalDiagnostics")),
@@ -3008,28 +3009,7 @@ public:
         simHcalFirstTime(selected.size(), 0.f), simHcalLastTime(selected.size(), 0.f),
         simZDCEnergy(selected.size(), enableZDCDiagnostics_ ? -1.f : -2.f),
         simZDCFirstTime(selected.size(), 0.f), simZDCLastTime(selected.size(), 0.f);
-    if (produceMomentumClosureDiagnostics_ && genParticles.isValid() && simTracks.isValid() &&
-        simVertices.isValid()) {
-      std::unordered_map<unsigned int, std::vector<PSimHit const*>> precisionHitsByTrack;
-      std::unordered_map<unsigned int, std::array<unsigned int, 4>> detectorHitCounts;
-      std::unordered_map<unsigned int, std::array<unsigned int, 2>> trackerHitCounts;
-      std::unordered_map<unsigned int, std::set<uint32_t>> dtChambersByTrack;
-      auto collectHits = [&precisionHitsByTrack, &detectorHitCounts](auto const& handle,
-                                                                    unsigned int detectorIndex,
-                                                                    bool precision) {
-        if (!handle.isValid())
-          return;
-        for (auto const& hit : *handle)
-          if (std::abs(hit.particleType()) == 13) {
-            ++detectorHitCounts[hit.trackId()][detectorIndex];
-            if (precision)
-              precisionHitsByTrack[hit.trackId()].push_back(&hit);
-          }
-      };
-      collectHits(dtSimHits, 0, true);
-      collectHits(cscSimHits, 1, true);
-      collectHits(rpcSimHits, 2, false);
-      collectHits(gemSimHits, 3, true);
+    if (produceHitTruthAssociation_ && genParticles.isValid() && simTracks.isValid() && simVertices.isValid()) {
       std::vector<shift::TruthCrossing> cscCrossings;
       if (cscSimHits.isValid())
         for (auto const& hit : *cscSimHits) {
@@ -3061,16 +3041,43 @@ public:
             if (g.status() != 1 || g.pdgId() != sim.type() || !(g.p() > 0.))
               continue;
             double const dp = std::hypot(std::hypot(g.px() - sim.momentum().px(), g.py() - sim.momentum().py()),
-                                         g.pz() - sim.momentum().pz()) / g.p();
+                                         g.pz() - sim.momentum().pz()) /
+                              g.p();
             double const dv = std::hypot(std::hypot(g.vx() - v.x(), g.vy() - v.y()), g.vz() - v.z());
             if (dp < 1.e-5 && dv < 1.e-3) {
-              if (match >= 0) { match = -2; break; }
+              if (match >= 0) {
+                match = -2;
+                break;
+              }
               match = j;
             }
           }
           hitGenPartIdx[i] = match >= 0 ? match : -1;
         }
       }
+    }
+    if (produceMomentumClosureDiagnostics_ && genParticles.isValid() && simTracks.isValid() &&
+        simVertices.isValid()) {
+      std::unordered_map<unsigned int, std::vector<PSimHit const*>> precisionHitsByTrack;
+      std::unordered_map<unsigned int, std::array<unsigned int, 4>> detectorHitCounts;
+      std::unordered_map<unsigned int, std::array<unsigned int, 2>> trackerHitCounts;
+      std::unordered_map<unsigned int, std::set<uint32_t>> dtChambersByTrack;
+      auto collectHits = [&precisionHitsByTrack, &detectorHitCounts](auto const& handle,
+                                                                    unsigned int detectorIndex,
+                                                                    bool precision) {
+        if (!handle.isValid())
+          return;
+        for (auto const& hit : *handle)
+          if (std::abs(hit.particleType()) == 13) {
+            ++detectorHitCounts[hit.trackId()][detectorIndex];
+            if (precision)
+              precisionHitsByTrack[hit.trackId()].push_back(&hit);
+          }
+      };
+      collectHits(dtSimHits, 0, true);
+      collectHits(cscSimHits, 1, true);
+      collectHits(rpcSimHits, 2, false);
+      collectHits(gemSimHits, 3, true);
       if (dtSimHits.isValid())
         for (auto const& hit : *dtSimHits)
           if (std::abs(hit.particleType()) == 13)
@@ -4901,7 +4908,7 @@ public:
     lssTransportDescription.add<std::string>("magneticFieldLabel", "");
     lssTransportDescription.add<double>("materialBoundaryAbsZCm", 1100.0);
     lssTransportDescription.add<double>("geant4eMomentumLimitGeV", 0.05);
-    lssTransportDescription.add<double>("geant4eMaximumStepLengthMm", 2.0);
+    lssTransportDescription.add<double>("geant4eMaximumStepLengthMm", 0.2);
     lssTransportDescription.add<double>("geant4eMaximumPathLengthCm", 2500.0);
     description.add<edm::ParameterSetDescription>("lssTransport", lssTransportDescription);
     description.add<bool>("directionalRefitUseMaterialEffects", false);
@@ -4929,6 +4936,7 @@ public:
     description.add<bool>("directionalRefitUseSecondIteration", false);
     description.add<unsigned int>("directionalRefitMinPrecisionStations", 2);
     description.add<double>("directionalRefitMaxPrecisionRelativeQoverPChange", 0.5);
+    description.add<bool>("produceHitTruthAssociation", true);
     description.add<bool>("produceMomentumClosureDiagnostics", false);
     description.add<bool>("produceTransportClosureAudit", false);
     description.add<bool>("enableHcalDiagnostics", false);
@@ -5049,6 +5057,7 @@ private:
   bool directionalRefitUseSecondIteration_;
   unsigned int directionalRefitMinPrecisionStations_;
   double directionalRefitMaxPrecisionRelativeQoverPChange_;
+  bool produceHitTruthAssociation_;
   bool produceMomentumClosureDiagnostics_;
   bool produceTransportClosureAudit_;
   bool enableHcalDiagnostics_;

@@ -111,7 +111,7 @@ shiftMuonTable = cms.EDProducer(
         magneticFieldLabel=cms.string(""),
         materialBoundaryAbsZCm=cms.double(1100.0),
         geant4eMomentumLimitGeV=cms.double(0.05),
-        geant4eMaximumStepLengthMm=cms.double(2.0),
+        geant4eMaximumStepLengthMm=cms.double(0.2),
         geant4eMaximumPathLengthCm=cms.double(2500.0),
     ),
     # Keep material updates in the canonical Kalman fit. The material-free
@@ -191,8 +191,11 @@ shiftMuonTable = cms.EDProducer(
     # Reject a precision-only solution that is incompatible with the all-hit
     # curvature; its diagnostic branches are still retained.
     directionalRefitMaxPrecisionRelativeQoverPChange=cms.double(0.5),
-    # Simulation-only closure columns and source/opposite-side precision
-    # refits. Disabled in production because the extra fits cost CPU.
+    # Simulation-only CSC reconstructed-hit association. This uses detector
+    # identity and local hit coordinates and is cheap enough for production.
+    produceHitTruthAssociation=cms.bool(True),
+    # Full source/opposite-side truth closure and precision refits. Disabled in
+    # production because the extra propagation and fits cost CPU.
     produceMomentumClosureDiagnostics=cms.bool(False),
     # Optional material/energy trace of the truth-only mean round trip.
     produceTransportClosureAudit=cms.bool(False),

@@ -500,7 +500,7 @@ def customiseShiftLssTransport(
     sumOverlaps=False,
     materialBoundaryAbsZCm=1100.0,
     geant4eMomentumLimitGeV=0.05,
-    geant4eMaximumStepLengthMm=2.0,
+    geant4eMaximumStepLengthMm=0.2,
     geant4eMaximumPathLengthCm=2500.0,
 ):
     """Configure simulation and reconstruction to share an optional LSS field."""
