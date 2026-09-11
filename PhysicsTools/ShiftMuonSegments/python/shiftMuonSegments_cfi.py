@@ -214,7 +214,16 @@ shiftMuonTable = cms.EDProducer(
     # matches Beams:sigmaVertexZ in the current production and is projected
     # into x/y by the fitted track slopes.
     produceTargetConstrainedMomentum=cms.bool(True),
-    targetUseInferredSide=cms.bool(True),
+    targetUseInferredSide=cms.bool(False),
+    # Nonlinear fit of detector posterior plus target hit; validation only.
+    targetUseForwardRefit=cms.bool(False),
+    targetForwardMaxIterations=cms.uint32(8),
+    # Mean-energy derivative, including changes of crossing distance at interfaces.
+    targetUseMeanEnergyLossJacobian=cms.bool(False),
+    # Isolate actual target-leg geometry from canonical reconstruction.
+    targetUseDetailedMaterialPropagation=cms.bool(False),
+    # Slow full-trajectory numerical derivative reference; validation only.
+    targetUseNumericalTransportCovariance=cms.bool(False),
     targetX=cms.double(0.0),
     targetY=cms.double(0.0),
     targetZ=cms.double(14800.0),

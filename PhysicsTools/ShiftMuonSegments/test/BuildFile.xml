@@ -8,3 +8,12 @@
 <test name="testShiftCommonVertexRefitRun" command="testShiftCommonVertexRefit"/>
 <bin file="testHitTruthAssociation.cc" name="testShiftHitTruthAssociation"/>
 <test name="testShiftHitTruthAssociationRun" command="testShiftHitTruthAssociation"/>
+
+<bin file="testTargetAngularError.cc" name="testShiftTargetAngularError">
+  <use name="DataFormats/CLHEP"/>
+</bin>
+<test name="testShiftTargetAngularErrorRun" command="testShiftTargetAngularError"/>
+<bin file="testForwardTargetFit.cc" name="testShiftForwardTargetFit">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftForwardTargetFitRun" command="testShiftForwardTargetFit"/>
