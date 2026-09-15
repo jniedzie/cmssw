@@ -220,6 +220,13 @@ shiftMuonTable = cms.EDProducer(
     targetForwardMaxIterations=cms.uint32(8),
     # Mean-energy derivative, including changes of crossing distance at interfaces.
     targetUseMeanEnergyLossJacobian=cms.bool(False),
+    targetUseFieldGradientJacobian=cms.bool(False),
+    targetCubatureStepCm=cms.double(0.),
+    targetForwardChordSeed=cms.bool(False),
+    targetImportanceClouds=cms.uint32(0),
+    targetImportanceSpacingCm=cms.double(100.),
+    targetUseMomentFit=cms.bool(False),
+    targetUseUnquenchedIonizationVariance=cms.bool(False),
     # Isolate actual target-leg geometry from canonical reconstruction.
     targetUseDetailedMaterialPropagation=cms.bool(False),
     # Slow full-trajectory numerical derivative reference; validation only.

@@ -39,6 +39,8 @@
 #include "RecoTracker/TransientTrackingRecHit/interface/TkClonerImpl.h"
 #include "RecoTracker/TransientTrackingRecHit/interface/TRecHit2DPosConstraint.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
+#include "TrackingTools/AnalyticalJacobians/interface/JacobianLocalToCurvilinear.h"
+#include "TrackingTools/AnalyticalJacobians/interface/JacobianCurvilinearToLocal.h"
 #include "TrackingTools/KalmanUpdators/interface/Chi2MeasurementEstimator.h"
 #include "TrackingTools/KalmanUpdators/interface/KFUpdator.h"
 #include "TrackingTools/PatternTools/interface/Trajectory.h"
@@ -81,11 +83,16 @@
 #include "PhysicsTools/ShiftMuonSegments/interface/SeedCovariance.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/TargetAngularError.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/ForwardTargetFit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/CubatureTransport.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/ImportanceTargetConstraint.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/TargetMomentFit.h"
+#include <iomanip>
 #include "TrackingTools/TrajectoryParametrization/interface/LocalTrajectoryParameters.h"
 #include "TrackingTools/TrajectoryParametrization/interface/LocalTrajectoryError.h"
 #include <Eigen/Cholesky>
 #include <map>
 #include "PhysicsTools/ShiftMuonSegments/interface/CommonVertexRefit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/DimuonKinematicCovariance.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/HitTruthAssociation.h"
 #include <array>
 #include <cmath>
@@ -916,6 +923,53 @@ namespace {
     std::map<std::string, double> diagnostics;
   };
 
+  TrajectoryStateOnSurface transportCubature(TrajectoryStateOnSurface state, GlobalPoint const& destination,
+                                             Propagator const& propagator, double maximumDeltaZ) {
+    if (!state.isValid() || !state.hasError() || !(maximumDeltaZ>0.)) return {};
+    double const startZ=state.globalPosition().z();
+    unsigned int const segments=std::max(1u,static_cast<unsigned int>(std::ceil(std::abs(destination.z()-startZ)/maximumDeltaZ)));
+    double const charge=state.signedInverseMomentum();
+    for (unsigned int segment=1;segment<=segments;++segment) {
+      auto const plane=Plane::build(segment==segments ? destination :
+          GlobalPoint(0.,0.,startZ+(destination.z()-startZ)*segment/segments),Surface::RotationType());
+      shift::TransportMoments input;
+      input.valid=true;
+      for (unsigned int i=0;i<5;++i) {
+        input.mean[i]=state.localParameters().vector()[i];
+        for (unsigned int j=0;j<5;++j) input.covariance(i,j)=state.localError().matrix()(i,j);
+      }
+      auto const moments=shift::cubatureTransport(input,[&](auto const& parameters) {
+        shift::TransportMoments output;
+        // A Gaussian spanning both charges is outside this single-hypothesis
+        // approximation. Retain the canonical row, but invalidate this fit.
+        if (parameters[0]*charge<=0.) return output;
+        AlgebraicVector5 local;
+        AlgebraicSymMatrix55 zero;
+        for (unsigned int i=0;i<5;++i) local[i]=parameters[i];
+        TrajectoryStateOnSurface point(LocalTrajectoryParameters(local,state.localMomentum().z()>0.?1.:-1.),
+            LocalTrajectoryError(zero),state.surface(),state.magneticField());
+        auto const end=propagator.propagate(point,*plane);
+        if (!end.isValid() || !end.hasError() || end.signedInverseMomentum()*charge<=0.) return output;
+        for (unsigned int i=0;i<5;++i) {
+          output.mean[i]=end.localParameters().vector()[i];
+          for (unsigned int j=0;j<5;++j) output.covariance(i,j)=end.localError().matrix()(i,j);
+        }
+        output.valid=true;
+        return output;
+      });
+      if (!moments.valid || moments.mean[0]*charge<=0.) return {};
+      AlgebraicVector5 local;
+      AlgebraicSymMatrix55 covariance;
+      for (unsigned int i=0;i<5;++i) {
+        local[i]=moments.mean[i];
+        for (unsigned int j=0;j<=i;++j) covariance(i,j)=moments.covariance(i,j);
+      }
+      state=TrajectoryStateOnSurface(LocalTrajectoryParameters(local,state.globalMomentum().z()>0.?1.:-1.),
+          LocalTrajectoryError(covariance),*plane,state.magneticField());
+    }
+    return state;
+  }
+
   TargetConstraintResult applyTargetConstraint(TrajectoryStateOnSurface const& upstream,
                                                int sourceSide,
                                                Propagator const& vacuumPropagator,
@@ -924,7 +978,12 @@ namespace {
                                                double materialBoundaryAbsZCm,
                                                bool numericalCovariance,
                                                bool forwardRefit = false,
-                                               unsigned int forwardMaxIterations = 8) {
+                                               unsigned int forwardMaxIterations = 8,
+                                               double cubatureStepCm = 0.,
+                                               bool forwardChordSeed = false,
+                                               unsigned int importanceClouds = 0,
+                                               double importanceSpacingCm = 100.,
+                                               bool momentFit = false) {
     TargetConstraintResult result;
     if (!upstream.isValid() || !upstream.freeState()) {
       result.status = -1;
@@ -940,6 +999,8 @@ namespace {
     };
     // Always restart from the detector posterior, including perturbed paths.
     auto transport = [&](TrajectoryStateOnSurface const& state) {
+      if (cubatureStepCm>0.)
+        return transportCubature(state,constraint.position,materialPropagator,cubatureStepCm);
       FreeTrajectoryState start = *state.freeState();
       if (sourceSide != 0 && sourceSide * start.position().z() < materialBoundaryAbsZCm) {
         auto const boundary = Plane::build(GlobalPoint(0., 0., sourceSide * materialBoundaryAbsZCm),
@@ -952,6 +1013,66 @@ namespace {
     };
     auto predicted = transport(upstream);
     if (!valid(predicted)) { result.status = -3; return result; }
+    TrajectoryStateOnSurface importancePosterior;
+    if (importanceClouds) {
+      auto const* geant4=dynamic_cast<Geant4ePropagator const*>(&materialPropagator);
+      if (!geant4) {result.status=-11;return result;}
+      double const strength=geant4->maximumInterfaceRelativeCurvatureSigma();
+      double const interfaceZ=geant4->maximumInterfaceZCm();
+      double const startZ=upstream.globalPosition().z();
+      double const direction=constraint.position.z()>startZ ? 1. : -1.;
+      // Resolve the strongest interface with finite paths starting before it.
+      // The grid is a numerical integration control, not a geometry-specific
+      // coordinate or truth-dependent choice. Check spacing/point convergence.
+      if (strength>0.) {
+        double const distance=direction*(interfaceZ-startZ);
+        if (!(distance>0.)) {result.status=-11;return result;}
+        double const anchorZ=startZ+direction*std::max(.001,
+            (std::ceil(distance/importanceSpacingCm)-1.)*importanceSpacingCm);
+        auto const anchorPlane=Plane::build(GlobalPoint(0.,0.,anchorZ),Surface::RotationType());
+        auto const anchor=materialPropagator.propagate(upstream,*anchorPlane);
+        if (!valid(anchor)) {result.status=-11;return result;}
+        shift::TransportMoments input;
+        input.valid=true;
+        for (unsigned int i=0;i<5;++i) {
+          input.mean[i]=anchor.localParameters().vector()[i];
+          for (unsigned int j=0;j<5;++j) input.covariance(i,j)=anchor.localError().matrix()(i,j);
+        }
+        auto const integrated=shift::importanceTargetConstraint(input,[&](auto const& parameters) {
+          shift::TransportMoments output;
+          if (parameters[0]*input.mean[0]<=0.) return output;
+          AlgebraicVector5 local;
+          AlgebraicSymMatrix55 zero;
+          for (unsigned int i=0;i<5;++i) local[i]=parameters[i];
+          TrajectoryStateOnSurface point(LocalTrajectoryParameters(local,anchor.localMomentum().z()>0.?1.:-1.),
+              LocalTrajectoryError(zero),*anchorPlane,anchor.magneticField());
+          auto const end=materialPropagator.propagate(point,*targetPlane);
+          if (!valid(end) || end.signedInverseMomentum()*input.mean[0]<=0.) return output;
+          for (unsigned int i=0;i<5;++i) {
+            output.mean[i]=end.localParameters().vector()[i];
+            for (unsigned int j=0;j<5;++j) output.covariance(i,j)=end.localError().matrix()(i,j);
+          }
+          output.valid=true;return output;
+        },constraint.sigmaX,constraint.sigmaY,constraint.sigmaZ,importanceClouds);
+        result.diagnostics["targetImportanceAnchorZ"]=anchorZ;
+        result.diagnostics["targetImportanceInterfaceSigma"]=strength;
+        if (!integrated.valid) {result.status=-11;return result;}
+        result.diagnostics["targetImportanceEffectivePoints"]=integrated.effectivePoints;
+        result.diagnostics["targetImportanceMaximumWeight"]=integrated.maximumWeight;
+        auto makeState=[&](shift::TransportMoments const& moments) {
+          AlgebraicVector5 local;
+          AlgebraicSymMatrix55 covariance;
+          for (unsigned int i=0;i<5;++i) {
+            local[i]=moments.mean[i];
+            for (unsigned int j=0;j<=i;++j) covariance(i,j)=moments.covariance(i,j);
+          }
+          return TrajectoryStateOnSurface(LocalTrajectoryParameters(local,anchor.localMomentum().z()>0.?1.:-1.),
+              LocalTrajectoryError(covariance),*targetPlane,anchor.magneticField());
+        };
+        predicted=makeState(integrated.prior);
+        importancePosterior=makeState(integrated.posterior);
+      }
+    }
     if (numericalCovariance) {
       // Validation reference for J C J^T + Q. Differentiate the full mean
       // transport, including path changes at material boundaries. A separate
@@ -1042,7 +1163,7 @@ namespace {
                    xx * residual.y() * residual.y()) /
                   determinant;
     KFUpdator updator;
-    auto constrained = updator.update(predicted, *targetHit);
+    auto constrained = importancePosterior.isValid() ? importancePosterior : updator.update(predicted, *targetHit);
     if (!constrained.isValid() || !constrained.freeState() || !std::isfinite(result.chi2)) {
       result.status = -6;
       return result;
@@ -1050,12 +1171,14 @@ namespace {
     // Crossing q/p=0 changes the charge hypothesis. The original trajectory
     // and local Jacobian cannot describe that change without repropagation.
     if (constrained.signedInverseMomentum()*predicted.signedInverseMomentum() <= 0.) {
-      result.status = -9;
-      return result;
+      if (!forwardRefit) {result.status = -9;return result;}
+      constrained=predicted;
     }
     if (forwardRefit) {
       std::unique_ptr<Propagator> forward(materialPropagator.clone());
       forward->setPropagationDirection(alongMomentum);
+      auto* forwardGeant4=dynamic_cast<Geant4ePropagator*>(forward.get());
+      if (momentFit && forwardGeant4) forwardGeant4->setRecordTransportJacobian(true);
       shift::TargetParameters seed, detector;
       shift::TargetCovariance detectorCovariance;
       for (unsigned int i = 0; i < 5; ++i) {
@@ -1065,6 +1188,13 @@ namespace {
           detectorCovariance(i,j) = upstream.localError().matrix()(i,j);
       }
       double const pzSign = constrained.localMomentum().z() > 0. ? 1. : -1.;
+      if (forwardChordSeed) {
+        auto const displacement=upstream.globalPosition()-constraint.position;
+        if (std::abs(displacement.z())<1.e-6) {result.status=-8;return result;}
+        seed[0]=predicted.signedInverseMomentum();
+        seed[1]=displacement.x()/displacement.z();seed[2]=displacement.y()/displacement.z();
+        seed[3]=seed[4]=0.;
+      }
       auto evaluate = [&](shift::TargetParameters const& parameters) {
         shift::ForwardTargetPrediction prediction;
         AlgebraicVector5 local;
@@ -1079,19 +1209,35 @@ namespace {
           for (unsigned int j = 0; j < 5; ++j) prediction.noise(i,j) = end.localError().matrix()(i,j);
         }
         prediction.valid = prediction.parameters.allFinite() && prediction.noise.allFinite();
+        if (momentFit && forwardGeant4 && forwardGeant4->transportJacobianValid()) {
+          JacobianLocalToCurvilinear const input(start.surface(),start.localParameters(),*start.magneticField());
+          JacobianCurvilinearToLocal const output(end.surface(),end.localParameters(),*end.magneticField());
+          AlgebraicMatrix55 const jacobian=output.jacobian()*forwardGeant4->curvilinearTransportJacobian()*input.jacobian();
+          for (unsigned int i=0;i<5;++i) for (unsigned int j=0;j<5;++j) prediction.jacobian(i,j)=jacobian(i,j);
+          prediction.jacobianValid=prediction.jacobian.allFinite();
+        }
         return prediction;
       };
-      auto const fitted = shift::fitForwardTarget(seed, detector, detectorCovariance,
+      auto const fitted = momentFit ? shift::fitTargetMoments(seed, detector, detectorCovariance,
+          constraint.sigmaX, constraint.sigmaY, constraint.sigmaZ, evaluate, forwardMaxIterations) :
+          shift::fitForwardTarget(seed, detector, detectorCovariance,
           constraint.sigmaX, constraint.sigmaY, constraint.sigmaZ, evaluate, forwardMaxIterations);
+      if (!fitted.valid) for (auto const& check : fitted.derivativeChecks)
+        edm::LogVerbatim("ShiftTargetForwardFit") << std::setprecision(17)
+            << "derivativeCoordinate=" << check.coordinate << " step=" << check.step
+            << " relativeError=" << check.relativeError << " valid=" << check.valid
+            << " parameters=" << check.parameters.transpose();
       for (unsigned int iteration = 0; iteration < fitted.steps.size(); ++iteration) {
         auto const& step = fitted.steps[iteration];
-        edm::LogVerbatim("ShiftTargetForwardFit") << "iteration=" << iteration
+        edm::LogVerbatim("ShiftTargetForwardFit") << std::setprecision(17) << "iteration=" << iteration
             << " parameters=" << step.parameters.transpose() << " chi2=" << step.chi2
             << " maxUpdate=" << step.maxUpdate << " objective=" << step.objective;
+        edm::LogVerbatim("ShiftTargetForwardFit") << "scoreDifference=" << step.scoreDifference;
       }
       if (!fitted.steps.empty()) {
         result.diagnostics["targetForwardMaxUpdate"] = fitted.steps.back().maxUpdate;
         result.diagnostics["targetForwardLastChi2"] = fitted.steps.back().chi2;
+        result.diagnostics["targetForwardObjective"] = fitted.steps.back().objective;
       }
       result.diagnostics["targetForwardIterations"] = fitted.iterations;
       result.diagnostics["targetForwardStatus"] = fitted.status;
@@ -1136,7 +1282,7 @@ namespace {
     result.diagnostics["targetPredictedQoverP"] = predicted.signedInverseMomentum();
     result.diagnostics["constrainedQoverP"] = constrained.signedInverseMomentum();
     result.valid = true;
-    result.status = forwardRefit ? 2 : 1;
+    result.status = importancePosterior.isValid() ? 3 : (forwardRefit ? (momentFit ? 4 : 2) : 1);
     result.state.valid = true;
     result.state.position = constrained.globalPosition();
     result.state.momentum = constrained.globalMomentum();
@@ -2041,6 +2187,13 @@ public:
         targetForwardMaxIterations_(parameters.getParameter<unsigned int>("targetForwardMaxIterations")),
         logCandidateSelection_(parameters.getUntrackedParameter<bool>("logCandidateSelection", false)),
         targetUseMeanEnergyLossJacobian_(parameters.getParameter<bool>("targetUseMeanEnergyLossJacobian")),
+        targetUseFieldGradientJacobian_(parameters.getParameter<bool>("targetUseFieldGradientJacobian")),
+        targetCubatureStepCm_(parameters.getParameter<double>("targetCubatureStepCm")),
+        targetForwardChordSeed_(parameters.getParameter<bool>("targetForwardChordSeed")),
+        targetImportanceClouds_(parameters.getParameter<unsigned int>("targetImportanceClouds")),
+        targetImportanceSpacingCm_(parameters.getParameter<double>("targetImportanceSpacingCm")),
+        targetUseMomentFit_(parameters.getParameter<bool>("targetUseMomentFit")),
+        targetUseUnquenchedIonizationVariance_(parameters.getParameter<bool>("targetUseUnquenchedIonizationVariance")),
         targetUseNumericalTransportCovariance_(parameters.getParameter<bool>("targetUseNumericalTransportCovariance")),
         targetUseDetailedMaterialPropagation_(parameters.getParameter<bool>("targetUseDetailedMaterialPropagation")),
         targetX_(parameters.getParameter<double>("targetX")),
@@ -2119,6 +2272,19 @@ public:
           << "directionalRefitSecondSeedErrorRescale must be finite and positive";
     if (targetUseMeanEnergyLossJacobian_ && !targetUseConsistentBackwardCovariance_)
       throw cms::Exception("Configuration") << "Target mean-energy Jacobian requires consistent backward covariance";
+    if (targetUseFieldGradientJacobian_ && !targetUseConsistentBackwardCovariance_)
+      throw cms::Exception("Configuration") << "Target field-gradient Jacobian requires consistent backward covariance";
+    if (targetUseUnquenchedIonizationVariance_ && !targetUseConsistentBackwardCovariance_)
+      throw cms::Exception("Configuration") << "Target ionization variance requires consistent backward covariance";
+    if (!std::isfinite(targetCubatureStepCm_) || targetCubatureStepCm_<0. ||
+        (targetCubatureStepCm_>0. && (!targetUseDetailedMaterialPropagation_ || targetUseNumericalTransportCovariance_ || targetUseForwardRefit_)))
+      throw cms::Exception("Configuration") << "Cubature target transport requires full material and no other transport override";
+    if (targetUseMomentFit_ && !targetUseForwardRefit_)
+      throw cms::Exception("Configuration") << "Target moment estimator requires the forward fit path";
+    if (targetImportanceClouds_>4 || !(targetImportanceSpacingCm_>0.) || !std::isfinite(targetImportanceSpacingCm_) ||
+        (targetImportanceClouds_ && (!targetUseDetailedMaterialPropagation_ || !targetUseMeanEnergyLossJacobian_ ||
+         targetUseNumericalTransportCovariance_ || targetUseForwardRefit_ || targetCubatureStepCm_>0.)))
+      throw cms::Exception("Configuration") << "Importance target integration requires full material, mean-loss Jacobian, 1--4 clouds and positive spacing, without other experimental target fits";
     if (targetUseForwardRefit_ && (!targetUseDetailedMaterialPropagation_ || targetUseNumericalTransportCovariance_))
       throw cms::Exception("Configuration") << "Forward target refit requires detailed target geometry and no numerical covariance override";
     if (targetForwardMaxIterations_ == 0 || targetForwardMaxIterations_ > 64)
@@ -2234,6 +2400,8 @@ public:
     if (detailedMaterialPropagator) {
       detailedMaterialPropagator->setUseConsistentBackwardCovariance(targetUseConsistentBackwardCovariance_);
       detailedMaterialPropagator->setUseMeanEnergyLossJacobian(targetUseMeanEnergyLossJacobian_);
+      detailedMaterialPropagator->setUseFieldGradientJacobian(targetUseFieldGradientJacobian_);
+      detailedMaterialPropagator->setUseUnquenchedIonizationVariance(targetUseUnquenchedIonizationVariance_);
     }
     if (useImprovedMomentumRefit_ && useDetailedMaterialPropagation_) {
       preRefitMaterialPropagator = detailedMaterialPropagator.get();
@@ -3127,7 +3295,7 @@ public:
             eventSourceSide, vacuumPropagator,
             *(targetUseDetailedMaterialPropagation_ ? detailedMaterialPropagator.get() : sourceFacingTargetMaterialPropagator),
             constraint, targetUseDetailedMaterialPropagation_ ? std::abs(configuredTargetZ) : lssMaterialBoundaryAbsZCm_,
-            targetUseNumericalTransportCovariance_, targetUseForwardRefit_, targetForwardMaxIterations_);
+            targetUseNumericalTransportCovariance_, targetUseForwardRefit_, targetForwardMaxIterations_, targetCubatureStepCm_, targetForwardChordSeed_, targetImportanceClouds_, targetImportanceSpacingCm_, targetUseMomentFit_);
         candidate.constrainedStatus = constrained.status;
         candidate.targetDiagnostics = constrained.diagnostics;
         if (constrained.valid) {
@@ -3211,6 +3379,11 @@ public:
     std::vector<float> simPAtFittedSurface(selected.size(), -1.f), simFittedSurfaceBracketCm(selected.size(), -1.f);
     std::vector<int> simIdealConstraintValid(selected.size(), 0);
     std::vector<float> simIdealConstraintEta(selected.size(), 0.f), simIdealConstraintPhi(selected.size(), 0.f);
+    std::map<std::string, std::vector<float>> simNoiseDiagnostics;
+    for (std::string const name : {"simIdealConstraintEtaErr", "simIdealConstraintPhiErr", "simIdealTargetChi2",
+                                  "simForwardNoiseChi2", "simForwardQoverPPull", "simForwardSlopeXPull",
+                                  "simForwardSlopeYPull", "simForwardXPull", "simForwardYPull"})
+      simNoiseDiagnostics.emplace(name, std::vector<float>(selected.size(), -1.f));
     std::vector<float> simMeanRoundTripDistance(selected.size(), -1.f), simMeanRoundTripRelativeP(selected.size(), -1.f),
         simMeanRoundTripAngle(selected.size(), -1.f);
     std::vector<int> simPixelHits(selected.size(), 0), simStripHits(selected.size(), 0),
@@ -3227,7 +3400,8 @@ public:
         simHcalFirstTime(selected.size(), 0.f), simHcalLastTime(selected.size(), 0.f),
         simZDCEnergy(selected.size(), enableZDCDiagnostics_ ? -1.f : -2.f),
         simZDCFirstTime(selected.size(), 0.f), simZDCLastTime(selected.size(), 0.f);
-    if (produceHitTruthAssociation_ && genParticles.isValid() && simTracks.isValid() && simVertices.isValid()) {
+    if ((produceHitTruthAssociation_ || produceMomentumClosureDiagnostics_) && genParticles.isValid() &&
+        simTracks.isValid() && simVertices.isValid()) {
       std::vector<shift::TruthCrossing> cscCrossings;
       if (cscSimHits.isValid())
         for (auto const& hit : *cscSimHits) {
@@ -3349,30 +3523,21 @@ public:
         collectCaloHits(zdcSimHits, zdcHitsByTrack, false);
 
       for (unsigned int selectedIndex = 0; selectedIndex < selected.size(); ++selectedIndex) {
-        int const genIndex = genPartIdx[selectedIndex];
-        if (genIndex < 0)
+        // Closure must cover the same independently hit-associated population
+        // as the performance plots, including badly reconstructed directions.
+        int const identity = hitSimTrackId[selectedIndex];
+        if (identity < 0)
           continue;
-        auto const& gen = (*genParticles)[genIndex];
         SimTrack const* matchedSimTrack = nullptr;
-        double bestScore = std::numeric_limits<double>::infinity();
         for (auto const& simTrack : *simTracks) {
-          if (simTrack.type() != gen.pdgId() || simTrack.vertIndex() < 0 ||
+          if (simTrack.trackId() != static_cast<unsigned int>(identity) || simTrack.vertIndex() < 0 ||
               static_cast<std::size_t>(simTrack.vertIndex()) >= simVertices->size() ||
-              !(simTrack.momentum().P() > 0.) || !(gen.p() > 0.))
+              !(simTrack.momentum().P() > 0.))
             continue;
-          GlobalVector const simDirection(
-              simTrack.momentum().px(), simTrack.momentum().py(), simTrack.momentum().pz());
-          GlobalVector const genDirection(gen.px(), gen.py(), gen.pz());
-          double const directionDot = simDirection.unit().dot(genDirection.unit());
-          double const angle = std::acos(std::clamp(directionDot, -1., 1.));
-          double const relativeMomentum = std::abs(std::log(simTrack.momentum().P() / gen.p()));
-          double const score = angle + relativeMomentum;
-          if (score < bestScore) {
-            bestScore = score;
-            matchedSimTrack = &simTrack;
-          }
+          matchedSimTrack = &simTrack;
+          break;
         }
-        if (!matchedSimTrack || bestScore > 0.1)
+        if (!matchedSimTrack)
           continue;
         simTruthMatched[selectedIndex] = 1;
         simTrackId[selectedIndex] = matchedSimTrack->trackId();
@@ -3517,24 +3682,42 @@ public:
           auto plane = Plane::build(point, Surface::RotationType());
           auto const ideal = applyTargetConstraint(TrajectoryStateOnSurface(truthState, *plane),
                                                    vertexPosition.z() > 0. ? 1 : -1,
-                                                   vacuumPropagator, *sourceFacingTargetMaterialPropagator,
+                                                   vacuumPropagator, *(targetUseDetailedMaterialPropagation_ ?
+                                                       detailedMaterialPropagator.get() : sourceFacingTargetMaterialPropagator),
                                                    TargetConstraint{vertexPosition, 1.e-4, 1.e-4, 0.},
-                                                   lssMaterialBoundaryAbsZCm_,
-                                                   targetUseNumericalTransportCovariance_, targetUseForwardRefit_, targetForwardMaxIterations_);
+                                                   targetUseDetailedMaterialPropagation_ ? std::abs(vertexPosition.z()) : lssMaterialBoundaryAbsZCm_,
+                                                   targetUseNumericalTransportCovariance_, targetUseForwardRefit_, targetForwardMaxIterations_, targetCubatureStepCm_, targetForwardChordSeed_, targetImportanceClouds_, targetImportanceSpacingCm_, targetUseMomentFit_);
           if (ideal.valid) {
             simIdealConstraintValid[selectedIndex] = 1;
             simIdealConstraintEta[selectedIndex] = ideal.state.momentum.eta();
             simIdealConstraintPhi[selectedIndex] = ideal.state.momentum.phi();
+            simNoiseDiagnostics["simIdealConstraintEtaErr"][selectedIndex] = ideal.diagnostics.at("constrainedEtaErr");
+            simNoiseDiagnostics["simIdealConstraintPhiErr"][selectedIndex] = ideal.diagnostics.at("constrainedPhiErr");
+            simNoiseDiagnostics["simIdealTargetChi2"][selectedIndex] = ideal.chi2;
           }
           FreeTrajectoryState productionState(
               GlobalTrajectoryParameters(vertexPosition, truthMomentum,
                                          firstHit->particleType() > 0 ? -1 : 1, &magneticField),
               CurvilinearTrajectoryError(covariance));
-          std::unique_ptr<Propagator> closurePropagator(sourceFacingTargetMaterialPropagator->clone());
+          std::unique_ptr<Propagator> closurePropagator((targetUseDetailedMaterialPropagation_ ?
+              detailedMaterialPropagator.get() : sourceFacingTargetMaterialPropagator)->clone());
           if (auto* detailed = dynamic_cast<Geant4ePropagator*>(closurePropagator.get()))
             detailed->setTransportAudit(produceTransportClosureAudit_);
           auto outward = materialStateAtZ(productionState, *closurePropagator, point.z());
           if (outward.first.isValid() && outward.first.freeState()) {
+            TrajectoryStateOnSurface const actual(truthState, outward.first.surface());
+            Eigen::Matrix<double,5,1> difference;
+            Eigen::Matrix<double,5,5> noise;
+            std::array<std::string,5> const names{"simForwardQoverPPull", "simForwardSlopeXPull",
+                "simForwardSlopeYPull", "simForwardXPull", "simForwardYPull"};
+            for (unsigned int i=0;i<5;++i) {
+              difference[i]=actual.localParameters().vector()[i]-outward.first.localParameters().vector()[i];
+              for (unsigned int j=0;j<5;++j) noise(i,j)=outward.first.localError().matrix()(i,j);
+              if (noise(i,i)>0.) simNoiseDiagnostics[names[i]][selectedIndex]=difference[i]/std::sqrt(noise(i,i));
+            }
+            Eigen::LLT<Eigen::Matrix<double,5,5>> solve(noise);
+            if (solve.info()==Eigen::Success && difference.allFinite())
+              simNoiseDiagnostics["simForwardNoiseChi2"][selectedIndex]=difference.dot(solve.solve(difference));
             auto returned = materialStateAtZ(*outward.first.freeState(), *closurePropagator,
                                              vertexPosition.z());
             if (returned.first.isValid()) {
@@ -4002,11 +4185,11 @@ public:
     table->addColumn<float>("pz", pz, "momentum z component");
     // The historical unqualified branches are the unconstrained hypothesis.
     // Only the target-restricted alternative receives a prefix.
-    table->addColumn<int>("constrainedValid", constrainedValid, "1 when the prompt-target Kalman fit is valid");
+    table->addColumn<int>("constrainedValid", constrainedValid, "1 when the prompt-target fit is valid");
     table->addColumn<int>("constrainedHits", constrainedHits, "detector hits retained by the prompt-target fit");
     table->addColumn<int>("constrainedStatus",
                           constrainedStatus,
-                          "prompt-target status: 1=Kalman update, 2=forward refit, -8=forward fit failed, -9=curvature sign crossing, -10=no valid detector refit, other negative=transport/update failure");
+                          "prompt-target status: 1=Kalman update, 2=forward likelihood, 3=path integration, 4=forward moment estimator, -8=forward fit failed, -9=curvature sign crossing, -10=no valid detector refit, -11=path integration failed, other negative=transport/update failure");
     table->addColumn<float>("constrainedPt", constrainedPt, "prompt-target-constrained transverse momentum");
     table->addColumn<float>("constrainedEta", constrainedEta, "prompt-target-constrained pseudorapidity");
     table->addColumn<float>("constrainedPhi", constrainedPhi, "prompt-target-constrained azimuth");
@@ -4516,7 +4699,8 @@ public:
         "targetResidualX", "targetResidualY", "targetPullX", "targetPullY",
         "targetHitXX", "targetHitXY", "targetHitYY", "targetPredictedEta", "targetPredictedPhi",
         "targetPredictedQoverP", "constrainedQoverP", "targetNumericalCovarianceDifference", "targetForwardIterations", "targetForwardStatus",
-        "targetForwardMaxUpdate", "targetForwardLastChi2"};
+        "targetForwardMaxUpdate", "targetForwardLastChi2", "targetForwardObjective",
+        "targetImportanceAnchorZ", "targetImportanceInterfaceSigma", "targetImportanceEffectivePoints", "targetImportanceMaximumWeight"};
     for (std::string const prefix : {"targetPredicted", "constrained"}) {
       for (std::string const suffix : {"EtaErr", "PhiErr", "QoverPErr", "XErr", "YErr"})
         targetDiagnosticNames.push_back(prefix + suffix);
@@ -4550,6 +4734,8 @@ public:
                            "validation only: true p interpolated between SimHits bracketing the retained upstream fit surface in its chamber; -1 if unavailable");
     table->addColumn<float>("simFittedSurfaceBracketCm", simFittedSurfaceBracketCm,
                            "validation only: local-z gap of truth interpolation at the fitted surface in cm; -1 if unavailable");
+    for (auto const& [name, values] : simNoiseDiagnostics)
+      table->addColumn<float>(name, values, "validation only: exact SimHit/source process-noise diagnostic; -1 if unavailable", 23);
     table->addColumn<int>("simIdealConstraintValid", simIdealConstraintValid,
                          "validation only: target update from exact simulated first-hit state and vertex succeeded");
     table->addColumn<float>("simIdealConstraintEta", simIdealConstraintEta,
@@ -4627,6 +4813,8 @@ public:
         vertexConstrainedOriginCompatibilityChi2, vertexConstrainedOriginCompatibilityNormalizedChi2;
     constexpr double muonMass = 0.105658;
     std::vector<int> vertexRefitStatus, vertexRefitIterations;
+    std::array<std::vector<float>, 5> vertexRefittedKinematicErrors;
+    std::vector<float> vertexRefittedMinQoverPSignificance;
     std::vector<float> vertexRefittedMass, vertexRefittedPt, vertexRefittedPz, vertexRefittedEta,
         vertexRefittedPhi, vertexRefittedVx, vertexRefittedVy, vertexRefittedVz,
         vertexRefittedVxErr, vertexRefittedVyErr, vertexRefittedVzErr, vertexRefittedChi2;
@@ -4809,9 +4997,10 @@ public:
         vertexRefit.status = -1;
         if (selected[first]->detectorStateValid && selected[second]->detectorStateValid)
           vertexRefit = vertexConstrainedRefit({selected[first]->detectorState, selected[second]->detectorState},
-                                               *sourceFacingTargetMaterialPropagator,
+                                               *(targetUseDetailedMaterialPropagation_ ? detailedMaterialPropagator.get() :
+                                                   sourceFacingTargetMaterialPropagator),
                                                vacuumPropagator,
-                                               (useDetailedMaterialPropagation_ || directionalRefitUseFirstPrinciplesMaterialEffects_ ||
+                                               (targetUseDetailedMaterialPropagation_ || useDetailedMaterialPropagation_ || directionalRefitUseFirstPrinciplesMaterialEffects_ ||
                                                 directionalRefitUseGeometryTargetMaterialEffects_) ? 0. : lssMaterialBoundaryAbsZCm_,
                                                choice.fit.position, commonVertexBeamLineResolution_);
       }
@@ -4853,6 +5042,14 @@ public:
       vertexRefittedPz.push_back(refittedPz);
       vertexRefittedEta.push_back(refittedPt > 0. ? std::asinh(refittedPz / refittedPt) : 0.);
       vertexRefittedPhi.push_back(vertexRefitValid ? std::atan2(refittedPy, refittedPx) : 0.);
+      shift::DimuonKinematicCovariance kinematicErrors;
+      if (vertexRefitValid)
+        kinematicErrors = shift::dimuonKinematicCovariance(vertexRefit.fit.tracks,
+            vertexRefit.fit.crossCovariance, {vertexRefit.momenta[0].z(), vertexRefit.momenta[1].z()}, muonMass);
+      for (unsigned int i = 0; i < 5; ++i)
+        vertexRefittedKinematicErrors[i].push_back(kinematicErrors.valid ?
+            std::sqrt(kinematicErrors.covariance(i,i)) : -1.);
+      vertexRefittedMinQoverPSignificance.push_back(kinematicErrors.minQoverPSignificance);
       for (unsigned int i = 0; i < 2; ++i) {
         auto const muonIndex = i == 0 ? first : second;
         muonVertexRefitIdx[muonIndex] = retainedVertices - 1;
@@ -4972,6 +5169,12 @@ public:
     vertexTable->addColumn<int>("refitStatus", vertexRefitStatus, vertexRefitStatusDoc);
     vertexTable->addColumn<int>("refitIterations", vertexRefitIterations, "number of joint vertex transport iterations");
     vertexTable->addColumn<float>("refittedMass", vertexRefittedMass, "dimuon mass from joint reconstructed-vertex-refitted tracks; refitStatus must be 1");
+    std::array<std::string,5> const refittedErrorNames{"Mass", "Pt", "Pz", "Eta", "Phi"};
+    for (unsigned int i = 0; i < refittedErrorNames.size(); ++i)
+      vertexTable->addColumn<float>("refitted" + refittedErrorNames[i] + "Err", vertexRefittedKinematicErrors[i],
+          "linearized joint-refit uncertainty including inter-track covariance; -1 if unavailable", 23);
+    vertexTable->addColumn<float>("refittedMinQoverPSignificance", vertexRefittedMinQoverPSignificance,
+        "minimum absolute q/p divided by its error for the two refitted muons; <=1 means a one-sigma interval reaches zero curvature", 23);
     vertexTable->addColumn<float>("refittedPt", vertexRefittedPt, "joint vertex refitted dimuon pT; refitStatus must be 1");
     vertexTable->addColumn<float>("refittedPz", vertexRefittedPz, "joint vertex refitted dimuon pz; refitStatus must be 1");
     vertexTable->addColumn<float>("refittedEta", vertexRefittedEta, "joint vertex refitted dimuon eta; refitStatus must be 1");
@@ -5192,6 +5395,13 @@ public:
     description.add<bool>("targetUseDetailedMaterialPropagation", false);
     description.add<bool>("targetUseNumericalTransportCovariance", false);
     description.add<bool>("targetUseMeanEnergyLossJacobian", false);
+    description.add<bool>("targetUseFieldGradientJacobian", false);
+    description.add<double>("targetCubatureStepCm", 0.);
+    description.add<bool>("targetForwardChordSeed", false);
+    description.add<unsigned int>("targetImportanceClouds", 0);
+    description.add<double>("targetImportanceSpacingCm", 100.);
+    description.add<bool>("targetUseMomentFit", false);
+    description.add<bool>("targetUseUnquenchedIonizationVariance", false);
     description.add<double>("targetX", 0.0);
     description.add<double>("targetY", 0.0);
     description.add<double>("targetZ", 14800.0);
@@ -5317,6 +5527,13 @@ private:
   unsigned int targetForwardMaxIterations_;
   bool logCandidateSelection_;
   bool targetUseMeanEnergyLossJacobian_;
+  bool targetUseFieldGradientJacobian_;
+  double targetCubatureStepCm_;
+  bool targetForwardChordSeed_;
+  unsigned int targetImportanceClouds_;
+  double targetImportanceSpacingCm_;
+  bool targetUseMomentFit_;
+  bool targetUseUnquenchedIonizationVariance_;
   bool targetUseNumericalTransportCovariance_;
   bool targetUseDetailedMaterialPropagation_;
   double targetX_;

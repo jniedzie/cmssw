@@ -23,3 +23,7 @@
   <use name="DataFormats/GeometryVector"/>
 </bin>
 <test name="testG4BackwardCovarianceRun" command="testG4BackwardCovariance"/>
+<bin file="testFieldGradientJacobian.cc" name="testG4FieldGradientJacobian"/>
+<test name="testG4FieldGradientJacobianRun" command="testG4FieldGradientJacobian"/>
+<bin file="testIonizationVariance.cc" name="testG4IonizationVariance"/>
+<test name="testG4IonizationVarianceRun" command="testG4IonizationVariance"/>
