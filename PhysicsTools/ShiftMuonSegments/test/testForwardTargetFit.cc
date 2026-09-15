@@ -1,6 +1,7 @@
 #include "PhysicsTools/ShiftMuonSegments/interface/ForwardTargetFit.h"
 #include <Eigen/LU>
 #include <stdexcept>
+#include <iostream>
 
 int main() {
   using namespace shift;
@@ -59,4 +60,28 @@ int main() {
   check(std::abs(varying.parameters[0] - observation[0]) > .0005);
   for (unsigned int i = 1; i < varying.steps.size(); ++i)
     check(varying.steps[i].objective < varying.steps[i-1].objective);
+  // A sharply varying but continuous covariance needs a derivative step
+  // selected in covariance units, rather than a fixed relative q/p step.
+  auto sharpNoise=[](TargetParameters const& x) {
+    ForwardTargetPrediction p{true,x,TargetCovariance::Zero()};
+    double const u=(x[0]-.02)/1.e-6;
+    p.noise(0,0)=1.e-5*(1.-std::tanh(u))/2.;return p;
+  };
+  auto sharp=fitForwardTarget(observation,observation,measurement,.1,.1,0.,sharpNoise,64);
+  if (!sharp.valid) {
+    std::cerr<<"Sharp likelihood status "<<sharp.status<<" iterations "<<sharp.iterations<<'\n';
+    for (auto const& step:sharp.steps)
+      std::cerr<<step.parameters[0]<<' '<<step.objective<<' '<<step.maxUpdate<<' '<<step.scoreDifference<<'\n';
+  }
+  check(sharp.valid);
+  auto sharpObjective=[](double x) {
+    double const v=1.e-6+1.e-5*(1.-std::tanh((x-.02)/1.e-6))/2.;
+    return (x-.02)*(x-.02)/v+std::log(v);
+  };
+  lower=.019;upper=.021;
+  for(unsigned int i=0;i<100;++i) {
+    double const a=(2.*lower+upper)/3.,b=(lower+2.*upper)/3.;
+    if(sharpObjective(a)<sharpObjective(b)) upper=b;else lower=a;
+  }
+  check(sharpObjective(sharp.parameters[0])-sharpObjective((lower+upper)/2.)<.001);
 }

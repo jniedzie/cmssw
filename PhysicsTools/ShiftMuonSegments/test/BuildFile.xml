@@ -17,3 +17,20 @@
   <use name="eigen"/>
 </bin>
 <test name="testShiftForwardTargetFitRun" command="testShiftForwardTargetFit"/>
+<bin file="testDimuonKinematicCovariance.cc" name="testShiftDimuonKinematicCovariance">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftDimuonKinematicCovarianceRun" command="testShiftDimuonKinematicCovariance"/>
+<bin file="testCubatureTransport.cc" name="testShiftCubatureTransport">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftCubatureTransportRun" command="testShiftCubatureTransport"/>
+<bin file="testImportanceTargetConstraint.cc" name="testShiftImportanceTargetConstraint">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftImportanceTargetConstraintRun" command="testShiftImportanceTargetConstraint"/>
+<bin file="testTargetMomentFit.cc" name="testShiftTargetMomentFit">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftTargetMomentFitRun" command="testShiftTargetMomentFit"/>
+<test name="testShiftReconstructionFieldCache" command="python3 ${LOCALTOP}/src/PhysicsTools/ShiftMuonSegments/test/testReconstructionFieldCache.py"/>

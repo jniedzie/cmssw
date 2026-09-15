@@ -62,6 +62,14 @@ public:
   // frame with a positive step and the returned covariance is reversed back.
   void setUseConsistentBackwardCovariance(bool value) { consistentBackwardCovariance_ = value; }
   void setUseMeanEnergyLossJacobian(bool value) { meanEnergyLossJacobian_ = value; }
+  void setUseFieldGradientJacobian(bool value) { fieldGradientJacobian_ = value; }
+  void setUseUnquenchedIonizationVariance(bool value) { unquenchedIonizationVariance_ = value; }
+  void setUseMaterialInterfaceJacobian(bool value) { materialInterfaceJacobian_ = value; }
+  double maximumInterfaceRelativeCurvatureSigma() const { return maximumInterfaceRelativeCurvatureSigma_; }
+  double maximumInterfaceZCm() const { return maximumInterfaceZCm_; }
+  void setRecordTransportJacobian(bool value) { recordTransportJacobian_ = value; }
+  bool transportJacobianValid() const { return transportJacobianValid_; }
+  AlgebraicMatrix55 const& curvilinearTransportJacobian() const { return curvilinearTransportJacobian_; }
   void setTransportAudit(bool value) { transportAudit_ = value; }
 
 private:
@@ -80,6 +88,14 @@ private:
   bool consistentBackwardCovariance_ = false;
   bool transportAudit_ = false;
   bool meanEnergyLossJacobian_ = false;
+  bool fieldGradientJacobian_ = false;
+  bool unquenchedIonizationVariance_ = false;
+  bool materialInterfaceJacobian_ = true;
+  mutable double maximumInterfaceRelativeCurvatureSigma_ = 0.;
+  mutable double maximumInterfaceZCm_ = 0.;
+  bool recordTransportJacobian_ = false;
+  mutable bool transportJacobianValid_ = false;
+  mutable AlgebraicMatrix55 curvilinearTransportJacobian_;
   double plimit_;
   double maximumStepLengthMm_;
   double maximumPathLengthCm_;

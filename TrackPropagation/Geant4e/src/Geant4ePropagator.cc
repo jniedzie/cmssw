@@ -6,6 +6,8 @@
 // Geant4e
 #include "TrackPropagation/Geant4e/interface/ConvertFromToCLHEP.h"
 #include "TrackPropagation/Geant4e/interface/Geant4ePropagator.h"
+#include "TrackPropagation/Geant4e/interface/FieldGradientJacobian.h"
+#include "TrackPropagation/Geant4e/interface/IonizationVariance.h"
 
 // CMSSW
 #include "DataFormats/TrajectorySeed/interface/PropagationDirection.h"
@@ -245,6 +247,7 @@ bool Geant4ePropagator::configurePropagation(G4ErrorMode &mode,
 template <class SurfaceType>
 std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(const FreeTrajectoryState &ftsStart,
                                                                                 const SurfaceType &pDest) const {
+  transportJacobianValid_ = false;
   ///////////////////////////////
   // Construct the target surface
   //
@@ -319,6 +322,8 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   //////////////////////////////
   // Propagate
   int iterations = 0;
+  maximumInterfaceRelativeCurvatureSigma_ = 0.;
+  maximumInterfaceZCm_ = 0.;
   double finalPathLength = 0;
   std::map<std::string, std::array<double, 3>> materialAudit;
   if (transportAudit_)
@@ -343,6 +348,7 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   if (meanEnergyLossJacobian_)
     energyLoss = std::make_unique<G4EnergyLossForExtrapolator>(0);
   G4ErrorTrajErr previousError(5, 0);
+  G4ErrorMatrix cumulativeJacobian(5, 5, 1);
   bool continuePropagation = true;
   while (continuePropagation) {
     iterations++;
@@ -351,16 +357,48 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
     // re-initialize navigator to avoid mismatches and/or segfaults
     theG4eManager->GetErrorPropagationNavigator()->LocateGlobalPointWithinVolume(g4eTrajState.GetPosition());
 
-    if (meanEnergyLossJacobian_) previousError = g4eTrajState.GetError();
+    if (meanEnergyLossJacobian_ || fieldGradientJacobian_) previousError = g4eTrajState.GetError();
     const int ierr = theG4eManager->PropagateOneStep(&g4eTrajState, mode);
-    if (ierr == 0 && energyLoss && g4eTrajState.GetG4Track()) {
+    G4ErrorMatrix stepJacobian;
+    if (recordTransportJacobian_ && ierr == 0) stepJacobian=g4eTrajState.GetTransfMat();
+    if (ierr == 0 && (energyLoss || fieldGradientJacobian_) && g4eTrajState.GetG4Track()) {
       auto const* track = g4eTrajState.GetG4Track();
       auto const* step = track->GetStep();
       auto const* before = step->GetPreStepPoint();
       auto const* after = step->GetPostStepPoint();
       double const e0 = before->GetKineticEnergy(), e1 = after->GetKineticEnergy();
       double const length = step->GetStepLength();
-      if (length > 0. && e0 > 0. && e1 > 0. && std::abs(e1-e0) > 1.e-12 * e0) {
+      auto const transport = g4eTrajState.GetTransfMat();
+      G4ErrorMatrix correction(5, 5, 0);
+      if (fieldGradientJacobian_ && length > 0.) {
+        auto const direction = (before->GetMomentumDirection() + after->GetMomentumDirection()).unit();
+        auto const midpoint = .5*(before->GetPosition() + after->GetPosition());
+        auto const* field = G4TransportationManager::GetTransportationManager()->GetFieldManager()->GetDetectorField();
+        if (field && direction.perp() > 0.) {
+          G4ThreeVector const u(-direction.y(), direction.x(), 0.);
+          std::array<G4ThreeVector, 2> const axes{u.unit(), direction.cross(u.unit())};
+          std::array<G4ThreeVector, 2> derivatives;
+          // A centimetre-based derivative step also resolves the float-backed
+          // CMS field coordinates. Differentiate the actual field provider,
+          // including its spatial support; no magnet-specific approximation.
+          constexpr double h = .01*CLHEP::cm;
+          for (unsigned int j = 0; j < 2; ++j) {
+            auto const a = midpoint + h*axes[j], b = midpoint - h*axes[j];
+            double pa[4]{a.x(),a.y(),a.z(),before->GetGlobalTime()};
+            double pb[4]{b.x(),b.y(),b.z(),before->GetGlobalTime()};
+            double ba[6]{}, bb[6]{};
+            field->GetFieldValue(pa,ba); field->GetFieldValue(pb,bb);
+            derivatives[j] = G4ThreeVector(ba[0]-bb[0],ba[1]-bb[1],ba[2]-bb[2]) /
+                (2.*h/CLHEP::cm*CLHEP::tesla);
+          }
+          double const momentum = .5*(before->GetMomentum().mag()+after->GetMomentum().mag())/CLHEP::GeV;
+          double const charge = track->GetDynamicParticle()->GetCharge() *
+              (mode == G4ErrorMode_PropBackwards ? -1. : 1.);
+          correction = TrackPropagation::fieldGradientJacobianCorrection(direction, derivatives,
+              length/CLHEP::cm, charge/momentum);
+        }
+      }
+      if (energyLoss && length > 0. && e0 > 0. && e1 > 0. && std::abs(e1-e0) > 1.e-12 * e0) {
         // G4ErrorFreeTrajState's helix Jacobian has unit inverse-momentum
         // derivative in field-free material, omitting the changing mean
         // energy. Differentiate G4ErrorEnergyLoss's SAME midpoint rule.
@@ -380,22 +418,23 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
         double const mass = track->GetParticleDefinition()->GetPDGMass();
         double const p0 = std::sqrt(e0*(e0+2.*mass)), p1 = std::sqrt(e1*(e1+2.*mass));
         double const jacobian = std::pow(p0/p1,3) * (e1+mass)/(e0+mass) * derivative;
-        auto const transport = g4eTrajState.GetTransfMat();
-        double const delta = jacobian - transport(1,1);
         if (!std::isfinite(jacobian) || !(jacobian > 0.))
           return TsosPP(TrajectoryStateOnSurface(), 0.0f);
-        auto corrected = g4eTrajState.GetError();
-        // T' = T + delta e0 e0^T. Keep Q exactly, instead of rescaling it
-        // together with the transported covariance.
-        for (int j = 1; j <= 5; ++j) {
-          double cross = 0.;
-          for (int k = 1; k <= 5; ++k) cross += previousError(1,k) * transport(j,k);
-          corrected(1,j) += delta * cross * (j == 1 ? 2. : 1.);
-        }
-        corrected(1,1) += delta*delta*previousError(1,1);
-        g4eTrajState.SetError(corrected);
+        correction(1,1) = jacobian - transport(1,1);
       }
-      if (after->GetStepStatus() == fGeomBoundary && before->GetMaterial() && after->GetMaterial() &&
+      // Replace T C T^T by (T+D) C (T+D)^T while retaining the step's
+      // process noise. Applying every step also corrects transport of all
+      // scattering/energy-loss noise accumulated earlier in the trajectory.
+      auto const dc = correction*previousError;
+      auto const cross = dc*transport.T();
+      auto const quadratic = dc*correction.T();
+      auto corrected = g4eTrajState.GetError();
+      for (int i = 1; i <= 5; ++i)
+        for (int j = 1; j <= i; ++j)
+          corrected(i,j) += cross(i,j)+cross(j,i)+quadratic(i,j);
+      g4eTrajState.SetError(corrected);
+      if (recordTransportJacobian_) stepJacobian+=correction;
+      if (energyLoss && after->GetStepStatus() == fGeomBoundary && before->GetMaterial() && after->GetMaterial() &&
           before->GetMaterial() != after->GetMaterial()) {
         // At a material interface the crossing distance itself varies with
         // the incoming state. The fixed-length helix Jacobian omits this
@@ -439,10 +478,45 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
         G4ErrorMatrix interfaceMap(5, 5, 1);
         interfaceMap(1, 4) = jump * normal.dot(transverse) / incidence;
         interfaceMap(1, 5) = jump * normal.dot(vertical) / incidence;
-        g4eTrajState.SetError(g4eTrajState.GetError().similarity(interfaceMap));
+        auto const beforeInterface=g4eTrajState.GetError();
+        double const a=interfaceMap(1,4),b=interfaceMap(1,5);
+        double const variance=a*a*beforeInterface(4,4)+2.*a*b*beforeInterface(4,5)+b*b*beforeInterface(5,5);
+        double const relativeSigma=momentum/CLHEP::GeV*std::sqrt(std::max(0.,variance));
+        if (relativeSigma>maximumInterfaceRelativeCurvatureSigma_) {
+          maximumInterfaceRelativeCurvatureSigma_=relativeSigma;
+          maximumInterfaceZCm_=after->GetPosition().z()/CLHEP::cm;
+        }
+        if (materialInterfaceJacobian_) {
+          g4eTrajState.SetError(beforeInterface.similarity(interfaceMap));
+          if (recordTransportJacobian_) stepJacobian=interfaceMap*stepJacobian;
+        }
       }
     }
 
+    if (ierr == 0 && unquenchedIonizationVariance_ && g4eTrajState.GetG4Track()) {
+      auto const* track = g4eTrajState.GetG4Track();
+      auto const* step = track->GetStep();
+      // Match Geant4e's material and energy convention exactly, replacing
+      // only its explicitly quenched contribution. No change to mean loss.
+      auto const* material = track->GetVolume()->GetLogicalVolume()->GetMaterial();
+      double z = 0., a = 0.;
+      for (size_t i=0; i<material->GetNumberOfElements(); ++i) {
+        double const fraction = material->GetFractionVector()[i];
+        z += material->GetElement(i)->GetZ()*fraction;
+        a += material->GetElement(i)->GetA()/(CLHEP::g/CLHEP::mole)*fraction;
+      }
+      double const energy = track->GetTotalEnergy()/CLHEP::GeV;
+      auto const variance = TrackPropagation::ionizationVariance(energy,
+          track->GetDynamicParticle()->GetMass()/CLHEP::GeV, z/a,
+          material->GetDensity()/(CLHEP::g/CLHEP::cm3), step->GetStepLength()/CLHEP::cm);
+      double const p = step->GetPreStepPoint()->GetMomentum().mag()/CLHEP::GeV;
+      if (p > 0.) {
+        auto corrected = g4eTrajState.GetError();
+        corrected(1,1) += energy*energy/std::pow(p,6)*(variance.physical-variance.legacy);
+        g4eTrajState.SetError(corrected);
+      }
+    }
+    if (recordTransportJacobian_ && ierr == 0) cumulativeJacobian=stepJacobian*cumulativeJacobian;
     if (transportAudit_ && g4eTrajState.GetG4Track()) {
       auto const* step = g4eTrajState.GetG4Track()->GetStep();
       if (step && step->GetPreStepPoint()->GetMaterial()) {
@@ -554,6 +628,17 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   LogDebug("Geant4e") << "CMS -  Error matrix after propagation: " << std::endl << curvError.matrix();
 
   GlobalTrajectoryParameters tParsDest(posEndGV, momEndGV, ftsStart.charge(), theField);
+  if (recordTransportJacobian_ && (mode == G4ErrorMode_PropForwards || consistentBackwardCovariance_)) {
+    // Same signed-curvature and reversed-frame conversions used for C above,
+    // at both endpoints. This maps CMS curvilinear input to output errors.
+    double signs[5]={double(ftsStart.charge()),1.,1.,1.,1.};
+    if (mode == G4ErrorMode_PropBackwards) {signs[1]=-1.;signs[3]=-1.;}
+    transportJacobianValid_=true;
+    for (unsigned int i=0;i<5;++i) for (unsigned int j=0;j<5;++j) {
+      curvilinearTransportJacobian_(i,j)=signs[i]*cumulativeJacobian(i+1,j+1)*signs[j];
+      transportJacobianValid_ &= std::isfinite(curvilinearTransportJacobian_(i,j));
+    }
+  }
 
   SurfaceSideDefinition::SurfaceSide side;
 

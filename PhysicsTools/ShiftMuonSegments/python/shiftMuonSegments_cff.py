@@ -92,7 +92,12 @@ def addShiftMuonSegments(
             GeoFromDD4hep=cms.bool(True),
             UseMagneticField=cms.bool(True),
             UseSensitiveDetectors=cms.bool(False),
-            MagneticField=_g4SimHits.MagneticField.clone(),
+            # The simulation's 1 mm proximity cache makes nearby transport
+            # evaluations query-order dependent and hides the 0.1 mm field
+            # probes used by covariance derivatives. Use the same physical
+            # field without that approximation for offline reconstruction.
+            # Clone only: do not modify g4SimHits or the simulation settings.
+            MagneticField=_g4SimHits.MagneticField.clone(delta=cms.double(0.)),
         )
         process.options.numberOfThreads = cms.untracked.uint32(1)
         process.options.numberOfStreams = cms.untracked.uint32(1)

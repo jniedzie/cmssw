@@ -42,6 +42,11 @@ def customise(
     # set.  Full float precision is important at the O(150 m) SHIFT baseline:
     # EXONanoAOD's eight-bit vertex precision quantises z by tens of cm.
     if hasattr(process, "genParticleTable"):
+        # Eight mantissa bits in the standard truth angles create a visible
+        # rounding contribution to narrow angular residuals and pulls. Keep
+        # full float precision for validation; this does not enter the fit.
+        for quantity in ("pt", "eta", "phi"):
+            getattr(process.genParticleTable.variables, quantity).precision = cms.int32(23)
         process.genParticleTable.variables.pz = Var(
             "pz",
             float,
