@@ -34,3 +34,4 @@
 </bin>
 <test name="testShiftTargetMomentFitRun" command="testShiftTargetMomentFit"/>
 <test name="testShiftReconstructionFieldCache" command="python3 ${LOCALTOP}/src/PhysicsTools/ShiftMuonSegments/test/testReconstructionFieldCache.py"/>
+<test name="testShiftLssMaterialBoundary" command="python3 ${LOCALTOP}/src/PhysicsTools/ShiftMuonSegments/test/testLssMaterialBoundary.py"/>
