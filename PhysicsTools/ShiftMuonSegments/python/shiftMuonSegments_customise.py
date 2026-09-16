@@ -506,6 +506,7 @@ def customiseShiftLssTransport(
     addBaseField=False,
     sumOverlaps=False,
     materialBoundaryAbsZCm=1100.0,
+    approximateMaterialBoundaryAbsZCm=1100.0,
     geant4eMomentumLimitGeV=0.05,
     geant4eMaximumStepLengthMm=0.2,
     geant4eMaximumPathLengthCm=2500.0,
@@ -515,11 +516,14 @@ def customiseShiftLssTransport(
         raise RuntimeError("Cannot configure SHIFT LSS transport: shiftMuonTable is absent")
     positive_values = {
         "materialBoundaryAbsZCm": materialBoundaryAbsZCm,
+        "approximateMaterialBoundaryAbsZCm": approximateMaterialBoundaryAbsZCm,
         "geant4eMomentumLimitGeV": geant4eMomentumLimitGeV,
         "geant4eMaximumStepLengthMm": geant4eMaximumStepLengthMm,
         "geant4eMaximumPathLengthCm": geant4eMaximumPathLengthCm,
     }
-    invalid = [name for name, value in positive_values.items() if not value > 0.0]
+    import math
+    invalid = [name for name, value in positive_values.items()
+               if not math.isfinite(value) or not value > 0.0]
     if invalid:
         raise ValueError("SHIFT LSS transport values must be positive: " + ", ".join(invalid))
     if fieldElements is not None:
@@ -535,9 +539,23 @@ def customiseShiftLssTransport(
         # g4SimHits consumes the empty-label product. The standard CMS field
         # has been moved to baseMagneticFieldLabel, leaving the composite as
         # the single default product consumed below by reconstruction too.
+    # The field remains active in the vacuum continuation. Its spatial extent
+    # must never extend the approximate CMS material map: doing so adds fictitious
+    # backward energy-loss corrections in the field-only sample. Geometry-aware
+    # target transport may use the requested external-material boundary.
+    table = process.shiftMuonTable
+    geometry_target_transport = any(getattr(table, name).value() for name in (
+        "useDetailedMaterialPropagation",
+        "directionalRefitUseFirstPrinciplesMaterialEffects",
+        "directionalRefitUseGeometryTargetMaterialEffects",
+    ))
+    canonical_boundary = (materialBoundaryAbsZCm if geometry_target_transport else
+                          min(materialBoundaryAbsZCm, approximateMaterialBoundaryAbsZCm))
+    # targetUseDetailedMaterialPropagation is intentionally separate: that
+    # constrained fit transports directly to its target plane in the producer.
     process.shiftMuonTable.lssTransport = cms.PSet(
         magneticFieldLabel=cms.string(magneticFieldLabel),
-        materialBoundaryAbsZCm=cms.double(materialBoundaryAbsZCm),
+        materialBoundaryAbsZCm=cms.double(canonical_boundary),
         geant4eMomentumLimitGeV=cms.double(geant4eMomentumLimitGeV),
         geant4eMaximumStepLengthMm=cms.double(geant4eMaximumStepLengthMm),
         geant4eMaximumPathLengthCm=cms.double(geant4eMaximumPathLengthCm),
