@@ -36,6 +36,54 @@ int main() {
   check(distantFit.valid && distantFit.iterations<=3 &&
         (distantFit.parameters-expected).norm()<1.e-6 &&
         (distantFit.covariance-expectedCovariance).norm()<1.e-8);
+
+  // A failed initial transport may be caused by the linear target seed,
+  // while the backward-predicted seed still describes a transportable path.
+  auto invalidSeed=expected;invalidSeed[3]=1.e6;
+  auto boundedTransport=[&](TargetParameters const& x) {
+    ++calls;
+    if (x[3]>1.e5) return ForwardTargetPrediction{};
+    ForwardTargetPrediction p{true,j*x,noise};p.jacobianValid=true;p.jacobian=j;return p;
+  };
+  auto const direct=fitTargetMoments(expected,detector,measurement,.1,.1,0.,boundedTransport);
+  bool usedFallback=false;
+  calls=0;
+  auto retry=fitTargetMomentsWithFallback(invalidSeed,expected,detector,measurement,
+                                        .1,.1,0.,boundedTransport,32,&usedFallback);
+  check(retry.valid && usedFallback && calls==2 && retry.iterations==1 &&
+        (retry.parameters.array()==direct.parameters.array()).all() &&
+        (retry.covariance.array()==direct.covariance.array()).all());
+  calls=0;
+  auto unchanged=fitTargetMomentsWithFallback(expected,invalidSeed,detector,measurement,
+                                             .1,.1,0.,boundedTransport,32,&usedFallback);
+  check(unchanged.valid && !usedFallback && calls==1 &&
+        (unchanged.parameters.array()==direct.parameters.array()).all() &&
+        (unchanged.covariance.array()==direct.covariance.array()).all() &&
+        unchanged.chi2==direct.chi2);
+  auto oppositeCharge=expected;oppositeCharge[0]*=-1.;
+  auto nonfinite=expected;nonfinite[1]=std::numeric_limits<double>::quiet_NaN();
+  for (auto const& forbiddenFallback : {invalidSeed,oppositeCharge,nonfinite}) {
+    calls=0;
+    auto failed=fitTargetMomentsWithFallback(invalidSeed,forbiddenFallback,detector,measurement,
+                                            .1,.1,0.,boundedTransport,32,&usedFallback);
+    check(!failed.valid && failed.status==-2 && failed.iterations==1 && !usedFallback && calls==1);
+  }
+  // The line-search prediction can have a finite mean but invalid noise.
+  // Rejection at the next iteration must remain a later failure, not trigger
+  // a new fit or hide a broken transport covariance behind another seed.
+  auto laterSeed=expected;laterSeed[3]+=1.;
+  auto laterFallback=expected;laterFallback[3]+=7.;
+  bool fallbackVisited=false;
+  auto laterFailure=[&](TargetParameters const& x) {
+    fallbackVisited |= (x.array()==laterFallback.array()).all();
+    ForwardTargetPrediction p{true,j*x,noise};p.jacobianValid=true;p.jacobian=j;
+    if (x[3]<expected[3]+.25) p.noise(0,0)=std::numeric_limits<double>::quiet_NaN();
+    return p;
+  };
+  auto later=fitTargetMomentsWithFallback(laterSeed,laterFallback,detector,measurement,
+                                         .1,.1,0.,laterFailure,32,&usedFallback);
+  check(!later.valid && later.status==-2 && later.iterations==2 && !usedFallback && !fallbackVisited);
+
   // A known mean with state-dependent variance: the quasi-score solution
   // is the observed mean. It deliberately differs from a Gaussian-density
   // maximum which uses the variance itself to infer the parameter.

@@ -1179,10 +1179,11 @@ namespace {
       forward->setPropagationDirection(alongMomentum);
       auto* forwardGeant4=dynamic_cast<Geant4ePropagator*>(forward.get());
       if (momentFit && forwardGeant4) forwardGeant4->setRecordTransportJacobian(true);
-      shift::TargetParameters seed, detector;
+      shift::TargetParameters seed, fallbackSeed, detector;
       shift::TargetCovariance detectorCovariance;
       for (unsigned int i = 0; i < 5; ++i) {
         seed[i] = constrained.localParameters().vector()[i];
+        fallbackSeed[i] = predicted.localParameters().vector()[i];
         detector[i] = upstream.localParameters().vector()[i];
         for (unsigned int j = 0; j < 5; ++j)
           detectorCovariance(i,j) = upstream.localError().matrix()(i,j);
@@ -1218,10 +1219,14 @@ namespace {
         }
         return prediction;
       };
-      auto const fitted = momentFit ? shift::fitTargetMoments(seed, detector, detectorCovariance,
-          constraint.sigmaX, constraint.sigmaY, constraint.sigmaZ, evaluate, forwardMaxIterations) :
+      bool usedFallback = false;
+      auto const fitted = momentFit ? shift::fitTargetMomentsWithFallback(seed, fallbackSeed, detector, detectorCovariance,
+          constraint.sigmaX, constraint.sigmaY, constraint.sigmaZ, evaluate, forwardMaxIterations, &usedFallback) :
           shift::fitForwardTarget(seed, detector, detectorCovariance,
           constraint.sigmaX, constraint.sigmaY, constraint.sigmaZ, evaluate, forwardMaxIterations);
+      if (usedFallback)
+        edm::LogVerbatim("ShiftTargetForwardFit") << "Retried initial transport from backward-predicted seed; status="
+                                                << fitted.status << " iterations=" << fitted.iterations;
       if (!fitted.valid) for (auto const& check : fitted.derivativeChecks)
         edm::LogVerbatim("ShiftTargetForwardFit") << std::setprecision(17)
             << "derivativeCoordinate=" << check.coordinate << " step=" << check.step

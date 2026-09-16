@@ -97,5 +97,29 @@ namespace shift {
     }
     result.status=-7;return result;
   }
+
+  // A linear target update can give an untransportable initial trajectory
+  // without crossing q/p=0. In that case only, restart from the original
+  // backward prediction, which supplies a different physical path. Never
+  // compare fits by residual/chi2, retry a later failure, or reuse an updated
+  // posterior as a measurement. Both attempts use the same detector input.
+  template<class Transport>
+  ForwardTargetFit fitTargetMomentsWithFallback(
+      TargetParameters const& seed, TargetParameters const& fallbackSeed,
+      TargetParameters const& detector, TargetCovariance const& detectorCovariance,
+      double sigmaX, double sigmaY, double sigmaZ, Transport const& transport,
+      unsigned int maximumIterations=32, bool* usedFallback=nullptr) {
+    if (usedFallback) *usedFallback=false;
+    auto result=fitTargetMoments(seed, detector, detectorCovariance,
+                                sigmaX, sigmaY, sigmaZ, transport, maximumIterations);
+    if (!result.valid && result.status==-2 && result.iterations==1 &&
+        fallbackSeed.allFinite() && seed[0]*fallbackSeed[0]>0. &&
+        (seed.array()!=fallbackSeed.array()).any()) {
+      if (usedFallback) *usedFallback=true;
+      return fitTargetMoments(fallbackSeed, detector, detectorCovariance,
+                              sigmaX, sigmaY, sigmaZ, transport, maximumIterations);
+    }
+    return result;
+  }
 }
 #endif
