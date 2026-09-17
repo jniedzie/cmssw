@@ -16,11 +16,13 @@
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
 #include "TrackingTools/AnalyticalJacobians/interface/JacobianLocalToCurvilinear.h"
 #include "TrackingTools/AnalyticalJacobians/interface/JacobianCurvilinearToLocal.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/MaterialEndpointChart.h"
 #include <Eigen/Core>
 #include <fstream>
 #include <iomanip>
 #include <cmath>
 #include <vector>
+#include <utility>
 
 class ShiftTargetCovarianceValidator : public edm::one::EDAnalyzer<> {
 public:
@@ -31,7 +33,23 @@ public:
         sourceParameters_(p.existsAs<std::vector<double>>("sourceParameters") ? p.getParameter<std::vector<double>>("sourceParameters") : std::vector<double>{}),
         sourceZ_(p.existsAs<double>("sourceZ") ? p.getParameter<double>("sourceZ") : 0.),
         roundTripNoise_(p.existsAs<bool>("roundTripNoise") && p.getParameter<bool>("roundTripNoise")),
-        useFieldGradient_(p.existsAs<bool>("useFieldGradient") && p.getParameter<bool>("useFieldGradient")) {}
+        useFieldGradient_(p.existsAs<bool>("useFieldGradient") && p.getParameter<bool>("useFieldGradient")),
+        transportAudit_(p.existsAs<bool>("transportAudit") && p.getParameter<bool>("transportAudit")),
+        useMaterialEndpointCharts_(p.existsAs<bool>("useMaterialEndpointCharts") && p.getParameter<bool>("useMaterialEndpointCharts")),
+        finiteDifferenceScale_(p.existsAs<double>("finiteDifferenceScale") ? p.getParameter<double>("finiteDifferenceScale") : 1.),
+        maximumStepLengthMm_(p.existsAs<double>("maximumStepLengthMm") ? p.getParameter<double>("maximumStepLengthMm") : .2),
+        finiteDifferenceSteps_(p.existsAs<std::vector<double>>("finiteDifferenceSteps") ?
+                              p.getParameter<std::vector<double>>("finiteDifferenceSteps") : std::vector<double>{}) {
+    if (!(finiteDifferenceScale_ > 0.) || !std::isfinite(finiteDifferenceScale_) ||
+        !(maximumStepLengthMm_ > 0.) || !std::isfinite(maximumStepLengthMm_) ||
+        (!finiteDifferenceSteps_.empty() && finiteDifferenceSteps_.size() != 5))
+      throw cms::Exception("Configuration") << "Invalid diagnostic finite-difference steps";
+    for (double step : finiteDifferenceSteps_)
+      if (!(step > 0.) || !std::isfinite(step))
+        throw cms::Exception("Configuration") << "Finite-difference steps must be finite and positive";
+    if (useMaterialEndpointCharts_ && (sourceParameters_.empty() || roundTripNoise_))
+      throw cms::Exception("Configuration") << "Endpoint charts require explicit-source mean-Jacobian mode";
+  }
   void analyze(edm::Event const& event, edm::EventSetup const& setup) override {
     if (done_) return;
     if (!sourceParameters_.empty()) {
@@ -49,12 +67,13 @@ public:
         // This isolates forward/backward covariance consistency without any
         // generated tracks, residual cuts, or finite-difference step choice.
         for (bool interface : {false,true}) {
-          Geant4ePropagator forward(&field,"mu",alongMomentum,1.,.2,20000.);
+          Geant4ePropagator forward(&field,"mu",alongMomentum,1.,maximumStepLengthMm_,20000.);
           forward.setUseConsistentBackwardCovariance(true);
           forward.setUseMeanEnergyLossJacobian(true);
           forward.setUseUnquenchedIonizationVariance(true);
           forward.setUseFieldGradientJacobian(useFieldGradient_);
           forward.setUseMaterialInterfaceJacobian(interface);
+          forward.setTransportAudit(transportAudit_);
           Geant4ePropagator backward(forward);
           backward.setPropagationDirection(oppositeToMomentum);
           AlgebraicVector5 parameters;AlgebraicSymMatrix55 zero;
@@ -84,31 +103,73 @@ public:
         out<<"]\n";done_=true;return;
       }
       for (bool interface : {false,true}) {
-        Geant4ePropagator prop(&field,"mu",alongMomentum,1.,.2,20000.);
+        Geant4ePropagator prop(&field,"mu",alongMomentum,1.,maximumStepLengthMm_,20000.);
         prop.setUseConsistentBackwardCovariance(true);prop.setUseMeanEnergyLossJacobian(true);
         prop.setUseUnquenchedIonizationVariance(true);prop.setUseMaterialInterfaceJacobian(interface);
         prop.setUseFieldGradientJacobian(useFieldGradient_);
         prop.setRecordTransportJacobian(true);
+        prop.setTransportAudit(transportAudit_);
         for (int coordinate=-1;coordinate<5;++coordinate) for (double offset : (coordinate<0 ? std::vector<double>{0.} : std::vector<double>{-1.,-.1,.1,1.})) {
           AlgebraicVector5 parameters;AlgebraicSymMatrix55 zero;
           for (unsigned int i=0;i<5;++i) parameters[i]=sourceParameters_[i];
-          if (coordinate>=0) parameters[coordinate]+=offset*(coordinate==0?std::abs(parameters[0])*1.e-3:(coordinate<3?1.e-5:.01));
+          if (coordinate>=0) parameters[coordinate]+=offset*finiteDifferenceScale_*
+              (finiteDifferenceSteps_.empty() ?
+               (coordinate==0?std::abs(parameters[0])*1.e-3:(coordinate<3?1.e-5:.01)) : finiteDifferenceSteps_[coordinate]);
           TrajectoryStateOnSurface state(LocalTrajectoryParameters(parameters,targetZ_>sourceZ_?1.:-1.),LocalTrajectoryError(zero),*source,&field);
           auto const result=prop.propagate(state,*target);
           if (!first) out<<',';first=false;
           out<<"{\"interface\":"<<interface<<",\"coordinate\":"<<coordinate<<",\"offset\":"<<offset<<",\"valid\":"<<result.isValid();
+          out<<",\"sourceZ\":"<<source->position().z()<<",\"targetZ\":"<<target->position().z()
+             <<",\"sourceParameters\":[";
+          for (unsigned int i=0;i<5;++i) {if(i)out<<',';out<<state.localParameters().vector()[i];}
+          out<<']';
           if (result.isValid() && result.hasError()) {
+            shift::MaterialEndpointMatrix selectedNoise;
+            for (unsigned int i=0;i<5;++i) for (unsigned int j=0;j<5;++j)
+              selectedNoise(i,j)=result.localError().matrix()(i,j);
+            auto emitMatrix=[&](char const* name, shift::MaterialEndpointMatrix const& matrix) {
+              out<<",\""<<name<<"\":[";
+              for (unsigned int i=0;i<5;++i) {if(i)out<<',';out<<'[';
+                for(unsigned int j=0;j<5;++j) {if(j)out<<',';out<<matrix(i,j);}out<<']';}out<<']';
+            };
+            out<<",\"endpointFlowValid\":"<<prop.meanCurvatureFlowValid()
+               <<",\"endpointBoundaryAmbiguous\":"<<prop.materialEndpointBoundaryAmbiguous()
+               <<",\"startMaterial\":"<<std::quoted(prop.startMeanCurvatureMaterial())
+               <<",\"endMaterial\":"<<std::quoted(prop.endMeanCurvatureMaterial());
+            for (auto const& quantity : {std::make_pair("startMeanCurvatureFlow",prop.startMeanCurvatureFlow()),
+                                         std::make_pair("endMeanCurvatureFlow",prop.endMeanCurvatureFlow())}) {
+              out<<",\""<<quantity.first<<"\":";
+              if (std::isfinite(quantity.second)) out<<quantity.second; else out<<"null";
+            }
+            out<<",\"endpointChartsApplied\":"<<useMaterialEndpointCharts_;
             if (prop.transportJacobianValid()) {
               JacobianLocalToCurvilinear const input(state.surface(),state.localParameters(),field);
               JacobianCurvilinearToLocal const output(result.surface(),result.localParameters(),field);
               AlgebraicMatrix55 const jacobian=output.jacobian()*prop.curvilinearTransportJacobian()*input.jacobian();
-              out<<",\"jacobian\":[";
-              for (unsigned int i=0;i<5;++i) {if(i)out<<',';out<<'[';
-                for(unsigned int j=0;j<5;++j) {if(j)out<<',';out<<jacobian(i,j);}out<<']';}out<<']';
+              shift::MaterialEndpointMatrix selectedJacobian;
+              for (unsigned int i=0;i<5;++i) for (unsigned int j=0;j<5;++j)
+                selectedJacobian(i,j)=jacobian(i,j);
+              emitMatrix("rawJacobian",selectedJacobian);
+              emitMatrix("rawCovariance",selectedNoise);
+              if (useMaterialEndpointCharts_) {
+                auto endpoint=[&](TrajectoryStateOnSurface const& point,double flow) {
+                  auto const direction=point.localParameters().direction();
+                  return shift::MaterialEndpoint{flow,Eigen::Vector3d(direction.x(),direction.y(),direction.z()).normalized()};
+                };
+                auto const corrected=shift::correctMaterialEndpointCharts(selectedJacobian,selectedNoise,
+                    endpoint(state,prop.startMeanCurvatureFlow()),endpoint(result,prop.endMeanCurvatureFlow()));
+                if (!prop.meanCurvatureFlowValid() || !corrected.valid)
+                  throw cms::Exception("CovarianceAudit") << "Unresolved material endpoint chart";
+                selectedJacobian=corrected.jacobian;
+                selectedNoise=corrected.noise;
+              }
+              emitMatrix("jacobian",selectedJacobian);
+            } else if (useMaterialEndpointCharts_) {
+              throw cms::Exception("CovarianceAudit") << "Missing raw mean Jacobian for endpoint chart";
             }
             out<<",\"maximumInterfaceRelativeCurvatureSigma\":"<<prop.maximumInterfaceRelativeCurvatureSigma();
             out<<",\"mean\":[";for (unsigned int i=0;i<5;++i) {if(i)out<<',';out<<result.localParameters().vector()[i];}out<<"],\"covariance\":[";
-            for (unsigned int i=0;i<5;++i) {if(i)out<<',';out<<'[';for(unsigned int j=0;j<5;++j) {if(j)out<<',';out<<result.localError().matrix()(i,j);}out<<']';}out<<']';
+            for (unsigned int i=0;i<5;++i) {if(i)out<<',';out<<'[';for(unsigned int j=0;j<5;++j) {if(j)out<<',';out<<selectedNoise(i,j);}out<<']';}out<<']';
           }
           out<<'}';out.flush();
         }
@@ -140,11 +201,12 @@ public:
       bool first=true;
       for(int variant : {0,1,2,3}) {
         bool const consistent=variant>0;
-        Geant4ePropagator prop(&field,"mu",oppositeToMomentum,1.,.2,50000.);
+        Geant4ePropagator prop(&field,"mu",oppositeToMomentum,1.,maximumStepLengthMm_,50000.);
         prop.setUseConsistentBackwardCovariance(consistent);
         prop.setUseMeanEnergyLossJacobian(variant>=2);
         prop.setUseFieldGradientJacobian(variant==3);
         prop.setRecordTransportJacobian(true);
+        prop.setTransportAudit(transportAudit_);
         auto propagate=[&](AlgebraicVector5 const& v, AlgebraicSymMatrix55 const& c) {
           TrajectoryStateOnSurface state(LocalTrajectoryParameters(v,pzSign),LocalTrajectoryError(c),*plane,&field);
           auto result=prop.propagate(state,*target);
@@ -170,7 +232,8 @@ public:
         for(double stepScale : {1.,.5}) {
           Eigen::Matrix<double,5,5> jacobian;
           for(unsigned j=0;j<5;++j) {
-            double const h=stepScale*(j==0?std::abs(par[0])*1.e-3:(j<3?1.e-5:.01));
+            double const h=stepScale*finiteDifferenceScale_*(finiteDifferenceSteps_.empty() ?
+                (j==0?std::abs(par[0])*1.e-3:(j<3?1.e-5:.01)) : finiteDifferenceSteps_[j]);
             auto plus=par,minus=par; plus[j]+=h;minus[j]-=h;
             auto a=propagate(plus,tiny),b=propagate(minus,tiny);
             for(unsigned i=0;i<5;++i) jacobian(i,j)=(a.localParameters().vector()[i]-b.localParameters().vector()[i])/(2.*h);
@@ -200,5 +263,10 @@ private:
   double sourceZ_;
   bool roundTripNoise_;
   bool useFieldGradient_;
+  bool transportAudit_;
+  bool useMaterialEndpointCharts_;
+  double finiteDifferenceScale_;
+  double maximumStepLengthMm_;
+  std::vector<double> finiteDifferenceSteps_;
 };
 DEFINE_FWK_MODULE(ShiftTargetCovarianceValidator);
