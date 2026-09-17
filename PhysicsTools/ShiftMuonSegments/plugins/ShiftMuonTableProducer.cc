@@ -2124,6 +2124,7 @@ public:
         useImprovedMomentumRefit_(parameters.getParameter<bool>("useImprovedMomentumRefit")),
         useDetailedMaterialPropagation_(parameters.getParameter<bool>("useDetailedMaterialPropagation")),
         targetUseConsistentBackwardCovariance_(parameters.getParameter<bool>("targetUseConsistentBackwardCovariance")),
+        useMaterialAwarePcaTransport_(parameters.getParameter<bool>("useMaterialAwarePcaTransport")),
         useMaterialAwareVertexTransport_(parameters.getParameter<bool>("useMaterialAwareVertexTransport")),
         useVertexConstrainedRefit_(parameters.getParameter<bool>("useVertexConstrainedRefit")),
         lssMaterialBoundaryAbsZCm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
@@ -2226,9 +2227,9 @@ public:
         maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
-    if (useMaterialAwareVertexTransport_ && !useDetailedMaterialPropagation_)
+    if ((useMaterialAwarePcaTransport_ || useMaterialAwareVertexTransport_) && !useDetailedMaterialPropagation_)
       throw cms::Exception("Configuration")
-          << "useMaterialAwareVertexTransport requires useDetailedMaterialPropagation";
+          << "Material-aware PCA/vertex transport requires useDetailedMaterialPropagation";
     auto collector = consumesCollector();
     hcalAssociatorParameters_.loadParameters(
         parameters.getParameter<edm::ParameterSet>("TrackAssociatorParameters"), collector);
@@ -2576,7 +2577,7 @@ public:
           directionSign,
           preRefitMaterialPropagator,
           eventSourceSide,
-          lssMaterialBoundaryAbsZCm_, useMaterialAwareVertexTransport_);
+          lssMaterialBoundaryAbsZCm_, useMaterialAwarePcaTransport_);
       candidate.preRefitPt = preRefitState.valid ? preRefitState.momentum.perp() : 0.;
       candidate.preRefitPz = preRefitState.valid ? preRefitState.momentum.z() : 0.;
       candidate.targetLineState = preRefitState;
@@ -2951,7 +2952,7 @@ public:
                                 precisionHitsOnly,
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
-                                &additionalHits, useMaterialAwareVertexTransport_);
+                                &additionalHits, useMaterialAwarePcaTransport_);
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -4818,6 +4819,7 @@ public:
         vertexConstrainedOriginCompatibilityChi2, vertexConstrainedOriginCompatibilityNormalizedChi2;
     constexpr double muonMass = 0.105658;
     std::vector<int> vertexRefitStatus, vertexRefitIterations;
+    std::vector<int> vertexMaterialTransportStatus, vertexMaterialTransportIterations, vertexMaterialTransportValid;
     std::array<std::vector<float>, 5> vertexRefittedKinematicErrors;
     std::vector<float> vertexRefittedMinQoverPSignificance;
     std::vector<float> vertexRefittedMass, vertexRefittedPt, vertexRefittedPz, vertexRefittedEta,
@@ -4871,50 +4873,6 @@ public:
           continue;
         auto firstAtVertex = firstState;
         auto secondAtVertex = secondState;
-        if (useMaterialAwareVertexTransport_) {
-          if (!selected[first]->detectorStateValid || !selected[second]->detectorStateValid)
-            continue;
-          bool converged = false;
-          for (unsigned int iteration = 0; iteration < 16; ++iteration) {
-            double const trialZ = fit.position.z();
-            auto firstTransport = materialStateAtZ(selected[first]->detectorState,
-                                                   *sourceFacingTargetMaterialPropagator, trialZ);
-            auto secondTransport = materialStateAtZ(selected[second]->detectorState,
-                                                    *sourceFacingTargetMaterialPropagator, trialZ);
-            if (!firstTransport.first.isValid() || !secondTransport.first.isValid())
-              break;
-            firstAtVertex.position = firstTransport.first.globalPosition();
-            firstAtVertex.momentum = firstTransport.first.globalMomentum();
-            secondAtVertex.position = secondTransport.first.globalPosition();
-            secondAtVertex.momentum = secondTransport.first.globalMomentum();
-            auto updated = commonLineVertex(firstAtVertex, secondAtVertex,
-                                            commonVertexLineResolution_, commonVertexBeamLineResolution_);
-            if (!updated.valid)
-              break;
-            double const deltaZ = updated.position.z() - trialZ;
-            if (std::abs(deltaZ) < 0.1) {
-              // Evaluate the momenta on the final common plane as well.
-              auto finalFirst = materialStateAtZ(selected[first]->detectorState,
-                                                 *sourceFacingTargetMaterialPropagator, updated.position.z());
-              auto finalSecond = materialStateAtZ(selected[second]->detectorState,
-                                                  *sourceFacingTargetMaterialPropagator, updated.position.z());
-              if (!finalFirst.first.isValid() || !finalSecond.first.isValid())
-                break;
-              firstAtVertex.position = finalFirst.first.globalPosition();
-              firstAtVertex.momentum = finalFirst.first.globalMomentum();
-              secondAtVertex.position = finalSecond.first.globalPosition();
-              secondAtVertex.momentum = finalSecond.first.globalMomentum();
-              fit = updated;
-              converged = true;
-              break;
-            }
-            updated.position = GlobalPoint(updated.position.x(), updated.position.y(),
-                                            trialZ + std::clamp(deltaZ, -2000., 2000.));
-            fit = updated;
-          }
-          if (!converged)
-            continue;
-        }
         double const score = originChi2 / originNdof +
                              std::pow(lineApproach.distance / commonVertexLineResolution_, 2) + fit.chi2 / fit.ndof;
         pairChoices.push_back({first, second, lineApproach, fit, originChi2, score,
@@ -4938,8 +4896,74 @@ public:
       muonAlreadyUsed[second] = true;
       ++retainedVertices;
 
-      auto const& firstState = choice.firstAtVertex;
-      auto const& secondState = choice.secondAtVertex;
+      // Pair assignment depends only on the original reconstructed tracks.
+      // An optional transport failure must neither remove nor replace a pair.
+      auto fit = choice.fit;
+      auto firstAtVertex = choice.firstAtVertex;
+      auto secondAtVertex = choice.secondAtVertex;
+      int transportStatus = 0;
+      int transportIterations = 0;
+      if (useMaterialAwareVertexTransport_) {
+        transportStatus = -1;
+        if (selected[first]->detectorStateValid && selected[second]->detectorStateValid) {
+          transportStatus = -4;
+          for (unsigned int iteration = 0; iteration < 16; ++iteration) {
+            transportIterations = iteration + 1;
+            double const trialZ = fit.position.z();
+            auto firstTransport = materialStateAtZ(selected[first]->detectorState,
+                                                   *sourceFacingTargetMaterialPropagator, trialZ);
+            auto secondTransport = materialStateAtZ(selected[second]->detectorState,
+                                                    *sourceFacingTargetMaterialPropagator, trialZ);
+            if (!finiteTrajectoryState(firstTransport.first) || !finiteTrajectoryState(secondTransport.first)) {
+              transportStatus = -2;
+              break;
+            }
+            firstAtVertex.position = firstTransport.first.globalPosition();
+            firstAtVertex.momentum = firstTransport.first.globalMomentum();
+            secondAtVertex.position = secondTransport.first.globalPosition();
+            secondAtVertex.momentum = secondTransport.first.globalMomentum();
+            auto updated = commonLineVertex(firstAtVertex, secondAtVertex,
+                                            commonVertexLineResolution_, commonVertexBeamLineResolution_);
+            if (!updated.valid) {
+              transportStatus = -3;
+              break;
+            }
+            double const deltaZ = updated.position.z() - trialZ;
+            if (std::abs(deltaZ) < 0.1) {
+              auto finalFirst = materialStateAtZ(selected[first]->detectorState,
+                                                 *sourceFacingTargetMaterialPropagator, updated.position.z());
+              auto finalSecond = materialStateAtZ(selected[second]->detectorState,
+                                                  *sourceFacingTargetMaterialPropagator, updated.position.z());
+              if (!finiteTrajectoryState(finalFirst.first) || !finiteTrajectoryState(finalSecond.first)) {
+                transportStatus = -2;
+                break;
+              }
+              firstAtVertex.position = finalFirst.first.globalPosition();
+              firstAtVertex.momentum = finalFirst.first.globalMomentum();
+              secondAtVertex.position = finalSecond.first.globalPosition();
+              secondAtVertex.momentum = finalSecond.first.globalMomentum();
+              fit = updated;
+              transportStatus = 1;
+              break;
+            }
+            updated.position = GlobalPoint(updated.position.x(), updated.position.y(),
+                                            trialZ + std::clamp(deltaZ, -2000., 2000.));
+            fit = updated;
+          }
+        }
+        if (transportStatus != 1) {
+          // Never publish intermediate iterations as a successful correction.
+          // Retain the baseline hypothesis with an explicit failed-fit status.
+          fit = choice.fit;
+          firstAtVertex = choice.firstAtVertex;
+          secondAtVertex = choice.secondAtVertex;
+        }
+      }
+      vertexMaterialTransportStatus.push_back(transportStatus);
+      vertexMaterialTransportIterations.push_back(transportIterations);
+      vertexMaterialTransportValid.push_back(transportStatus == 1);
+      auto const& firstState = firstAtVertex;
+      auto const& secondState = secondAtVertex;
       int const firstCharge = candidateCharge(*selected[first]);
       int const secondCharge = candidateCharge(*selected[second]);
 
@@ -4973,16 +4997,16 @@ public:
       vertexKalmanAttempted.push_back(0);
       vertexKalmanValid.push_back(0);
       vertexUsesLineFallback.push_back(1);
-      vertexVx.push_back(choice.fit.position.x());
-      vertexVy.push_back(choice.fit.position.y());
-      vertexVz.push_back(choice.fit.position.z());
-      vertexVxError.push_back(choice.fit.error[0]);
-      vertexVyError.push_back(choice.fit.error[1]);
-      vertexVzError.push_back(choice.fit.error[2]);
-      vertexChi2.push_back(choice.fit.chi2);
-      vertexNdof.push_back(choice.fit.ndof);
-      vertexNormalizedChi2.push_back(choice.fit.chi2 / choice.fit.ndof);
-      vertexProbability.push_back(ChiSquaredProbability(choice.fit.chi2, choice.fit.ndof));
+      vertexVx.push_back(fit.position.x());
+      vertexVy.push_back(fit.position.y());
+      vertexVz.push_back(fit.position.z());
+      vertexVxError.push_back(fit.error[0]);
+      vertexVyError.push_back(fit.error[1]);
+      vertexVzError.push_back(fit.error[2]);
+      vertexChi2.push_back(fit.chi2);
+      vertexNdof.push_back(fit.ndof);
+      vertexNormalizedChi2.push_back(fit.chi2 / fit.ndof);
+      vertexProbability.push_back(ChiSquaredProbability(fit.chi2, fit.ndof));
       vertexOriginCompatibilityChi2.push_back(choice.originChi2);
       vertexOriginCompatibilityNormalizedChi2.push_back(choice.originChi2 / 3.);
       vertexDcaStatus.push_back(choice.approach.valid);
@@ -5007,7 +5031,7 @@ public:
                                                vacuumPropagator,
                                                (targetUseDetailedMaterialPropagation_ || useDetailedMaterialPropagation_ || directionalRefitUseFirstPrinciplesMaterialEffects_ ||
                                                 directionalRefitUseGeometryTargetMaterialEffects_) ? 0. : lssMaterialBoundaryAbsZCm_,
-                                               choice.fit.position, commonVertexBeamLineResolution_);
+                                               fit.position, commonVertexBeamLineResolution_);
       }
       bool const vertexRefitValid = vertexRefit.status == 1;
       if (produceMomentumClosureDiagnostics_ && vertexRefitValid)
@@ -5234,8 +5258,13 @@ public:
                                 vertexUsesLineFallback,
                                 "1 when position uses a common-line model rather than a Kalman vertex fit");
     vertexTable->addColumn<int>("materialAwareTransport",
-                                std::vector<int>(vertexVx.size(), useMaterialAwareVertexTransport_),
+                                vertexMaterialTransportValid,
                                 "1 when material transport is iterated to the common vertex plane for both muons");
+    vertexTable->addColumn<int>("materialTransportStatus", vertexMaterialTransportStatus,
+                                "0 disabled, 1 converged, -1 no detector posterior, -2 propagation failure, "
+                                "-3 invalid line fit, -4 no convergence; failures retain baseline pair kinematics");
+    vertexTable->addColumn<int>("materialTransportIterations", vertexMaterialTransportIterations,
+                                "common-plane material transport iterations attempted for this retained pair");
     vertexTable->addColumn<float>("vx", vertexVx, "unbounded common-line fit vertex x");
     vertexTable->addColumn<float>("vy", vertexVy, "unbounded common-line fit vertex y");
     vertexTable->addColumn<float>("vz", vertexVz, "unbounded common-line fit vertex z");
@@ -5351,6 +5380,7 @@ public:
     description.add<bool>("useImprovedMomentumRefit", false);
     description.add<bool>("useDetailedMaterialPropagation", false);
     description.add<bool>("targetUseConsistentBackwardCovariance", false);
+    description.add<bool>("useMaterialAwarePcaTransport", false);
     description.add<bool>("useMaterialAwareVertexTransport", false);
     description.add<bool>("useVertexConstrainedRefit", false);
     edm::ParameterSetDescription lssTransportDescription;
@@ -5488,6 +5518,7 @@ private:
   bool useImprovedMomentumRefit_;
   bool useDetailedMaterialPropagation_;
   bool targetUseConsistentBackwardCovariance_;
+  bool useMaterialAwarePcaTransport_;
   bool useMaterialAwareVertexTransport_;
   bool useVertexConstrainedRefit_;
   double lssMaterialBoundaryAbsZCm_;
