@@ -75,8 +75,9 @@ public:
   // Diagnostic endpoint flows only: d(q/p)/ds along PHYSICAL momentum,
   // in GeV^-1 cm^-1. No change to the propagated mean, covariance or J.
   // Source uses the first pre-step material; destination uses the final
-  // approached (pre-step) material. A geometric endpoint boundary is
-  // conservatively ambiguous even if both named materials happen to agree.
+  // approached (pre-step) material. Geometry-boundary endpoints are resolved
+  // by a one-sided probe along the actual path and rejected if that probe does
+  // not reproduce the recorded material.
   bool meanCurvatureFlowValid() const { return meanCurvatureFlowValid_; }
   double startMeanCurvatureFlow() const { return startMeanCurvatureFlow_; }
   double endMeanCurvatureFlow() const { return endMeanCurvatureFlow_; }
