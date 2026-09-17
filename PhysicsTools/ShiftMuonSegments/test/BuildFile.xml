@@ -6,6 +6,22 @@
   <use name="eigen"/>
 </bin>
 <test name="testShiftCommonVertexRefitRun" command="testShiftCommonVertexRefit"/>
+<bin file="testJointForwardVertexFit.cc" name="testShiftJointForwardVertexFit">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftJointForwardVertexFitRun" command="testShiftJointForwardVertexFit"/>
+<bin file="testShortFlowDerivative.cc" name="testShiftShortFlowDerivative">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftShortFlowDerivativeRun" command="testShiftShortFlowDerivative"/>
+<bin file="testMultiscaleDerivativeAudit.cc" name="testShiftMultiscaleDerivativeAudit">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftMultiscaleDerivativeAuditRun" command="testShiftMultiscaleDerivativeAudit"/>
+<bin file="testMaterialEndpointChart.cc" name="testShiftMaterialEndpointChart">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftMaterialEndpointChartRun" command="testShiftMaterialEndpointChart"/>
 <bin file="testHitTruthAssociation.cc" name="testShiftHitTruthAssociation"/>
 <test name="testShiftHitTruthAssociationRun" command="testShiftHitTruthAssociation"/>
 

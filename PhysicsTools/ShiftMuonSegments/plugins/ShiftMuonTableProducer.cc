@@ -86,6 +86,10 @@
 #include "PhysicsTools/ShiftMuonSegments/interface/CubatureTransport.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/ImportanceTargetConstraint.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/TargetMomentFit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/JointForwardVertexFit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/MaterialEndpointChart.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/ShortFlowDerivative.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/MultiscaleDerivativeAudit.h"
 #include <iomanip>
 #include "TrackingTools/TrajectoryParametrization/interface/LocalTrajectoryParameters.h"
 #include "TrackingTools/TrajectoryParametrization/interface/LocalTrajectoryError.h"
@@ -1985,6 +1989,331 @@ namespace {
     shift::CommonVertexRefit fit;
   };
 
+  VertexRefitResult forwardVertexRefit(std::array<FreeTrajectoryState, 2> const& detectorStates,
+                                       Propagator const& materialPropagator,
+                                       GlobalPoint const& initialVertex,
+                                       double beamLineSigma,
+                                       bool auditSeedDerivatives,
+                                       bool auditFailureDirection,
+                                       VertexRefitResult const* initialFit = nullptr) {
+    VertexRefitResult result;
+    std::array<shift::JointVertexTrack, 2> measurements;
+    std::array<Plane::PlanePointer, 2> detectorPlanes;
+    shift::JointVertexParameters seed;
+    seed.head<3>() << initialVertex.x(), initialVertex.y(), initialVertex.z();
+    std::unique_ptr<Propagator> forward(materialPropagator.clone());
+    forward->setPropagationDirection(alongMomentum);
+    auto* geant4 = dynamic_cast<Geant4ePropagator*>(forward.get());
+    if (!geant4) { result.status = -20; return result; }
+    geant4->setRecordTransportJacobian(true);
+    std::unique_ptr<Propagator> shortTransport(materialPropagator.clone());
+    dynamic_cast<Geant4ePropagator*>(shortTransport.get())->setRecordTransportJacobian(false);
+    unsigned int longCalls = 0, shortCalls = 0;
+    std::array<bool, 2> audited{{false, false}};
+    std::array<bool, 2> endpointLogged{{false, false}};
+    for (unsigned int i = 0; i < 2; ++i) {
+      detectorPlanes[i] = Plane::build(GlobalPoint(0., 0., detectorStates[i].position().z()),
+                                       Surface::RotationType());
+      TrajectoryStateOnSurface const detector(detectorStates[i], *detectorPlanes[i]);
+      if (!finiteTrajectoryState(detector) || !detector.hasError()) {
+        result.status = -1;
+        return result;
+      }
+      for (unsigned int row = 0; row < 5; ++row) {
+        measurements[i].parameters[row] = detector.localParameters().vector()[row];
+        for (unsigned int column = 0; column < 5; ++column)
+          measurements[i].covariance(row, column) = detector.localError().matrix()(row, column);
+      }
+      if (auditSeedDerivatives || auditFailureDirection) {
+        edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+            << "detectorState track=" << i << " z=" << detectorPlanes[i]->position().z()
+            << " parameters=" << measurements[i].parameters.transpose();
+        for (unsigned int row = 0; row < 5; ++row)
+          edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+              << "detectorCovariance track=" << i << " row=" << row
+              << " values=" << measurements[i].covariance.row(row);
+      }
+      // The backward prediction initializes the search, but is never counted
+      // again as a measurement. Every trial is tested at the detector surface.
+      if (initialFit && initialFit->status == 1) {
+        seed.segment<3>(3 + 3 * i) = initialFit->fit.tracks[i].parameters.head<3>();
+        result.predictedMomenta[i] = initialFit->predictedMomenta[i];
+      } else {
+        auto const initial = materialStateAtZ(detectorStates[i], materialPropagator, initialVertex.z());
+        if (!finiteTrajectoryState(initial.first)) { result.status = -2; return result; }
+        for (unsigned int j = 0; j < 3; ++j)
+          seed[3 + 3 * i + j] = initial.first.localParameters().vector()[j];
+        result.predictedMomenta[i] = initial.first.globalMomentum();
+      }
+    }
+    auto predict = [&](unsigned int i, shift::VertexTrackParameters const& parameters, double z) {
+      shift::JointVertexPrediction prediction;
+      // A source state must precede its measured detector state along the
+      // physical muon direction; this has no preferred target or decay z.
+      if ((detectorStates[i].position().z() - z) * detectorStates[i].momentum().z() <= 0.)
+        return prediction;
+      AlgebraicVector5 local;
+      AlgebraicSymMatrix55 zero;
+      for (unsigned int j = 0; j < 5; ++j) local[j] = parameters[j];
+      auto const plane = Plane::build(GlobalPoint(0., 0., z), Surface::RotationType());
+      TrajectoryStateOnSurface const start(
+          LocalTrajectoryParameters(local, detectorStates[i].momentum().z() > 0. ? 1. : -1.),
+          LocalTrajectoryError(zero), *plane, &detectorStates[i].parameters().magneticField());
+      ++longCalls;
+      auto const end = forward->propagate(start, *detectorPlanes[i]);
+      // This covariance is process noise from a zero-error input, not a
+      // measured posterior. It may be semidefinite (zero in vacuum); the
+      // solver checks Q >= 0 and C_detector + Q > 0 separately.
+      if (!end.isValid() || !end.hasError()) {
+        edm::LogVerbatim("ShiftForwardVertexFit") << "invalid transport track=" << i
+            << " z=" << z << " parameters=" << parameters.transpose();
+        return prediction;
+      }
+      for (unsigned int row = 0; row < 5; ++row) {
+        prediction.parameters[row] = end.localParameters().vector()[row];
+        for (unsigned int column = 0; column < 5; ++column)
+          prediction.noise(row, column) = end.localError().matrix()(row, column);
+      }
+      prediction.valid = prediction.parameters.allFinite() && prediction.noise.allFinite();
+      if (geant4->transportJacobianValid()) {
+        JacobianLocalToCurvilinear const input(start.surface(), start.localParameters(), *start.magneticField());
+        JacobianCurvilinearToLocal const output(end.surface(), end.localParameters(), *end.magneticField());
+        AlgebraicMatrix55 const jacobian =
+            output.jacobian() * geant4->curvilinearTransportJacobian() * input.jacobian();
+        for (unsigned int row = 0; row < 5; ++row)
+          for (unsigned int column = 0; column < 5; ++column)
+            prediction.jacobian(row, column) = jacobian(row, column);
+        prediction.jacobianValid = prediction.jacobian.allFinite();
+      }
+      // Stock local/curvilinear charts contain magnetic terms but omit
+      // energy loss over the changed distance to a tilted endpoint plane.
+      // Correct both mean-Jacobian charts and only the OUTPUT chart of Q;
+      // the input error is zero and the propagated mean is unchanged.
+      if (!geant4->meanCurvatureFlowValid()) {
+        prediction.valid = false;
+        edm::LogVerbatim("ShiftForwardVertexFit") << "invalid material endpoint track=" << i
+            << " boundaryAmbiguous=" << geant4->materialEndpointBoundaryAmbiguous();
+        return prediction;
+      }
+      auto const inputDirection = start.localMomentum();
+      auto const outputDirection = end.localMomentum();
+      shift::MaterialEndpoint const sourceEndpoint{
+          geant4->startMeanCurvatureFlow(),
+          Eigen::Vector3d(inputDirection.x(), inputDirection.y(), inputDirection.z()).normalized()};
+      shift::MaterialEndpoint const destinationEndpoint{
+          geant4->endMeanCurvatureFlow(),
+          Eigen::Vector3d(outputDirection.x(), outputDirection.y(), outputDirection.z()).normalized()};
+      auto const corrected = shift::correctMaterialEndpointCharts(
+          prediction.jacobian, prediction.noise, sourceEndpoint, destinationEndpoint);
+      if (!corrected.valid) { prediction.valid = false; return prediction; }
+      prediction.jacobian = corrected.jacobian;
+      prediction.noise = corrected.noise;
+      if ((auditSeedDerivatives || auditFailureDirection) && !endpointLogged[i]) {
+        endpointLogged[i] = true;
+        edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+            << "transportEndpoint track=" << i << " sourceZ=" << z
+            << " targetZ=" << detectorPlanes[i]->position().z()
+            << " input=" << parameters.transpose() << " output=" << prediction.parameters.transpose()
+            << " startFlow=" << sourceEndpoint.inverseMomentumFlow
+            << " endFlow=" << destinationEndpoint.inverseMomentumFlow
+            << " startMaterial=" << geant4->startMeanCurvatureMaterial()
+            << " endMaterial=" << geant4->endMeanCurvatureMaterial();
+      }
+      return prediction;
+    };
+    auto evaluate = [&](unsigned int i, shift::VertexTrackParameters const& parameters, double z) {
+      auto prediction = predict(i, parameters, z);
+      if (!prediction.valid || !prediction.jacobianValid) return prediction;
+      Eigen::LLT<shift::JointVertexTrackCovariance> covariance(measurements[i].covariance + prediction.noise);
+      if (covariance.info() != Eigen::Success) return prediction;
+      shift::JointVertexTrackCovariance const weight =
+          covariance.solve(shift::JointVertexTrackCovariance::Identity());
+      AlgebraicVector5 local;
+      AlgebraicSymMatrix55 zero;
+      for (unsigned int j = 0; j < 5; ++j) local[j] = parameters[j];
+      auto const plane = Plane::build(GlobalPoint(0., 0., z), Surface::RotationType());
+      TrajectoryStateOnSurface const start(
+          LocalTrajectoryParameters(local, detectorStates[i].momentum().z() > 0. ? 1. : -1.),
+          LocalTrajectoryError(zero), *plane, &detectorStates[i].parameters().magneticField());
+      float const actualZ = plane->position().z();
+      double const ulp = std::max(
+          std::abs(std::nextafter(actualZ, std::numeric_limits<float>::infinity()) - actualZ),
+          std::abs(actualZ - std::nextafter(actualZ, -std::numeric_limits<float>::infinity())));
+      double const initialStep = std::max(.1, 1024. * ulp);
+      auto probe = [&](double deltaZ) {
+        shift::FlowProbe sampled;
+        auto const destination = Plane::build(GlobalPoint(0., 0., double(actualZ) + deltaZ), Surface::RotationType());
+        sampled.offset = double(destination->position().z()) - actualZ;
+        if (sampled.offset == 0.) return sampled;
+        shortTransport->setPropagationDirection(
+            sampled.offset * detectorStates[i].momentum().z() > 0. ? alongMomentum : oppositeToMomentum);
+        ++shortCalls;
+        auto const end = shortTransport->propagate(start, *destination);
+        if (!end.isValid()) return sampled;
+        for (unsigned int j = 0; j < 5; ++j) sampled.parameters[j] = end.localParameters().vector()[j];
+        sampled.valid = sampled.parameters.allFinite() && sampled.parameters[0] * parameters[0] > 0.;
+        return sampled;
+      };
+      // Moving the start plane changes the detector prediction by -J*f_start.
+      // Check the local flow with half steps AND one-sided differences so a
+      // material discontinuity is not silently averaged into a derivative.
+      for (unsigned int refinement = 0; refinement < 4; ++refinement) {
+        double const h = std::ldexp(initialStep, -int(refinement));
+        auto const flow = shift::shortFlowDerivative(prediction.jacobian, weight, h, .01, probe);
+        edm::LogVerbatim("ShiftForwardVertexFit") << "flow track=" << i << " z=" << z
+            << " h=" << h << " centralError=" << flow.centralRelativeError
+            << " oneSidedError=" << flow.oneSidedRelativeError << " valid=" << flow.valid;
+        if (flow.valid) {
+          prediction.zDerivative = flow.derivative;
+          prediction.zDerivativeValid = true;
+          break;
+        }
+      }
+      // Diagnostic only: independently perturb each full source-to-detector
+      // leg once at the actual reconstructed seed. Never alter the fit from
+      // a truth comparison or an unresolvable finite-difference result.
+      if (auditSeedDerivatives && !audited[i]) {
+        audited[i] = true;
+        for (unsigned int j = 0; j < 6; ++j) {
+          double const h = j == 5 ? initialStep :
+              (j == 0 ? std::abs(parameters[0]) * .001 : (j < 3 ? 1.e-5 : .01));
+          auto auditProbe = [&](double offset) {
+            shift::DerivativeAuditProbe sampled;
+            auto trial = parameters;
+            double trialZ = z;
+            if (j == 5) {
+              trialZ += offset;
+              sampled.offset = double(float(trialZ)) - double(float(z));
+            } else {
+              trial[j] += offset;
+              sampled.offset = double(float(trial[j])) - double(float(parameters[j]));
+            }
+            auto const p = predict(i, trial, trialZ);
+            sampled.valid = p.valid && (j < 5 || prediction.zDerivativeValid);
+            sampled.parameters = p.parameters;
+            return sampled;
+          };
+          shift::FlowVector const analytic = j < 5 ? shift::FlowVector(prediction.jacobian.col(j)) : prediction.zDerivative;
+          auto const comparison = shift::auditDerivativeMultiscale(analytic, weight, auditProbe, h);
+          for (auto const& attempt : comparison.attempts)
+            edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+                << "auditAttempt track=" << i << " coordinate=" << j << " h=" << attempt.step
+                << " actualOffsets=" << attempt.actualOffsets[0] << "," << attempt.actualOffsets[1]
+                << "," << attempt.actualOffsets[2] << "," << attempt.actualOffsets[3]
+                << " probeStatus=" << attempt.probeStatus << " stability=" << attempt.stability
+                << " stable=" << attempt.stable;
+          edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+              << "audit track=" << i << " coordinate=" << j
+              << " h=" << comparison.chosenStep << " stability=" << comparison.stability
+              << " disagreement=" << comparison.disagreement << " valid=" << comparison.valid
+              << " resolved=" << comparison.resolved << " status=" << comparison.status;
+          edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+              << "auditVectors track=" << i << " coordinate=" << j
+              << " analytic=" << analytic.transpose()
+              << " numerical=" << comparison.reference.transpose();
+        }
+      }
+      return prediction;
+    };
+    shift::JointVertexOptions options;
+    // CMSSW source positions are float-backed. Use enough representable z
+    // increments for a meaningful half-step derivative check; shrinking a
+    // sub-ULP displacement cannot improve a finite difference.
+    float const sourceZ = seed[2];
+    double const zUlp = std::abs(std::nextafter(sourceZ, std::numeric_limits<float>::infinity()) - sourceZ);
+    options.zDerivativeStep = std::max(options.zDerivativeStep, 1024. * zUlp);
+    auto const fitted = shift::fitJointForwardVertex(seed, measurements, beamLineSigma, evaluate, options);
+    if (auditFailureDirection && fitted.status == shift::JointForwardVertexFit::noDescent && !fitted.steps.empty()) {
+      auto const& last = fitted.steps.back();
+      edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+          << "directionalState=" << last.parameters.transpose() << " direction=" << last.direction.transpose()
+          << " chi2=" << last.chi2 << " expectedSlope=" << -2.*last.expectedReduction;
+      for (unsigned int i = 0; i < 2; ++i) {
+        shift::JointVertexTrackParameters const residual = measurements[i].parameters - last.predictedParameters[i];
+        shift::JointVertexTrackParameters const derivative = last.designs[i]*last.direction;
+        edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+            << "directionalTrack track=" << i << " mean=" << last.predictedParameters[i].transpose()
+            << " residual=" << residual.transpose() << " analytic=" << derivative.transpose()
+            << " expectedSlope=" << -2.*residual.dot(last.weights[i]*derivative);
+        for (unsigned int row = 0; row < 5; ++row)
+          edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+              << "directionalWeight track=" << i << " row=" << row << " values=" << last.weights[i].row(row);
+      }
+      for (auto const& trial : last.trials)
+        edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+            << "failedTrial fraction=" << trial.fraction << " chi2=" << trial.chi2 << " valid=" << trial.valid;
+      auto frozenChi2 = [&](double fraction) {
+        shift::JointVertexParameters const state = last.parameters + fraction*last.direction;
+        double chi2 = state.head<2>().squaredNorm()/(beamLineSigma*beamLineSigma);
+        for (unsigned int i = 0; i < 2; ++i) {
+          shift::JointVertexTrackParameters local;
+          local << state[3+3*i], state[4+3*i], state[5+3*i], state[0], state[1];
+          auto const prediction = predict(i, local, state[2]);
+          if (!prediction.valid || local[0]*seed[3+3*i] <= 0.)
+            return std::numeric_limits<double>::quiet_NaN();
+          edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+              << "directionalTrackProbe track=" << i << " fraction=" << fraction
+              << " mean=" << prediction.parameters.transpose();
+          shift::JointVertexTrackParameters const residual = measurements[i].parameters - prediction.parameters;
+          chi2 += residual.dot(last.weights[i]*residual);
+        }
+        return chi2;
+      };
+      edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+          << "directionalBase recordedChi2=" << last.chi2 << " replayChi2=" << frozenChi2(0.);
+      for (int exponent = 13; exponent <= 16; ++exponent) {
+        double const fraction = std::ldexp(1., -exponent);
+        double const plus = frozenChi2(fraction), minus = frozenChi2(-fraction);
+        edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17)
+            << "directionalProbe fraction=" << fraction << " plusChi2=" << plus << " minusChi2=" << minus
+            << " measuredSlope=" << (plus-minus)/(2.*fraction)
+            << " expectedSlope=" << -2.*last.expectedReduction;
+      }
+    }
+    result.iterations = fitted.iterations;
+    result.status = fitted.valid ? 1 : -20 + fitted.status;
+    edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17) << "status=" << fitted.status
+        << " iterations=" << fitted.iterations << " calls=" << fitted.transportCalls
+        << " longCalls=" << longCalls << " shortCalls=" << shortCalls
+        << " seed=" << seed.transpose()
+        << " fitted=" << fitted.parameters.transpose() << " chi2=" << fitted.chi2;
+    for (auto const& step : fitted.steps)
+      edm::LogVerbatim("ShiftForwardVertexFit") << std::setprecision(17) << "step=" << step.parameters.transpose()
+          << " chi2=" << step.chi2 << " update=" << step.maxUpdate
+          << " jointUpdate=" << step.jointUpdate
+          << " fraction=" << step.acceptedFraction << " nextChi2=" << step.acceptedFrozenChi2;
+    for (auto const& check : fitted.derivativeChecks)
+      edm::LogVerbatim("ShiftForwardVertexFit") << "derivative track=" << check.track
+          << " coordinate=" << check.coordinate << " h=" << check.step
+          << " relativeError=" << check.relativeError << " valid=" << check.valid;
+    if (!fitted.valid) return result;
+    result.position = GlobalPoint(fitted.parameters[0], fitted.parameters[1], fitted.parameters[2]);
+    result.fit.valid = true;
+    result.fit.displacement = fitted.parameters.head<3>();
+    result.fit.covariance = fitted.covariance.topLeftCorner<3, 3>();
+    result.fit.chi2 = fitted.chi2;
+    std::array<Eigen::Matrix<double, 5, 9>, 2> projection;
+    for (unsigned int i = 0; i < 2; ++i) {
+      projection[i].setZero();
+      projection[i].block<3, 3>(0, 3 + 3 * i).setIdentity();
+      projection[i](3, 0) = projection[i](4, 1) = 1.;
+      result.fit.tracks[i].parameters = projection[i] * fitted.parameters;
+      result.fit.tracks[i].covariance = projection[i] * fitted.covariance * projection[i].transpose();
+      auto const& parameters = result.fit.tracks[i].parameters;
+      double const pz = std::copysign(1. / (std::abs(parameters[0]) *
+          std::sqrt(1. + parameters[1] * parameters[1] + parameters[2] * parameters[2])),
+          detectorStates[i].momentum().z());
+      result.momenta[i] = GlobalVector(parameters[1] * pz, parameters[2] * pz, pz);
+      if (!std::isfinite(result.momenta[i].mag2()) || !(result.momenta[i].perp() > 0.)) {
+        result.status = -3;
+        result.fit.valid = false;
+        return result;
+      }
+    }
+    result.fit.crossCovariance = projection[0] * fitted.covariance * projection[1].transpose();
+    return result;
+  }
+
   VertexRefitResult vertexConstrainedRefit(std::array<FreeTrajectoryState, 2> const& detectorStates,
                                           Propagator const& propagator,
                                           Propagator const& vacuumPropagator,
@@ -2127,6 +2456,8 @@ public:
         useMaterialAwarePcaTransport_(parameters.getParameter<bool>("useMaterialAwarePcaTransport")),
         useMaterialAwareVertexTransport_(parameters.getParameter<bool>("useMaterialAwareVertexTransport")),
         useVertexConstrainedRefit_(parameters.getParameter<bool>("useVertexConstrainedRefit")),
+        useForwardCommonVertexFit_(parameters.getParameter<bool>("useForwardCommonVertexFit")),
+        forwardVertexDerivativeAudit_(parameters.getParameter<std::string>("forwardVertexDerivativeAudit")),
         lssMaterialBoundaryAbsZCm_(parameters.getParameter<edm::ParameterSet>("lssTransport")
                                        .getParameter<double>("materialBoundaryAbsZCm")),
         lssGeant4eMomentumLimitGeV_(parameters.getParameter<edm::ParameterSet>("lssTransport")
@@ -2230,6 +2561,15 @@ public:
     if ((useMaterialAwarePcaTransport_ || useMaterialAwareVertexTransport_) && !useDetailedMaterialPropagation_)
       throw cms::Exception("Configuration")
           << "Material-aware PCA/vertex transport requires useDetailedMaterialPropagation";
+    if (useForwardCommonVertexFit_ && (!useVertexConstrainedRefit_ || !targetUseDetailedMaterialPropagation_ ||
+                                      !targetUseMeanEnergyLossJacobian_))
+      throw cms::Exception("Configuration")
+          << "Forward common vertex fit requires vertex refit, detailed target transport and the mean energy-loss Jacobian";
+    if (forwardVertexDerivativeAudit_ != "none" && forwardVertexDerivativeAudit_ != "seed" &&
+        forwardVertexDerivativeAudit_ != "failure" && forwardVertexDerivativeAudit_ != "both")
+      throw cms::Exception("Configuration") << "forwardVertexDerivativeAudit must be none, seed, failure, or both";
+    if (forwardVertexDerivativeAudit_ != "none" && !useForwardCommonVertexFit_)
+      throw cms::Exception("Configuration") << "Forward derivative diagnostics require the forward common-vertex fit";
     auto collector = consumesCollector();
     hcalAssociatorParameters_.loadParameters(
         parameters.getParameter<edm::ParameterSet>("TrackAssociatorParameters"), collector);
@@ -4820,6 +5160,9 @@ public:
     constexpr double muonMass = 0.105658;
     std::vector<int> vertexRefitStatus, vertexRefitIterations;
     std::vector<int> vertexMaterialTransportStatus, vertexMaterialTransportIterations, vertexMaterialTransportValid;
+    std::vector<float> vertexMaterialTransportedMass, vertexMaterialTransportedPt, vertexMaterialTransportedPz,
+        vertexMaterialTransportedEta, vertexMaterialTransportedPhi, vertexMaterialTransportedVx,
+        vertexMaterialTransportedVy, vertexMaterialTransportedVz;
     std::array<std::vector<float>, 5> vertexRefittedKinematicErrors;
     std::vector<float> vertexRefittedMinQoverPSignificance;
     std::vector<float> vertexRefittedMass, vertexRefittedPt, vertexRefittedPz, vertexRefittedEta,
@@ -4930,18 +5273,9 @@ public:
             }
             double const deltaZ = updated.position.z() - trialZ;
             if (std::abs(deltaZ) < 0.1) {
-              auto finalFirst = materialStateAtZ(selected[first]->detectorState,
-                                                 *sourceFacingTargetMaterialPropagator, updated.position.z());
-              auto finalSecond = materialStateAtZ(selected[second]->detectorState,
-                                                  *sourceFacingTargetMaterialPropagator, updated.position.z());
-              if (!finiteTrajectoryState(finalFirst.first) || !finiteTrajectoryState(finalSecond.first)) {
-                transportStatus = -2;
-                break;
-              }
-              firstAtVertex.position = finalFirst.first.globalPosition();
-              firstAtVertex.momentum = finalFirst.first.globalMomentum();
-              secondAtVertex.position = finalSecond.first.globalPosition();
-              secondAtVertex.momentum = finalSecond.first.globalMomentum();
+              // Both states were just evaluated on trialZ, at most 1 mm from
+              // the accepted common plane. Repeating two full Geant4e legs
+              // here is numerically immaterial and doubles the dominant cost.
               fit = updated;
               transportStatus = 1;
               break;
@@ -4951,17 +5285,43 @@ public:
             fit = updated;
           }
         }
-        if (transportStatus != 1) {
-          // Never publish intermediate iterations as a successful correction.
-          // Retain the baseline hypothesis with an explicit failed-fit status.
-          fit = choice.fit;
-          firstAtVertex = choice.firstAtVertex;
-          secondAtVertex = choice.secondAtVertex;
-        }
       }
       vertexMaterialTransportStatus.push_back(transportStatus);
       vertexMaterialTransportIterations.push_back(transportIterations);
       vertexMaterialTransportValid.push_back(transportStatus == 1);
+      if (transportStatus == 1) {
+        double const px = firstAtVertex.momentum.x() + secondAtVertex.momentum.x();
+        double const py = firstAtVertex.momentum.y() + secondAtVertex.momentum.y();
+        double const pz = firstAtVertex.momentum.z() + secondAtVertex.momentum.z();
+        double const pt = std::hypot(px, py);
+        double const energy = std::sqrt(firstAtVertex.momentum.mag2() + muonMass * muonMass) +
+                              std::sqrt(secondAtVertex.momentum.mag2() + muonMass * muonMass);
+        vertexMaterialTransportedMass.push_back(
+            std::sqrt(std::max(0., energy * energy - px * px - py * py - pz * pz)));
+        vertexMaterialTransportedPt.push_back(pt);
+        vertexMaterialTransportedPz.push_back(pz);
+        vertexMaterialTransportedEta.push_back(
+            pt > 0. ? std::asinh(pz / pt) : std::copysign(std::numeric_limits<float>::infinity(), pz));
+        vertexMaterialTransportedPhi.push_back(std::atan2(py, px));
+        vertexMaterialTransportedVx.push_back(fit.position.x());
+        vertexMaterialTransportedVy.push_back(fit.position.y());
+        vertexMaterialTransportedVz.push_back(fit.position.z());
+      } else {
+        // Never publish intermediate iterations as a successful hypothesis.
+        vertexMaterialTransportedMass.push_back(0.);
+        vertexMaterialTransportedPt.push_back(0.);
+        vertexMaterialTransportedPz.push_back(0.);
+        vertexMaterialTransportedEta.push_back(0.);
+        vertexMaterialTransportedPhi.push_back(0.);
+        vertexMaterialTransportedVx.push_back(0.);
+        vertexMaterialTransportedVy.push_back(0.);
+        vertexMaterialTransportedVz.push_back(0.);
+      }
+      // Preserve the established unconstrained, LLP-safe hypothesis. The
+      // common-plane material result is experimental and stored separately.
+      fit = choice.fit;
+      firstAtVertex = choice.firstAtVertex;
+      secondAtVertex = choice.secondAtVertex;
       auto const& firstState = firstAtVertex;
       auto const& secondState = secondAtVertex;
       int const firstCharge = candidateCharge(*selected[first]);
@@ -5024,14 +5384,40 @@ public:
       VertexRefitResult vertexRefit;
       if (useVertexConstrainedRefit_) {
         vertexRefit.status = -1;
-        if (selected[first]->detectorStateValid && selected[second]->detectorStateValid)
-          vertexRefit = vertexConstrainedRefit({selected[first]->detectorState, selected[second]->detectorState},
+        if (selected[first]->detectorStateValid && selected[second]->detectorStateValid) {
+          if (useForwardCommonVertexFit_) {
+            vertexRefit = forwardVertexRefit({selected[first]->detectorState, selected[second]->detectorState},
+                                               *detailedMaterialPropagator, fit.position,
+                                               commonVertexBeamLineResolution_,
+                                               forwardVertexDerivativeAudit_ == "seed" || forwardVertexDerivativeAudit_ == "both",
+                                               forwardVertexDerivativeAudit_ == "failure" || forwardVertexDerivativeAudit_ == "both");
+            // A shared-position seed can cross different material than either
+            // independent backward track. Retry only an invalid initial mean
+            // transport, using the old reconstructed joint solution solely as
+            // a starting point. It is never added as another measurement.
+            if (vertexRefit.status == -22 && vertexRefit.iterations == 1) {
+              auto const initial = vertexConstrainedRefit(
+                  {selected[first]->detectorState, selected[second]->detectorState},
+                  *detailedMaterialPropagator, vacuumPropagator, 0., fit.position,
+                  commonVertexBeamLineResolution_);
+              if (initial.status == 1) {
+                edm::LogVerbatim("ShiftForwardVertexFit") << "Retrying invalid initial transport from backward joint seed";
+                vertexRefit = forwardVertexRefit(
+                    {selected[first]->detectorState, selected[second]->detectorState},
+                    *detailedMaterialPropagator, initial.position, commonVertexBeamLineResolution_,
+                    forwardVertexDerivativeAudit_ == "seed" || forwardVertexDerivativeAudit_ == "both",
+                    forwardVertexDerivativeAudit_ == "failure" || forwardVertexDerivativeAudit_ == "both", &initial);
+              }
+            }
+          }
+          else vertexRefit = vertexConstrainedRefit({selected[first]->detectorState, selected[second]->detectorState},
                                                *(targetUseDetailedMaterialPropagation_ ? detailedMaterialPropagator.get() :
                                                    sourceFacingTargetMaterialPropagator),
                                                vacuumPropagator,
                                                (targetUseDetailedMaterialPropagation_ || useDetailedMaterialPropagation_ || directionalRefitUseFirstPrinciplesMaterialEffects_ ||
                                                 directionalRefitUseGeometryTargetMaterialEffects_) ? 0. : lssMaterialBoundaryAbsZCm_,
                                                fit.position, commonVertexBeamLineResolution_);
+        }
       }
       bool const vertexRefitValid = vertexRefit.status == 1;
       if (produceMomentumClosureDiagnostics_ && vertexRefitValid)
@@ -5187,7 +5573,9 @@ public:
     auto vertexTable = std::make_unique<nanoaod::FlatTable>(vertexMuonIdx1.size(), "ShiftDimuonVertex", false, false);
     std::string const vertexRefitStatusDoc =
         "joint vertex refit: 1 valid, 0 disabled/unpaired, -1 missing detector state, -2 transport failure, "
-        "-3 invalid covariance/update, -4 no convergence";
+        "-3 invalid covariance/update, -4 no convergence; forward: -20 wrong propagator, "
+        "-21 invalid input, -22 transport, -23 covariance, -25 singular fit, -26 no descent, "
+        "-27 iteration limit, -30 derivative, -31 transport-call limit, -32 charge";
     table->addColumn<int>("vertexRefitIdx", muonVertexRefitIdx, "associated ShiftDimuonVertex row; -1 unpaired");
     table->addColumn<int>("vertexRefitStatus", muonVertexRefitStatus, vertexRefitStatusDoc);
     table->addColumn<float>("vertexRefittedPt", muonVertexRefittedPt, "muon pT from joint reconstructed-vertex refit; status must be 1");
@@ -5265,6 +5653,22 @@ public:
                                 "-3 invalid line fit, -4 no convergence; failures retain baseline pair kinematics");
     vertexTable->addColumn<int>("materialTransportIterations", vertexMaterialTransportIterations,
                                 "common-plane material transport iterations attempted for this retained pair");
+    vertexTable->addColumn<float>("materialTransportedMass", vertexMaterialTransportedMass,
+                                  "experimental common-plane material-transported dimuon mass; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedPt", vertexMaterialTransportedPt,
+                                  "experimental common-plane material-transported dimuon pT; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedPz", vertexMaterialTransportedPz,
+                                  "experimental common-plane material-transported dimuon pz; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedEta", vertexMaterialTransportedEta,
+                                  "experimental common-plane material-transported dimuon eta; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedPhi", vertexMaterialTransportedPhi,
+                                  "experimental common-plane material-transported dimuon phi; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedVx", vertexMaterialTransportedVx,
+                                  "experimental common-plane material-transported vertex x; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedVy", vertexMaterialTransportedVy,
+                                  "experimental common-plane material-transported vertex y; status must be 1");
+    vertexTable->addColumn<float>("materialTransportedVz", vertexMaterialTransportedVz,
+                                  "experimental common-plane material-transported vertex z; status must be 1");
     vertexTable->addColumn<float>("vx", vertexVx, "unbounded common-line fit vertex x");
     vertexTable->addColumn<float>("vy", vertexVy, "unbounded common-line fit vertex y");
     vertexTable->addColumn<float>("vz", vertexVz, "unbounded common-line fit vertex z");
@@ -5383,6 +5787,8 @@ public:
     description.add<bool>("useMaterialAwarePcaTransport", false);
     description.add<bool>("useMaterialAwareVertexTransport", false);
     description.add<bool>("useVertexConstrainedRefit", false);
+    description.add<bool>("useForwardCommonVertexFit", false);
+    description.add<std::string>("forwardVertexDerivativeAudit", "none");
     edm::ParameterSetDescription lssTransportDescription;
     lssTransportDescription.add<std::string>("magneticFieldLabel", "");
     lssTransportDescription.add<double>("materialBoundaryAbsZCm", 1100.0);
@@ -5521,6 +5927,8 @@ private:
   bool useMaterialAwarePcaTransport_;
   bool useMaterialAwareVertexTransport_;
   bool useVertexConstrainedRefit_;
+  bool useForwardCommonVertexFit_;
+  std::string forwardVertexDerivativeAudit_;
   double lssMaterialBoundaryAbsZCm_;
   double lssGeant4eMomentumLimitGeV_;
   double lssGeant4eMaximumStepLengthMm_;

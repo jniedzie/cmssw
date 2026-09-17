@@ -2,6 +2,8 @@
 #define TrackPropagation_Geant4ePropagator_h
 
 #include <memory>
+#include <limits>
+#include <string>
 
 // CMS includes
 // - Propagator
@@ -70,6 +72,17 @@ public:
   void setRecordTransportJacobian(bool value) { recordTransportJacobian_ = value; }
   bool transportJacobianValid() const { return transportJacobianValid_; }
   AlgebraicMatrix55 const& curvilinearTransportJacobian() const { return curvilinearTransportJacobian_; }
+  // Diagnostic endpoint flows only: d(q/p)/ds along PHYSICAL momentum,
+  // in GeV^-1 cm^-1. No change to the propagated mean, covariance or J.
+  // Source uses the first pre-step material; destination uses the final
+  // approached (pre-step) material. A geometric endpoint boundary is
+  // conservatively ambiguous even if both named materials happen to agree.
+  bool meanCurvatureFlowValid() const { return meanCurvatureFlowValid_; }
+  double startMeanCurvatureFlow() const { return startMeanCurvatureFlow_; }
+  double endMeanCurvatureFlow() const { return endMeanCurvatureFlow_; }
+  bool materialEndpointBoundaryAmbiguous() const { return materialEndpointBoundaryAmbiguous_; }
+  std::string const& startMeanCurvatureMaterial() const { return startMeanCurvatureMaterial_; }
+  std::string const& endMeanCurvatureMaterial() const { return endMeanCurvatureMaterial_; }
   void setTransportAudit(bool value) { transportAudit_ = value; }
 
 private:
@@ -96,6 +109,11 @@ private:
   bool recordTransportJacobian_ = false;
   mutable bool transportJacobianValid_ = false;
   mutable AlgebraicMatrix55 curvilinearTransportJacobian_;
+  mutable bool meanCurvatureFlowValid_ = false;
+  mutable double startMeanCurvatureFlow_ = std::numeric_limits<double>::quiet_NaN();
+  mutable double endMeanCurvatureFlow_ = std::numeric_limits<double>::quiet_NaN();
+  mutable bool materialEndpointBoundaryAmbiguous_ = false;
+  mutable std::string startMeanCurvatureMaterial_, endMeanCurvatureMaterial_;
   double plimit_;
   double maximumStepLengthMm_;
   double maximumPathLengthCm_;

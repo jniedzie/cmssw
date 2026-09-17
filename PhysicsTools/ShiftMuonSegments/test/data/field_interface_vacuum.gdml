@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- Diagnostic-only volume, placed outside CMS by field_interface_cfg.py. -->
+<gdml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="http://cern.ch/service-spi/app/releases/GDML/schema/gdml.xsd">
+  <materials>
+    <material name="field_interface_vacuum" Z="1" state="gas">
+      <D value="1e-25" unit="g/cm3"/>
+      <atom value="1.00794" unit="g/mole"/>
+    </material>
+  </materials>
+  <solids>
+    <box name="field_interface_container_box" x="120" y="120" z="120" lunit="cm"/>
+    <box name="field_interface_vacuum_box" x="100" y="100" z="100" lunit="cm"/>
+  </solids>
+  <structure>
+    <volume name="field_interface_vacuum_volume">
+      <materialref ref="field_interface_vacuum"/>
+      <solidref ref="field_interface_vacuum_box"/>
+    </volume>
+    <volume name="field_interface_container_volume">
+      <materialref ref="field_interface_vacuum"/>
+      <solidref ref="field_interface_container_box"/>
+      <physvol name="field_interface_vacuum_placement">
+        <volumeref ref="field_interface_vacuum_volume"/>
+        <position name="field_interface_vacuum_origin" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+  <setup name="Default" version="1.0">
+    <world ref="field_interface_container_volume"/>
+  </setup>
+</gdml>

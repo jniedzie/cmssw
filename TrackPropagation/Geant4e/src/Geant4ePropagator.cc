@@ -2,6 +2,8 @@
 #include <array>
 #include <map>
 #include <iomanip>
+#include <algorithm>
+#include <limits>
 
 // Geant4e
 #include "TrackPropagation/Geant4e/interface/ConvertFromToCLHEP.h"
@@ -44,6 +46,7 @@
 #include "G4VPhysicalVolume.hh"
 #include "G4TouchableHistory.hh"
 #include "G4VSolid.hh"
+#include "G4Navigator.hh"
 
 // CLHEP
 #include <CLHEP/Units/SystemOfUnits.h>
@@ -248,6 +251,11 @@ template <class SurfaceType>
 std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(const FreeTrajectoryState &ftsStart,
                                                                                 const SurfaceType &pDest) const {
   transportJacobianValid_ = false;
+  meanCurvatureFlowValid_ = false;
+  startMeanCurvatureFlow_ = endMeanCurvatureFlow_ = std::numeric_limits<double>::quiet_NaN();
+  materialEndpointBoundaryAmbiguous_ = false;
+  startMeanCurvatureMaterial_.clear();
+  endMeanCurvatureMaterial_.clear();
   ///////////////////////////////
   // Construct the target surface
   //
@@ -347,6 +355,12 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   std::unique_ptr<G4EnergyLossForExtrapolator> energyLoss;
   if (meanEnergyLossJacobian_)
     energyLoss = std::make_unique<G4EnergyLossForExtrapolator>(0);
+  G4Material const* flowStartMaterial = nullptr;
+  G4Material const* flowEndMaterial = nullptr;
+  G4ParticleDefinition const* flowParticle = nullptr;
+  double flowStartKineticEnergy = 0., flowEndKineticEnergy = 0.;
+  G4ThreeVector flowStartPosition, flowEndPosition, flowStartTravelDirection, flowEndTravelDirection;
+  bool flowEndAtBoundary = false;
   G4ErrorTrajErr previousError(5, 0);
   G4ErrorMatrix cumulativeJacobian(5, 5, 1);
   bool continuePropagation = true;
@@ -368,6 +382,22 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
       auto const* after = step->GetPostStepPoint();
       double const e0 = before->GetKineticEnergy(), e1 = after->GetKineticEnergy();
       double const length = step->GetStepLength();
+      if (recordTransportJacobian_ && energyLoss) {
+        if (iterations == 1) {
+          flowStartMaterial = before->GetMaterial();
+          flowStartKineticEnergy = e0;
+          flowStartPosition = before->GetPosition();
+          flowStartTravelDirection = before->GetMomentumDirection();
+        }
+        // Retain the side from which the final point is approached. Compute
+        // DEDX only twice after completion, not at every transport step.
+        flowEndMaterial = before->GetMaterial();
+        flowEndKineticEnergy = e1;
+        flowEndPosition = after->GetPosition();
+        flowEndTravelDirection = after->GetMomentumDirection();
+        flowEndAtBoundary = after->GetStepStatus() == fGeomBoundary;
+        flowParticle = track->GetParticleDefinition();
+      }
       auto const transport = g4eTrajState.GetTransfMat();
       G4ErrorMatrix correction(5, 5, 0);
       if (fieldGradientJacobian_ && length > 0.) {
@@ -577,6 +607,59 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   // store the correct location for the hit on the RECO surface
   LogDebug("Geant4e") << "Position on the RECO surface" << g4eTrajState.GetPosition() << std::endl;
   finalRecoPos = g4eTrajState.GetPosition();
+
+  if (recordTransportJacobian_ && energyLoss && flowParticle && flowStartMaterial && flowEndMaterial) {
+    startMeanCurvatureMaterial_ = flowStartMaterial->GetName();
+    endMeanCurvatureMaterial_ = flowEndMaterial->GetName();
+    auto curvatureFlow = [&](double kineticEnergy, G4Material const* material) {
+      double const mass = flowParticle->GetPDGMass();
+      if (!(kineticEnergy > 0.) || !std::isfinite(kineticEnergy) ||
+          !(mass >= 0.) || !std::isfinite(mass) || std::abs(ftsStart.charge()) != 1)
+        return std::numeric_limits<double>::quiet_NaN();
+      double const momentum = std::sqrt(kineticEnergy * (kineticEnergy + 2.*mass));
+      if (!(momentum > 0.) || !std::isfinite(momentum))
+        return std::numeric_limits<double>::quiet_NaN();
+      double const stopping = energyLoss->ComputeDEDX(kineticEnergy, flowParticle, material);
+      if (!(stopping >= 0.) || !std::isfinite(stopping))
+        return std::numeric_limits<double>::quiet_NaN();
+      // DEDX is a positive MeV/mm loss. Never reverse this physical flow
+      // for backward propagation: physical q and physical momentum define it.
+      return ftsStart.charge() * (kineticEnergy + mass) / std::pow(momentum, 3) * stopping *
+             CLHEP::GeV * CLHEP::cm;
+    };
+    startMeanCurvatureFlow_ = curvatureFlow(flowStartKineticEnergy, flowStartMaterial);
+    endMeanCurvatureFlow_ = curvatureFlow(flowEndKineticEnergy, flowEndMaterial);
+    // An independent navigator keeps this diagnostic from changing the
+    // tracking/error navigator's state. Safety includes daughter boundaries.
+    // A conservative safety underestimate is allowed to reject an endpoint,
+    // but an unresolved interface is never assigned an averaged derivative.
+    G4Navigator endpointNavigator;
+    auto* world = theG4eManager->GetErrorPropagationNavigator()->GetWorldVolume();
+    if (world) endpointNavigator.SetWorldVolume(world);
+    auto ambiguousEndpoint = [&](G4ThreeVector const& point, G4ThreeVector const& travelDirection,
+                                 G4Material const* approachedMaterial) {
+      if (!world) return true;
+      auto* volume = endpointNavigator.LocateGlobalPointAndSetup(point, &travelDirection, false, false);
+      if (!volume || !volume->GetLogicalVolume() ||
+          volume->GetLogicalVolume()->GetMaterial() != approachedMaterial) return true;
+      double const scale = std::max({1., std::abs(point.x()), std::abs(point.y()), std::abs(point.z())});
+      double const tolerance = std::max(10.*G4GeometryTolerance::GetInstance()->GetSurfaceTolerance(),
+                                       64.*std::numeric_limits<double>::epsilon()*scale);
+      double const safety = endpointNavigator.ComputeSafety(point, 2.*tolerance, true);
+      return !std::isfinite(safety) || !(safety > tolerance);
+    };
+    materialEndpointBoundaryAmbiguous_ = flowEndAtBoundary ||
+        ambiguousEndpoint(flowStartPosition, flowStartTravelDirection, flowStartMaterial) ||
+        ambiguousEndpoint(flowEndPosition, flowEndTravelDirection, flowEndMaterial);
+    meanCurvatureFlowValid_ = !materialEndpointBoundaryAmbiguous_ &&
+        std::isfinite(startMeanCurvatureFlow_) && std::isfinite(endMeanCurvatureFlow_);
+  }
+  if (transportAudit_ && recordTransportJacobian_)
+    edm::LogVerbatim("Geant4eTransportAudit") << std::setprecision(17)
+        << "ENDPOINT_FLOW valid=" << meanCurvatureFlowValid_
+        << " boundaryAmbiguous=" << materialEndpointBoundaryAmbiguous_
+        << " startMaterial=" << startMeanCurvatureMaterial_ << " startFlow=" << startMeanCurvatureFlow_
+        << " endMaterial=" << endMeanCurvatureMaterial_ << " endFlow=" << endMeanCurvatureFlow_;
 
   theG4eManager->EventTermination();
 

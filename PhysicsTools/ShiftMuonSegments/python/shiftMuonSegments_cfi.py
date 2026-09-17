@@ -97,12 +97,20 @@ shiftMuonTable = cms.EDProducer(
     # Experimental backward covariance correction; validate paired target fits
     # before enabling in production. Does not change geometry or mean transport.
     targetUseConsistentBackwardCovariance=cms.bool(False),
-    # Direct material transport to free PCA and iterated common vertex.
-    # Requires detailed transport; keep guarded until paired closure passes.
+    # These are separate studies: changing the individual PCA transport also
+    # changes candidate cleaning, while vertex transport must act only after
+    # the baseline reconstructed pair has been selected.
+    useMaterialAwarePcaTransport=cms.bool(False),
     useMaterialAwareVertexTransport=cms.bool(False),
     # Joint reconstructed-vertex fit and track smoothing; separate from the
     # prompt-target hypothesis. Enable for bounded validation before production.
     useVertexConstrainedRefit=cms.bool(False),
+    # Joint field/material transport from a free common decay vertex to the
+    # two measured detector posteriors. No target-z measurement is applied.
+    useForwardCommonVertexFit=cms.bool(False),
+    # Bounded numerical checks only: none, seed, failure, or both. They do not
+    # change fit acceptance and do not use generator information.
+    forwardVertexDerivativeAudit=cms.string("none"),
     # Shared reconstruction-side contract for an extended LSS geometry and
     # composite magnetic field. Defaults preserve the current CMS-only setup.
     # An LSS configuration must select the same EventSetup field used by
