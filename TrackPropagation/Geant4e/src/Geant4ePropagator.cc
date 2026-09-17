@@ -360,7 +360,6 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   G4ParticleDefinition const* flowParticle = nullptr;
   double flowStartKineticEnergy = 0., flowEndKineticEnergy = 0.;
   G4ThreeVector flowStartPosition, flowEndPosition, flowStartTravelDirection, flowEndTravelDirection;
-  bool flowEndAtBoundary = false;
   G4ErrorTrajErr previousError(5, 0);
   G4ErrorMatrix cumulativeJacobian(5, 5, 1);
   bool continuePropagation = true;
@@ -395,7 +394,6 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
         flowEndKineticEnergy = e1;
         flowEndPosition = after->GetPosition();
         flowEndTravelDirection = after->GetMomentumDirection();
-        flowEndAtBoundary = after->GetStepStatus() == fGeomBoundary;
         flowParticle = track->GetParticleDefinition();
       }
       auto const transport = g4eTrajState.GetTransfMat();
@@ -636,21 +634,27 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
     G4Navigator endpointNavigator;
     auto* world = theG4eManager->GetErrorPropagationNavigator()->GetWorldVolume();
     if (world) endpointNavigator.SetWorldVolume(world);
-    auto ambiguousEndpoint = [&](G4ThreeVector const& point, G4ThreeVector const& travelDirection,
-                                 G4Material const* approachedMaterial) {
-      if (!world) return true;
-      auto* volume = endpointNavigator.LocateGlobalPointAndSetup(point, &travelDirection, false, false);
-      if (!volume || !volume->GetLogicalVolume() ||
-          volume->GetLogicalVolume()->GetMaterial() != approachedMaterial) return true;
+    auto unresolvedEndpoint = [&](G4ThreeVector const& point, G4ThreeVector const& travelDirection,
+                                  G4Material const* approachedMaterial, double pathSide) {
+      if (!world || !approachedMaterial || !(travelDirection.mag2() > 0.)) return true;
       double const scale = std::max({1., std::abs(point.x()), std::abs(point.y()), std::abs(point.z())});
       double const tolerance = std::max(10.*G4GeometryTolerance::GetInstance()->GetSurfaceTolerance(),
-                                       64.*std::numeric_limits<double>::epsilon()*scale);
-      double const safety = endpointNavigator.ComputeSafety(point, 2.*tolerance, true);
+                                        64.*std::numeric_limits<double>::epsilon()*scale);
+      // Endpoint states frequently lie exactly on a geometry boundary. The
+      // material derivative is nevertheless one-sided and well defined for
+      // this path: just after the source and just before the destination.
+      // Probe that approached side rather than averaging the two materials.
+      double const probeDistance = std::max(1000.*tolerance, 1.e-5*CLHEP::mm);
+      G4ThreeVector const probe = point + pathSide*probeDistance*travelDirection.unit();
+      auto* volume = endpointNavigator.LocateGlobalPointAndSetup(probe, &travelDirection, false, false);
+      if (!volume || !volume->GetLogicalVolume() ||
+          volume->GetLogicalVolume()->GetMaterial() != approachedMaterial) return true;
+      double const safety = endpointNavigator.ComputeSafety(probe, 2.*probeDistance, true);
       return !std::isfinite(safety) || !(safety > tolerance);
     };
-    materialEndpointBoundaryAmbiguous_ = flowEndAtBoundary ||
-        ambiguousEndpoint(flowStartPosition, flowStartTravelDirection, flowStartMaterial) ||
-        ambiguousEndpoint(flowEndPosition, flowEndTravelDirection, flowEndMaterial);
+    materialEndpointBoundaryAmbiguous_ =
+        unresolvedEndpoint(flowStartPosition, flowStartTravelDirection, flowStartMaterial, +1.) ||
+        unresolvedEndpoint(flowEndPosition, flowEndTravelDirection, flowEndMaterial, -1.);
     meanCurvatureFlowValid_ = !materialEndpointBoundaryAmbiguous_ &&
         std::isfinite(startMeanCurvatureFlow_) && std::isfinite(endMeanCurvatureFlow_);
   }

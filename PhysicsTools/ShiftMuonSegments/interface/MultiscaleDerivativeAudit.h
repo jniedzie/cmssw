@@ -45,17 +45,19 @@ namespace shift {
   };
 
   // Diagnostic only. Select the FIRST independently stable numerical
-  // reference; never search for a step which agrees with the analytic J.
-  // The fixed scale order makes the decision reproducible and bounds calls
-  // to 8*4=32. References use ACTUAL representable coordinate separations.
-  // Instability, collapse and zero derivative information remain explicit.
+  // reference while scanning from the largest to the smallest scale; never
+  // search for a step which agrees with the analytic J. Starting coarse
+  // avoids a false plateau made by float-quantized output coordinates. The
+  // fixed order is reproducible and bounds calls to 8*4=32. References use
+  // ACTUAL representable coordinate separations. Instability, collapse and
+  // zero derivative information remain explicit.
   template <class Probe>
   DerivativeAuditResult auditDerivativeMultiscale(
       DerivativeAuditVector const& analytic,
       DerivativeAuditMatrix const& weight,
       Probe const& probe,
       double initialStep) {
-    constexpr std::array<double, 8> scales{{1., 2., .5, 4., .25, 8., .125, 16.}};
+    constexpr std::array<double, 8> scales{{16., 8., 4., 2., 1., .5, .25, .125}};
     constexpr double stabilityTolerance = .002;
     constexpr double agreementTolerance = .01;
     DerivativeAuditResult result;
