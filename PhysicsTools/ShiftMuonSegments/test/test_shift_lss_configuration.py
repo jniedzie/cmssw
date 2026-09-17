@@ -53,7 +53,9 @@ class ShiftLssConfigurationTest(unittest.TestCase):
             geant4eMaximumPathLengthCm=20000.0,
         )
         self.assertEqual(process.shiftMuonTable.lssTransport.magneticFieldLabel.value(), "")
-        self.assertEqual(process.shiftMuonTable.lssTransport.materialBoundaryAbsZCm.value(), 14800.0)
+        # Approximate CMS material ends at CMS; the composite field retains
+        # every configured external element beyond that material boundary.
+        self.assertEqual(process.shiftMuonTable.lssTransport.materialBoundaryAbsZCm.value(), 1100.0)
         self.assertEqual(len(process.shiftLssMagneticField.elements), 2)
         self.assertEqual(process.baseField.label.value(), "shiftLssBaseMagneticField")
         self.assertEqual(process.shiftLssMagneticField.outputLabel.value(), "")
