@@ -55,7 +55,7 @@ public:
                                "StepLength", "Density", "RadiationLength", "NuclearInteractionLength",
                                "CumulativeX0", "CumulativeInteractionLengths", "CumulativeEnergyLoss",
                                "EnergyDeposit"})
-      produces<std::vector<float>>(instance(suffix));
+      produces<std::vector<double>>(instance(suffix));
     for (auto const& suffix : {"Volume", "Material", "Process"})
       produces<std::vector<std::string>>(instance(suffix));
     produces<int>(instance("Truncated"));
@@ -233,7 +233,7 @@ private:
   std::map<int, double> cumulativeInteractionLengths_;
   std::map<int, double> nextPeriodicLength_;
   std::vector<int> trackId_, parentId_, pdgId_, step_, kind_;
-  std::vector<float> x_, y_, z_, px_, py_, pz_, globalTime_, trackLength_, stepLength_, density_, radiationLength_,
+  std::vector<double> x_, y_, z_, px_, py_, pz_, globalTime_, trackLength_, stepLength_, density_, radiationLength_,
       nuclearInteractionLength_, cumulativeX0Values_, cumulativeInteractionLengthValues_, cumulativeEnergyLoss_,
       energyDeposit_;
   std::vector<std::string> volume_, material_, process_;

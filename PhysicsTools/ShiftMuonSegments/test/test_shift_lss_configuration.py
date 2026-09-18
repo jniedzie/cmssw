@@ -98,6 +98,7 @@ class ShiftLssConfigurationTest(unittest.TestCase):
         self.assertEqual(watcher.type.value(), "ShiftMuonTruthTrailWatcher")
         self.assertEqual(watcher.ShiftMuonTruthTrailWatcher.intervalCm.value(), 75.0)
         self.assertEqual(watcher.ShiftMuonTruthTrailWatcher.maxCheckpoints.value(), 321)
+        self.assertEqual(process.shiftMuonTruthTrailContract.schemaVersion.value(), 2)
         self.assertIn(
             "keep *_g4SimHits_shiftMuonTruthTrail*_*",
             process.output.outputCommands,
