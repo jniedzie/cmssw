@@ -607,6 +607,7 @@ def customiseShiftMuonTruthTrail(
         if hasattr(output, "outputCommands") and field_keep_command not in output.outputCommands:
             output.outputCommands.append(field_keep_command)
     process.shiftMuonTruthTrailContract = cms.PSet(
+        schemaVersion=cms.uint32(2),
         intervalCm=cms.double(intervalCm),
         maxCheckpoints=cms.uint32(maxCheckpoints),
         inwardOnly=cms.bool(inwardOnly),

@@ -24,6 +24,7 @@
 <use name="DataFormats/NanoAOD"/>
 <use name="DataFormats/HepMCCandidate"/>
 <use name="DataFormats/GeometryVector"/>
+<use name="DataFormats/GeometrySurface"/>
 <use name="Geometry/CommonTopologies"/>
 <use name="Geometry/CaloGeometry"/>
 <use name="Geometry/Records"/>

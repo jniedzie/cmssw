@@ -39,11 +39,11 @@ def audit(path):
         for field in INT_FIELDS:
             values[field] = read_product(event, "vector<int>", field)
         for field in FLOAT_FIELDS:
-            values[field] = read_product(event, "vector<float>", field)
+            values[field] = read_product(event, "vector<double>", field)
         for field in ("FieldX", "FieldY", "FieldZ"):
             values[field] = read_product(
                 event,
-                "vector<float>",
+                "vector<double>",
                 field[5:],
                 module="shiftMuonTruthTrailField",
                 prefix="field",

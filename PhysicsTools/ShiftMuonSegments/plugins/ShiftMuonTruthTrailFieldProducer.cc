@@ -16,13 +16,13 @@
 class ShiftMuonTruthTrailFieldProducer : public edm::stream::EDProducer<> {
 public:
   explicit ShiftMuonTruthTrailFieldProducer(edm::ParameterSet const& parameters)
-      : xToken_(consumes<std::vector<float>>(parameters.getParameter<edm::InputTag>("x"))),
-        yToken_(consumes<std::vector<float>>(parameters.getParameter<edm::InputTag>("y"))),
-        zToken_(consumes<std::vector<float>>(parameters.getParameter<edm::InputTag>("z"))),
+      : xToken_(consumes<std::vector<double>>(parameters.getParameter<edm::InputTag>("x"))),
+        yToken_(consumes<std::vector<double>>(parameters.getParameter<edm::InputTag>("y"))),
+        zToken_(consumes<std::vector<double>>(parameters.getParameter<edm::InputTag>("z"))),
         fieldToken_(esConsumes(parameters.getParameter<edm::ESInputTag>("magneticField"))) {
-    produces<std::vector<float>>("fieldX");
-    produces<std::vector<float>>("fieldY");
-    produces<std::vector<float>>("fieldZ");
+    produces<std::vector<double>>("fieldX");
+    produces<std::vector<double>>("fieldY");
+    produces<std::vector<double>>("fieldZ");
   }
 
   void produce(edm::Event& event, edm::EventSetup const& setup) override {
@@ -32,9 +32,9 @@ public:
     if (x.size() != y.size() || x.size() != z.size())
       throw cms::Exception("LogicError") << "SHIFT muon truth-trail position vectors have different sizes";
     auto const& field = setup.getData(fieldToken_);
-    auto fieldX = std::make_unique<std::vector<float>>();
-    auto fieldY = std::make_unique<std::vector<float>>();
-    auto fieldZ = std::make_unique<std::vector<float>>();
+    auto fieldX = std::make_unique<std::vector<double>>();
+    auto fieldY = std::make_unique<std::vector<double>>();
+    auto fieldZ = std::make_unique<std::vector<double>>();
     fieldX->reserve(x.size());
     fieldY->reserve(x.size());
     fieldZ->reserve(x.size());
@@ -59,7 +59,7 @@ public:
   }
 
 private:
-  edm::EDGetTokenT<std::vector<float>> xToken_, yToken_, zToken_;
+  edm::EDGetTokenT<std::vector<double>> xToken_, yToken_, zToken_;
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> fieldToken_;
 };
 
