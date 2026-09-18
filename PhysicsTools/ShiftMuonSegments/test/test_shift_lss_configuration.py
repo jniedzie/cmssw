@@ -19,6 +19,7 @@ from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cff import addShiftMuonSeg
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_customise import (
     customiseShiftLssMagneticField,
     customiseShiftLssTransport,
+    customiseShiftMuonTruthTrail,
 )
 
 
@@ -83,6 +84,33 @@ class ShiftLssConfigurationTest(unittest.TestCase):
         addShiftMuonSegments(process, useDetailedMaterialPropagation=True)
         self.assertTrue(process.shiftMuonTable.useDetailedMaterialPropagation.value())
         self.assertTrue(hasattr(process, "shiftMuonGeant4Geometry"))
+
+    def test_truth_trail_is_explicit_and_persisted(self):
+        process = cms.Process("TEST")
+        process.g4SimHits = cms.EDProducer("OscarMTProducer", Watchers=cms.VPSet())
+        process.simulation_step = cms.Path(process.g4SimHits)
+        process.output = cms.OutputModule(
+            "PoolOutputModule", outputCommands=cms.untracked.vstring("drop *")
+        )
+        customiseShiftMuonTruthTrail(process, intervalCm=75.0, maxCheckpoints=321)
+        self.assertEqual(len(process.g4SimHits.Watchers), 1)
+        watcher = process.g4SimHits.Watchers[0]
+        self.assertEqual(watcher.type.value(), "ShiftMuonTruthTrailWatcher")
+        self.assertEqual(watcher.ShiftMuonTruthTrailWatcher.intervalCm.value(), 75.0)
+        self.assertEqual(watcher.ShiftMuonTruthTrailWatcher.maxCheckpoints.value(), 321)
+        self.assertIn(
+            "keep *_g4SimHits_shiftMuonTruthTrail*_*",
+            process.output.outputCommands,
+        )
+        self.assertIn(
+            "keep *_shiftMuonTruthTrailField_*_*",
+            process.output.outputCommands,
+        )
+        self.assertIn("shiftMuonTruthTrailField", process.simulation_step.moduleNames())
+        with self.assertRaises(RuntimeError):
+            customiseShiftMuonTruthTrail(process)
+        with self.assertRaises(ValueError):
+            customiseShiftMuonTruthTrail(cms.Process("EMPTY"), intervalCm=0.0)
 
     def test_fluka_map_element_keeps_all_runtime_inputs(self):
         element = shiftLssFlukaMap2DFieldElement(

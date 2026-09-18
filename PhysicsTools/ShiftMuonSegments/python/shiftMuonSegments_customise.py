@@ -561,3 +561,54 @@ def customiseShiftLssTransport(
         geant4eMaximumPathLengthCm=cms.double(geant4eMaximumPathLengthCm),
     )
     return process
+
+
+def customiseShiftMuonTruthTrail(
+    process,
+    *,
+    intervalCm=100.0,
+    maxCheckpoints=10000,
+    inwardOnly=True,
+):
+    """Persist a sparse primary-muon Geant4 trail for bounded MC diagnostics."""
+    import math
+    if not math.isfinite(intervalCm) or intervalCm <= 0.0:
+        raise ValueError("SHIFT muon truth-trail intervalCm must be finite and positive")
+    if maxCheckpoints <= 0:
+        raise ValueError("SHIFT muon truth-trail maxCheckpoints must be positive")
+    if not hasattr(process, "g4SimHits") or not hasattr(process.g4SimHits, "Watchers"):
+        raise RuntimeError("Cannot configure SHIFT muon truth trail: g4SimHits.Watchers is absent")
+    if not hasattr(process, "simulation_step"):
+        raise RuntimeError("Cannot configure SHIFT muon truth trail: simulation_step is absent")
+    if any(watcher.type.value() == "ShiftMuonTruthTrailWatcher" for watcher in process.g4SimHits.Watchers):
+        raise RuntimeError("SHIFT muon truth trail is already configured")
+
+    process.g4SimHits.Watchers.append(cms.PSet(
+        type=cms.string("ShiftMuonTruthTrailWatcher"),
+        ShiftMuonTruthTrailWatcher=cms.PSet(
+            intervalCm=cms.untracked.double(intervalCm),
+            maxCheckpoints=cms.untracked.uint32(maxCheckpoints),
+            inwardOnly=cms.untracked.bool(inwardOnly),
+        ),
+    ))
+    process.shiftMuonTruthTrailField = cms.EDProducer(
+        "ShiftMuonTruthTrailFieldProducer",
+        x=cms.InputTag("g4SimHits", "shiftMuonTruthTrailX"),
+        y=cms.InputTag("g4SimHits", "shiftMuonTruthTrailY"),
+        z=cms.InputTag("g4SimHits", "shiftMuonTruthTrailZ"),
+        magneticField=cms.ESInputTag("", ""),
+    )
+    process.simulation_step += process.shiftMuonTruthTrailField
+    keep_command = "keep *_g4SimHits_shiftMuonTruthTrail*_*"
+    field_keep_command = "keep *_shiftMuonTruthTrailField_*_*"
+    for output in process.outputModules_().values():
+        if hasattr(output, "outputCommands") and keep_command not in output.outputCommands:
+            output.outputCommands.append(keep_command)
+        if hasattr(output, "outputCommands") and field_keep_command not in output.outputCommands:
+            output.outputCommands.append(field_keep_command)
+    process.shiftMuonTruthTrailContract = cms.PSet(
+        intervalCm=cms.double(intervalCm),
+        maxCheckpoints=cms.uint32(maxCheckpoints),
+        inwardOnly=cms.bool(inwardOnly),
+    )
+    return process
