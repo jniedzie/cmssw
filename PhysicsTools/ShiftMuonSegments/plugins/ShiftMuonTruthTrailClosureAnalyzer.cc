@@ -26,6 +26,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -79,12 +80,14 @@ public:
         maximumStepLengthMm_(parameters.getParameter<double>("maximumStepLengthMm")),
         maximumPathLengthCm_(parameters.getParameter<double>("maximumPathLengthCm")),
         cumulativeStrideCm_(parameters.getParameter<double>("cumulativeStrideCm")),
+        externalBoundaryAbsZCm_(parameters.getParameter<double>("externalBoundaryAbsZCm")),
         useMeanEnergyLossJacobian_(parameters.getParameter<bool>("useMeanEnergyLossJacobian")),
         useFieldGradientJacobian_(parameters.getParameter<bool>("useFieldGradientJacobian")),
         useUnquenchedIonizationVariance_(parameters.getParameter<bool>("useUnquenchedIonizationVariance")) {
     if (!(maximumStepLengthMm_ > 0.) || !(maximumPathLengthCm_ > 0.) || !(cumulativeStrideCm_ > 0.) ||
+        !(externalBoundaryAbsZCm_ > 0.) ||
         !std::isfinite(maximumStepLengthMm_) || !std::isfinite(maximumPathLengthCm_) ||
-        !std::isfinite(cumulativeStrideCm_))
+        !std::isfinite(cumulativeStrideCm_) || !std::isfinite(externalBoundaryAbsZCm_))
       throw cms::Exception("Configuration") << "Truth-trail closure lengths must be finite and positive";
   }
 
@@ -119,6 +122,8 @@ public:
     propagator.setUseMeanEnergyLossJacobian(useMeanEnergyLossJacobian_);
     propagator.setUseFieldGradientJacobian(useFieldGradientJacobian_);
     propagator.setUseUnquenchedIonizationVariance(useUnquenchedIonizationVariance_);
+    Geant4ePropagator forwardPropagator(propagator);
+    forwardPropagator.setPropagationDirection(alongMomentum);
 
     std::ostringstream json;
     json << std::setprecision(9) << "{\"run\":" << event.id().run() << ",\"lumi\":"
@@ -281,7 +286,89 @@ public:
         json << propagate(hitPoint, hitMomentum, target);
         lastDistance = distance;
       }
-      json << "]}";
+      json << ']';
+
+      // The CSC-seeded cumulative propagation necessarily includes stochastic
+      // detector material.  Seed separately from the last truth checkpoint on
+      // the source side of the requested |z| boundary so that the long LSS leg
+      // can be tested without conflating it with CMS material.
+      auto externalSeed = periodic.end();
+      double const sourceSide = checkpoints.front().z < 0. ? -1. : 1.;
+      for (auto item = periodic.begin(); item != periodic.end(); ++item) {
+        auto const& candidate = checkpoints[*item];
+        if (sourceSide * candidate.z >= externalBoundaryAbsZCm_)
+          externalSeed = item;
+      }
+      json << ",\"externalBoundaryAbsZCm\":" << externalBoundaryAbsZCm_;
+      if (externalSeed == periodic.end()) {
+        json << ",\"externalSeedFound\":false,\"externalCumulative\":[]}";
+        continue;
+      }
+
+      auto const& seed = checkpoints[*externalSeed];
+      json << ",\"externalSeedFound\":true,\"externalSeedLengthCm\":" << seed.length
+           << ",\"externalSeedPositionCm\":[" << seed.x << ',' << seed.y << ',' << seed.z << ']'
+           << ",\"externalSeedMomentumGeV\":[" << seed.px << ',' << seed.py << ',' << seed.pz << ']'
+           << ",\"externalSeedX0\":" << seed.x0
+           << ",\"externalSeedEnergyLossGeV\":" << seed.energyLoss
+           << ",\"externalSeedMaterial\":" << std::quoted(seed.material)
+           << ",\"externalSeedVolume\":" << std::quoted(seed.volume)
+           << ",\"externalCumulative\":[";
+      first = true;
+      lastDistance = -std::numeric_limits<double>::infinity();
+      for (auto item = std::make_reverse_iterator(externalSeed + 1); item != periodic.rend(); ++item) {
+        auto const& target = checkpoints[*item];
+        double const distance = seed.length - target.length;
+        if (distance < 100.)
+          continue;
+        bool const endpoint = *item == periodic.front();
+        if (!endpoint && distance < lastDistance + cumulativeStrideCm_)
+          continue;
+        if (!first)
+          json << ',';
+        first = false;
+        json << propagate(GlobalPoint(seed.x, seed.y, seed.z), GlobalVector(seed.px, seed.py, seed.pz), target);
+        lastDistance = distance;
+      }
+      json << "]";
+
+      // This is the genuinely deterministic field check.  Use Geant4e for
+      // both directions, so the return residual cannot contain the random
+      // Geant4 scattering encoded in the truth checkpoints.
+      auto const sourcePlane = Plane::build(vertexPoint, normalTo(productionMomentum));
+      GlobalPoint const seedPoint(seed.x, seed.y, seed.z);
+      GlobalVector const seedMomentum(seed.px, seed.py, seed.pz);
+      auto const seedPlane = Plane::build(seedPoint, normalTo(seedMomentum));
+      AlgebraicSymMatrix55 roundTripCovariance;
+      for (unsigned int coordinate = 0; coordinate < 5; ++coordinate)
+        roundTripCovariance(coordinate, coordinate) = 1.e-12;
+      FreeTrajectoryState const sourceState(
+          GlobalTrajectoryParameters(vertexPoint, productionMomentum, charge, &field),
+          CurvilinearTrajectoryError(roundTripCovariance));
+      auto const forwardResult = forwardPropagator.propagateWithPath(sourceState, *seedPlane);
+      json << ",\"deterministicRoundTrip\":{\"forwardValid\":"
+           << (forwardResult.first.isValid() ? "true" : "false");
+      if (forwardResult.first.isValid()) {
+        auto const forwardPosition = forwardResult.first.globalPosition();
+        auto const forwardMomentum = forwardResult.first.globalMomentum();
+        json << ",\"forwardPathCm\":" << forwardResult.second
+             << ",\"forwardTruthPositionResidualCm\":" << (forwardPosition - seedPoint).mag()
+             << ",\"forwardTruthAngleResidualRad\":" << angle(forwardMomentum, seedMomentum)
+             << ",\"forwardTruthRelativeMomentumResidual\":"
+             << forwardMomentum.mag() / seedMomentum.mag() - 1.;
+        auto const backwardResult = propagator.propagateWithPath(forwardResult.first, *sourcePlane);
+        json << ",\"backwardValid\":" << (backwardResult.first.isValid() ? "true" : "false");
+        if (backwardResult.first.isValid()) {
+          auto const backwardPosition = backwardResult.first.globalPosition();
+          auto const backwardMomentum = backwardResult.first.globalMomentum();
+          json << ",\"backwardPathCm\":" << backwardResult.second
+               << ",\"returnPositionResidualCm\":" << (backwardPosition - vertexPoint).mag()
+               << ",\"returnAngleResidualRad\":" << angle(backwardMomentum, productionMomentum)
+               << ",\"returnRelativeMomentumResidual\":"
+               << backwardMomentum.mag() / productionMomentum.mag() - 1.;
+        }
+      }
+      json << "}}";
     }
     json << "]}";
     events_.push_back(json.str());
@@ -292,9 +379,10 @@ public:
     if (!output)
       throw cms::Exception("FileWriteError") << "Cannot write " << output_;
     output << std::setprecision(17)
-           << "{\"schema_version\":1,\"maximum_step_length_mm\":" << maximumStepLengthMm_
+           << "{\"schema_version\":2,\"maximum_step_length_mm\":" << maximumStepLengthMm_
            << ",\"maximum_path_length_cm\":" << maximumPathLengthCm_
            << ",\"cumulative_stride_cm\":" << cumulativeStrideCm_
+           << ",\"external_boundary_abs_z_cm\":" << externalBoundaryAbsZCm_
            << ",\"use_mean_energy_loss_jacobian\":"
            << (useMeanEnergyLossJacobian_ ? "true" : "false")
            << ",\"use_field_gradient_jacobian\":" << (useFieldGradientJacobian_ ? "true" : "false")
@@ -334,6 +422,7 @@ public:
     description.add<double>("maximumStepLengthMm", 10.);
     description.add<double>("maximumPathLengthCm", 20000.);
     description.add<double>("cumulativeStrideCm", 1000.);
+    description.add<double>("externalBoundaryAbsZCm", 3000.);
     description.add<bool>("useMeanEnergyLossJacobian", true);
     description.add<bool>("useFieldGradientJacobian", true);
     description.add<bool>("useUnquenchedIonizationVariance", true);
@@ -351,7 +440,7 @@ private:
   edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> field_;
   edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> geometry_;
   std::string output_;
-  double maximumStepLengthMm_, maximumPathLengthCm_, cumulativeStrideCm_;
+  double maximumStepLengthMm_, maximumPathLengthCm_, cumulativeStrideCm_, externalBoundaryAbsZCm_;
   bool useMeanEnergyLossJacobian_, useFieldGradientJacobian_, useUnquenchedIonizationVariance_;
   std::vector<std::string> events_;
 };
