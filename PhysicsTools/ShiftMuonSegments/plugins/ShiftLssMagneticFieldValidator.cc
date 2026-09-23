@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cmath>
+#include <iomanip>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,7 @@ public:
         if (!std::isfinite(components[component]) ||
             std::abs(components[component] - sample.expected[component]) > sample.tolerance) {
           throw cms::Exception("FieldValidation")
+              << std::setprecision(17)
               << "SHIFT LSS field sample '" << sample.name << "' failed at (" << sample.point[0] << ", "
               << sample.point[1] << ", " << sample.point[2] << ") cm: expected (" << sample.expected[0] << ", "
               << sample.expected[1] << ", " << sample.expected[2] << ") T, got (" << components[0] << ", "

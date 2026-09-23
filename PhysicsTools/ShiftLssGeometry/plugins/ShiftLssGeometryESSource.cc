@@ -157,55 +157,6 @@ namespace {
     return bounds;
   }
 
-  std::array<double, 6> transformedDaughterBounds(TGeoVolume const& volume,
-                                                  std::array<double, 9> const& rotation,
-                                                  std::array<double, 3> const& translation) {
-    if (volume.GetNdaughters() < 1) {
-      throw cms::Exception("UnsupportedGeometry") << "External LSS world has no placed daughter volumes";
-    }
-    std::array<double, 6> bounds = {
-        std::numeric_limits<double>::max(),
-        -std::numeric_limits<double>::max(),
-        std::numeric_limits<double>::max(),
-        -std::numeric_limits<double>::max(),
-        std::numeric_limits<double>::max(),
-        -std::numeric_limits<double>::max(),
-    };
-    for (int index = 0; index < volume.GetNdaughters(); ++index) {
-      TGeoNode const* node = volume.GetNode(index);
-      if (!node || !node->GetVolume() || !node->GetVolume()->GetShape() || !node->GetMatrix()) {
-        throw cms::Exception("UnsupportedGeometry") << "External LSS world has an invalid placed daughter";
-      }
-      std::array<double, 3> low;
-      std::array<double, 3> high;
-      for (int axis = 0; axis < 3; ++axis) {
-        node->GetVolume()->GetShape()->GetAxisRange(axis + 1, low[axis], high[axis]);
-        if (!(low[axis] < high[axis])) {
-          throw cms::Exception("UnsupportedGeometry")
-              << "External LSS daughter " << node->GetName() << " has invalid local bounds";
-        }
-      }
-      for (unsigned int corner = 0; corner < 8; ++corner) {
-        double local[3] = {
-            corner & 1 ? high[0] : low[0],
-            corner & 2 ? high[1] : low[1],
-            corner & 4 ? high[2] : low[2],
-        };
-        double artifact[3];
-        node->GetMatrix()->LocalToMaster(local, artifact);
-        for (unsigned int row = 0; row < 3; ++row) {
-          double global = translation[row];
-          for (unsigned int column = 0; column < 3; ++column) {
-            global += rotation[3 * row + column] * artifact[column];
-          }
-          bounds[2 * row] = std::min(bounds[2 * row], global);
-          bounds[2 * row + 1] = std::max(bounds[2 * row + 1], global);
-        }
-      }
-    }
-    return bounds;
-  }
-
   TGeoVolume* findUniqueVolume(TGeoManager const& manager, std::string const& name) {
     TGeoVolume* result = nullptr;
     TObjArray const* volumes = manager.GetListOfVolumes();

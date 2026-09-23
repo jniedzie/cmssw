@@ -59,6 +59,7 @@
 #include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixPropagator.h"
 #include "TrackPropagation/Geant4e/interface/Geant4ePropagator.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
+#include "MagneticField/VolumeBasedEngine/interface/VolumeBasedMagneticField.h"
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
 #include "Geometry/CaloGeometry/interface/CaloGeometry.h"
@@ -2681,6 +2682,7 @@ public:
     auto const stripStereoRecHits = event.getHandle(stripStereoRecHitsToken_);
     auto const stripStereoUnmatchedRecHits = event.getHandle(stripStereoUnmatchedRecHitsToken_);
     auto const& magneticField = setup.getData(magneticFieldToken_);
+    bool const useMagneticVolumes = dynamic_cast<VolumeBasedMagneticField const*>(&magneticField) != nullptr;
     bool const useGeometryMaterialInFitter = directionalRefitUseGeometryMaterialEffects_ ||
                                              directionalRefitUseGeometryMaterialEffectsInFitter_;
     bool const useGeometryMaterialInSmoother = directionalRefitUseGeometryMaterialEffects_ ||
@@ -2690,27 +2692,27 @@ public:
     // transport without changing hit selection, ordering, or fit thresholds.
     SteppingHelixPropagator approximateMaterialPropagator(&magneticField, anyDirection);
     approximateMaterialPropagator.setMaterialMode(false);
-    approximateMaterialPropagator.setUseMagVolumes(true);
+    approximateMaterialPropagator.setUseMagVolumes(useMagneticVolumes);
     approximateMaterialPropagator.setUseMatVolumes(true);
     approximateMaterialPropagator.setEnergyLossScale(directionalRefitEnergyLossScale_);
     approximateMaterialPropagator.applyRadX0Correction(true);
     SteppingHelixPropagator explicitBackwardMaterialPropagator(&magneticField, oppositeToMomentum);
     explicitBackwardMaterialPropagator.setMaterialMode(false);
-    explicitBackwardMaterialPropagator.setUseMagVolumes(true);
+    explicitBackwardMaterialPropagator.setUseMagVolumes(useMagneticVolumes);
     explicitBackwardMaterialPropagator.setUseMatVolumes(true);
     explicitBackwardMaterialPropagator.setEnergyLossScale(directionalRefitEnergyLossScale_);
     explicitBackwardMaterialPropagator.applyRadX0Correction(true);
     auto firstPrinciplesProvider = std::make_shared<Geant4MaterialEffectsProvider>();
     SteppingHelixPropagator firstPrinciplesMaterialPropagator(&magneticField, anyDirection);
     firstPrinciplesMaterialPropagator.setMaterialMode(false);
-    firstPrinciplesMaterialPropagator.setUseMagVolumes(true);
+    firstPrinciplesMaterialPropagator.setUseMagVolumes(useMagneticVolumes);
     firstPrinciplesMaterialPropagator.setUseMatVolumes(false);
     firstPrinciplesMaterialPropagator.setMaterialEffectsProvider(
         firstPrinciplesProvider, directionalRefitFirstPrinciplesStepCm_);
     firstPrinciplesMaterialPropagator.applyRadX0Correction(true);
     SteppingHelixPropagator firstPrinciplesBackwardMaterialPropagator(&magneticField, oppositeToMomentum);
     firstPrinciplesBackwardMaterialPropagator.setMaterialMode(false);
-    firstPrinciplesBackwardMaterialPropagator.setUseMagVolumes(true);
+    firstPrinciplesBackwardMaterialPropagator.setUseMagVolumes(useMagneticVolumes);
     firstPrinciplesBackwardMaterialPropagator.setUseMatVolumes(false);
     firstPrinciplesBackwardMaterialPropagator.setMaterialEffectsProvider(
         firstPrinciplesProvider, directionalRefitFirstPrinciplesStepCm_);
@@ -2755,7 +2757,7 @@ public:
     }
     SteppingHelixPropagator vacuumPropagator(&magneticField, anyDirection);
     vacuumPropagator.setMaterialMode(true);
-    vacuumPropagator.setUseMagVolumes(true);
+    vacuumPropagator.setUseMagVolumes(useMagneticVolumes);
     vacuumPropagator.setSendLogWarning(logCandidateSelection_);
     // The standalone fit momentum can be far below the physical incoming
     // momentum. The associator's default material propagator then stops
@@ -2764,7 +2766,7 @@ public:
     hcalAssociator_.setPropagator(&vacuumPropagator);
     SteppingHelixPropagator geometryCovariancePropagator(&magneticField, anyDirection);
     geometryCovariancePropagator.setMaterialMode(false);
-    geometryCovariancePropagator.setUseMagVolumes(true);
+    geometryCovariancePropagator.setUseMagVolumes(useMagneticVolumes);
     geometryCovariancePropagator.setUseMatVolumes(true);
     geometryCovariancePropagator.setEnergyLossScale(0.);
     geometryCovariancePropagator.applyRadX0Correction(true);
@@ -2779,7 +2781,7 @@ public:
       geometryBackwardCovariancePropagator =
           std::make_unique<SteppingHelixPropagator>(&magneticField, oppositeToMomentum);
       geometryBackwardCovariancePropagator->setMaterialMode(false);
-      geometryBackwardCovariancePropagator->setUseMagVolumes(true);
+      geometryBackwardCovariancePropagator->setUseMagVolumes(useMagneticVolumes);
       geometryBackwardCovariancePropagator->setUseMatVolumes(true);
       geometryBackwardCovariancePropagator->setEnergyLossScale(0.);
       geometryBackwardCovariancePropagator->applyRadX0Correction(true);

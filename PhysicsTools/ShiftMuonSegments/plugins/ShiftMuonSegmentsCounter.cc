@@ -20,6 +20,7 @@
 #include "Geometry/CommonTopologies/interface/GlobalTrackingGeometry.h"
 #include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
+#include "MagneticField/VolumeBasedEngine/interface/VolumeBasedMagneticField.h"
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
@@ -90,18 +91,19 @@ public:
 
     if (printPropagationClosure_) {
       auto const& field = setup.getData(magneticField_);
+      bool const useMagneticVolumes = dynamic_cast<VolumeBasedMagneticField const*>(&field) != nullptr;
       auto const& geometry = setup.getData(trackingGeometry_);
       SteppingHelixPropagator material(&field, alongMomentum);
       material.setMaterialMode(false);
-      material.setUseMagVolumes(true);
+      material.setUseMagVolumes(useMagneticVolumes);
       material.setUseMatVolumes(true);
       material.applyRadX0Correction(true);
       SteppingHelixPropagator vacuum(&field, alongMomentum);
       vacuum.setMaterialMode(true);
-      vacuum.setUseMagVolumes(true);
+      vacuum.setUseMagVolumes(useMagneticVolumes);
       SteppingHelixPropagator backwardMaterial(&field, oppositeToMomentum);
       backwardMaterial.setMaterialMode(false);
-      backwardMaterial.setUseMagVolumes(true);
+      backwardMaterial.setUseMagVolumes(useMagneticVolumes);
       backwardMaterial.setUseMatVolumes(true);
       backwardMaterial.applyRadX0Correction(true);
 

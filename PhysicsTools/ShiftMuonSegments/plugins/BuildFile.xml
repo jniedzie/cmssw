@@ -46,6 +46,7 @@
 <use name="geant4"/>
 <use name="eigen"/>
 <use name="MagneticField/Engine"/>
+<use name="MagneticField/VolumeBasedEngine"/>
 <use name="MagneticField/Records"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
