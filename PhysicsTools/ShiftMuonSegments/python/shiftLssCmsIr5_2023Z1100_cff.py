@@ -2,6 +2,7 @@
 # Do not edit by hand. The caller must supply the reviewed model-to-CMS transform.
 
 import math
+import os
 
 from PhysicsTools.ShiftMuonSegments.shiftLssMagneticField_cfi import (
     shiftLssFlukaMap2DFieldElement,
@@ -60,11 +61,16 @@ def _validated_transform(modelOriginCm, modelToCms):
     return origin, rotation
 
 
-def shiftLssCmsIr5_2023Z1100FieldElements(*, modelOriginCm, modelToCms, fieldScale=1.0):
+def shiftLssCmsIr5_2023Z1100FieldElements(
+    *, modelOriginCm, modelToCms, fieldScale=1.0, dataDirectory=None
+):
     model_origin, rotation = _validated_transform(modelOriginCm, modelToCms)
     field_scale = float(fieldScale)
     if not math.isfinite(field_scale) or field_scale == 0.0:
         raise ValueError("fieldScale must be finite and nonzero")
+    map_directory = _DATA_DIRECTORY if dataDirectory is None else dataDirectory
+    if dataDirectory is not None and not os.path.isabs(map_directory):
+        raise ValueError("dataDirectory must be an absolute path")
 
     def cms_origin(origin):
         return tuple(
@@ -92,7 +98,7 @@ def shiftLssCmsIr5_2023Z1100FieldElements(*, modelOriginCm, modelToCms, fieldSca
         else:
             result.append(shiftLssFlukaMap2DFieldElement(
                 element["name"], element["minimum"], element["maximum"],
-                f"{_DATA_DIRECTORY}/{element['map_file']}",
+                f"{map_directory}/{element['map_file']}",
                 field_scale * element["field_scale"], **common,
             ))
     return result

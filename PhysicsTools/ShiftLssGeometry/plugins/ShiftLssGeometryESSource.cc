@@ -175,12 +175,27 @@ namespace {
     }
     return result;
   }
+
+  std::string resolveGdmlPath(edm::ParameterSet const& parameters) {
+    bool const hasPackagedFile = parameters.existsAs<edm::FileInPath>("gdmlFile");
+    bool const hasExternalPath = parameters.existsAs<std::string>("gdmlPath");
+    if (hasPackagedFile == hasExternalPath) {
+      throw cms::Exception("Configuration")
+          << "Configure exactly one of gdmlFile (packaged data) and gdmlPath (absolute external path)";
+    }
+    if (hasPackagedFile)
+      return parameters.getParameter<edm::FileInPath>("gdmlFile").fullPath();
+    auto const path = parameters.getParameter<std::string>("gdmlPath");
+    if (path.empty() || path.front() != '/')
+      throw cms::Exception("Configuration") << "gdmlPath must be a non-empty absolute path";
+    return path;
+  }
 }  // namespace
 
 class ShiftLssGeometryESSource : public edm::ESProducer, public edm::EventSetupRecordIntervalFinder {
 public:
   explicit ShiftLssGeometryESSource(edm::ParameterSet const& parameters)
-      : gdmlFile_(parameters.getParameter<edm::FileInPath>("gdmlFile").fullPath()),
+      : gdmlFile_(resolveGdmlPath(parameters)),
         geometryLabel_(parameters.getParameter<std::string>("geometryLabel")),
         detectorElementName_(parameters.getParameter<std::string>("detectorElementName")),
         externalMotherVolumeName_(parameters.getParameter<std::string>("externalMotherVolumeName")),
@@ -210,7 +225,8 @@ public:
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
     edm::ParameterSetDescription description;
-    description.add<edm::FileInPath>("gdmlFile");
+    description.addOptional<edm::FileInPath>("gdmlFile");
+    description.addOptional<std::string>("gdmlPath");
     description.add<std::string>("geometryLabel", "Extended");
     description.add<std::string>("detectorElementName", "shiftLssExternal");
     description.add<std::string>("externalMotherVolumeName", "cms:CMSE");

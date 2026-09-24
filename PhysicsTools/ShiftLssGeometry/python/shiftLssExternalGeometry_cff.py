@@ -1,3 +1,5 @@
+import os
+
 import FWCore.ParameterSet.Config as cms
 
 
@@ -37,9 +39,15 @@ def customiseShiftLssExternalGeometry(
             "geometryLabel must match DDDetectorESProducerFromDB.label so the same CMS payload is used"
         )
 
+    gdml_parameter = (
+        dict(gdmlPath=cms.string(gdmlFile))
+        if os.path.isabs(gdmlFile)
+        else dict(gdmlFile=cms.FileInPath(gdmlFile))
+    )
+
     process.shiftLssGeometryESSource = cms.ESSource(
         "ShiftLssGeometryESSource",
-        gdmlFile=cms.FileInPath(gdmlFile),
+        **gdml_parameter,
         geometryLabel=cms.string(geometryLabel),
         detectorElementName=cms.string(detectorElementName),
         externalMotherVolumeName=cms.string(externalMotherVolumeName),

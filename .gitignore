@@ -21,3 +21,8 @@ __init__.py
 
 #ignore mac specific file
 .DS_Store
+
+# Private CMS/ATLAS LSS geometry and field-map inputs must never be published.
+# Keep the local files available to workflows while excluding them from Git.
+/PhysicsTools/ShiftLssGeometry/data/
+/PhysicsTools/ShiftMuonSegments/data/lss/
