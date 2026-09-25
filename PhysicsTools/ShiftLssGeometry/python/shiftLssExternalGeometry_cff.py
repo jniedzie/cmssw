@@ -14,6 +14,7 @@ def customiseShiftLssExternalGeometry(
     geometryLabel="Extended",
     detectorElementName="shiftLssExternal",
     externalMotherVolumeName="cms:CMSE",
+    symmetricTwoSided=False,
     overlapToleranceCm=0.001,
     checkOverlaps=True,
 ):
@@ -54,6 +55,7 @@ def customiseShiftLssExternalGeometry(
         artifactOriginInModelCm=cms.vdouble(*artifactOriginInModelCm),
         modelOriginCm=cms.vdouble(*modelOriginCm),
         modelToCms=cms.vdouble(*modelToCms),
+        symmetricTwoSided=cms.bool(symmetricTwoSided),
         minimumAbsZCm=cms.double(minimumAbsZCm),
         overlapToleranceCm=cms.double(overlapToleranceCm),
         checkOverlaps=cms.bool(checkOverlaps),
@@ -68,6 +70,8 @@ def customiseShiftLssExternalGeometry(
         artifactOriginInModelCm=cms.vdouble(*artifactOriginInModelCm),
         modelOriginCm=cms.vdouble(*modelOriginCm),
         modelToCms=cms.vdouble(*modelToCms),
+        symmetricTwoSided=cms.bool(symmetricTwoSided),
+        placementCount=cms.uint32(2 if symmetricTwoSided else 1),
         minimumAbsZCm=cms.double(minimumAbsZCm),
     )
     return process

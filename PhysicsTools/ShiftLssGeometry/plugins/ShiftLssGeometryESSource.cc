@@ -66,6 +66,16 @@ namespace {
     return rotation;
   }
 
+  std::array<double, 9> rotate180AboutCmsY(std::array<double, 9> rotation) {
+    // Left multiplication by diag(-1, +1, -1) rotates the complete placed
+    // model by pi around the CMS y axis.
+    for (unsigned int column = 0; column < 3; ++column) {
+      rotation[column] = -rotation[column];
+      rotation[6 + column] = -rotation[6 + column];
+    }
+    return rotation;
+  }
+
   void preflightGdml(std::string const& path) {
     std::ifstream input(path);
     if (!input) {
@@ -202,6 +212,7 @@ public:
         artifactOriginInModelCm_(parameters.getParameter<std::vector<double>>("artifactOriginInModelCm")),
         modelOriginCm_(parameters.getParameter<std::vector<double>>("modelOriginCm")),
         rotation_(checkedRotation(parameters.getParameter<std::vector<double>>("modelToCms"))),
+        symmetricTwoSided_(parameters.getParameter<bool>("symmetricTwoSided")),
         minimumAbsZCm_(parameters.getParameter<double>("minimumAbsZCm")),
         overlapToleranceCm_(parameters.getParameter<double>("overlapToleranceCm")),
         checkOverlaps_(parameters.getParameter<bool>("checkOverlaps")) {
@@ -233,6 +244,7 @@ public:
     description.add<std::vector<double>>("artifactOriginInModelCm");
     description.add<std::vector<double>>("modelOriginCm");
     description.add<std::vector<double>>("modelToCms");
+    description.add<bool>("symmetricTwoSided", false);
     description.add<double>("minimumAbsZCm");
     description.add<double>("overlapToleranceCm", 0.001);
     description.add<bool>("checkOverlaps", true);
@@ -288,18 +300,6 @@ private:
       throw cms::Exception("UnsupportedGeometry") << "External GDML world must have an untransformed solid frame";
     edm::LogInfo("ShiftLssGeometry") << "Normalized " << normalizer.changed()
                                      << " Boolean frames for faithful DDG4 conversion";
-    // The bounded converter recentres the source model around an artifact
-    // origin.  Place that artifact origin at the transformed source-model
-    // coordinate; fields use the same modelOrigin + R * modelPoint contract.
-    std::array<double, 3> translation;
-    for (unsigned int row = 0; row < 3; ++row) {
-      translation[row] = modelOriginCm_[row];
-      for (unsigned int column = 0; column < 3; ++column) {
-        translation[row] += rotation_[3 * row + column] * artifactOriginInModelCm_[column];
-      }
-      translation[row] *= dd4hep::cm;
-    }
-    auto const artifactBounds = transformedBounds(importedVolume, rotation_, translation);
     // The GDML world is a bookkeeping container and may be larger than its
     // physical daughters when it carries an exterior continuation shell. Raw
     // AABBs of legacy Boolean daughters are not safe for an aggregate gate.
@@ -315,58 +315,93 @@ private:
         rockNode = node;
       }
     }
-    auto bounds = artifactBounds;
-    if (rockNode) {
-      auto const rockBounds = transformedNodeBounds(*rockNode, rotation_, translation);
-      // The inner world is centered at the artifact origin. Its extent is
-      // recovered from the shell subtraction's second operand by the
-      // converter, so the continuation itself is the only new protected-zone
-      // risk. The original artifact passed this gate before augmentation.
-      bounds = rockBounds;
-    }
+    std::vector<std::array<double, 9>> rotations = {rotation_};
+    if (symmetricTwoSided_)
+      rotations.push_back(rotate180AboutCmsY(rotation_));
+    std::vector<std::array<double, 3>> translations;
+    std::vector<std::array<double, 6>> artifactBoundsByPlacement;
+    std::vector<std::array<double, 6>> protectedBoundsByPlacement;
+    translations.reserve(rotations.size());
+    artifactBoundsByPlacement.reserve(rotations.size());
+    protectedBoundsByPlacement.reserve(rotations.size());
     double const boundary = minimumAbsZCm_ * dd4hep::cm;
-    if (!(bounds[4] >= boundary || bounds[5] <= -boundary)) {
-      throw cms::Exception("UnsupportedGeometry")
-          << "External LSS bounds [" << bounds[4] / dd4hep::cm << ", " << bounds[5] / dd4hep::cm
-          << "] cm cross the protected |z| < " << minimumAbsZCm_ << " cm CMS region";
+    for (auto const& rotation : rotations) {
+      // The bounded converter recentres the source model around an artifact
+      // origin. Place that artifact origin at the transformed source-model
+      // coordinate; fields use the same modelOrigin + R * modelPoint contract.
+      std::array<double, 3> translation;
+      for (unsigned int row = 0; row < 3; ++row) {
+        translation[row] = modelOriginCm_[row];
+        for (unsigned int column = 0; column < 3; ++column) {
+          translation[row] += rotation[3 * row + column] * artifactOriginInModelCm_[column];
+        }
+        translation[row] *= dd4hep::cm;
+      }
+      auto const artifactBounds = transformedBounds(importedVolume, rotation, translation);
+      auto bounds = artifactBounds;
+      if (rockNode) {
+        // The inner world is centered at the artifact origin. Its extent is
+        // recovered from the shell subtraction's second operand by the
+        // converter, so the continuation itself is the only new protected-zone
+        // risk. The original artifact passed this gate before augmentation.
+        bounds = transformedNodeBounds(*rockNode, rotation, translation);
+      }
+      if (!(bounds[4] >= boundary || bounds[5] <= -boundary)) {
+        throw cms::Exception("UnsupportedGeometry")
+            << "External LSS bounds [" << bounds[4] / dd4hep::cm << ", " << bounds[5] / dd4hep::cm
+            << "] cm cross the protected |z| < " << minimumAbsZCm_ << " cm CMS region";
+      }
+      translations.push_back(translation);
+      artifactBoundsByPlacement.push_back(artifactBounds);
+      protectedBoundsByPlacement.push_back(bounds);
     }
 
     cmsWorld->RemoveNode(oldPlacement.ptr());
-    shift::ExternalVolumeClipper clipper;
-    for (auto const* node : baselineMotherNodes)
-      clipper.protect(*node->GetVolume(), TGeoHMatrix(*node->GetMatrix()));
-    TGeoHMatrix assemblyPlacement;
-    assemblyPlacement.SetRotation(rotation_.data());
-    assemblyPlacement.SetTranslation(translation.data());
-    dd4hep::Assembly importedAssembly(detectorElementName_ + "_assembly");
-    for (int index = 0; index < importedVolume.ptr()->GetNdaughters(); ++index) {
-      TGeoNode* sourceNode = importedVolume.ptr()->GetNode(index);
-      auto placement = assemblyPlacement;
-      placement.Multiply(sourceNode->GetMatrix());
-      importedAssembly.ptr()->AddNode(clipper.clip(sourceNode->GetVolume(), placement),
-                                      sourceNode->GetNumber(),
-                                      new TGeoHMatrix(*sourceNode->GetMatrix()));
+    unsigned int totalSubtractions = 0;
+    for (unsigned int placementIndex = 0; placementIndex < rotations.size(); ++placementIndex) {
+      auto const& rotation = rotations[placementIndex];
+      auto const& translation = translations[placementIndex];
+      shift::ExternalVolumeClipper clipper;
+      for (auto const* node : baselineMotherNodes)
+        clipper.protect(*node->GetVolume(), TGeoHMatrix(*node->GetMatrix()));
+      TGeoHMatrix assemblyPlacement;
+      assemblyPlacement.SetRotation(rotation.data());
+      assemblyPlacement.SetTranslation(translation.data());
+      dd4hep::Assembly importedAssembly(detectorElementName_ + "_assembly_" + std::to_string(placementIndex + 1));
+      for (int index = 0; index < importedVolume.ptr()->GetNdaughters(); ++index) {
+        TGeoNode* sourceNode = importedVolume.ptr()->GetNode(index);
+        auto placement = assemblyPlacement;
+        placement.Multiply(sourceNode->GetMatrix());
+        importedAssembly.ptr()->AddNode(clipper.clip(sourceNode->GetVolume(), placement),
+                                        sourceNode->GetNumber(),
+                                        new TGeoHMatrix(*sourceNode->GetMatrix()));
+      }
+      // The protected CMS solids can themselves contain transformed Booleans.
+      // Normalize the new difference expressions without mutating CMS volumes.
+      shift::BooleanFrameNormalizer clippedNormalizer;
+      clippedNormalizer.volume(importedAssembly.ptr());
+      totalSubtractions += clipper.subtractions();
+      dd4hep::Rotation3D modelRotation(rotation.begin(), rotation.end());
+      dd4hep::Transform3D modelTransform(
+          modelRotation, dd4hep::Position(translation[0], translation[1], translation[2]));
+      dd4hep::PlacedVolume placed =
+          dd4hep::Volume(externalMother).placeVolume(importedAssembly, placementIndex + 1, modelTransform);
+      if (placementIndex == 0)
+        child.setPlacement(placed);
     }
-    // The protected CMS solids can themselves contain transformed Booleans.
-    // Normalize the new difference expressions without mutating CMS volumes.
-    shift::BooleanFrameNormalizer clippedNormalizer;
-    clippedNormalizer.volume(importedAssembly.ptr());
-    edm::LogInfo("ShiftLssGeometry") << "Applied " << clipper.subtractions()
+    edm::LogInfo("ShiftLssGeometry") << "Applied " << totalSubtractions
                                      << " exact solid exclusions to preserve existing CMS volume ownership";
-    dd4hep::Rotation3D modelRotation(rotation_.begin(), rotation_.end());
-    dd4hep::Transform3D modelTransform(modelRotation, dd4hep::Position(translation[0], translation[1], translation[2]));
-    dd4hep::PlacedVolume placed = dd4hep::Volume(externalMother).placeVolume(importedAssembly, 1, modelTransform);
-    child.setPlacement(placed);
 
     if (cmsWorld->GetNdaughters() != baselineWorldDaughters) {
       throw cms::Exception("GeometryVerification")
           << "External attachment changed the CMS world daughter count: " << baselineWorldDaughters << " before, "
           << cmsWorld->GetNdaughters() << " after";
     }
-    if (externalMother->GetNdaughters() != baselineMotherDaughters + 1) {
+    if (externalMother->GetNdaughters() != baselineMotherDaughters + static_cast<int>(rotations.size())) {
       throw cms::Exception("GeometryVerification")
-          << "External attachment did not add exactly one assembly below " << externalMotherVolumeName_ << ": "
-          << baselineMotherDaughters << " daughters before, " << externalMother->GetNdaughters() << " after";
+          << "External attachment did not add exactly " << rotations.size() << " assembly/assemblies below "
+          << externalMotherVolumeName_ << ": " << baselineMotherDaughters << " daughters before, "
+          << externalMother->GetNdaughters() << " after";
     }
     for (int index = 0; index < baselineMotherDaughters; ++index) {
       if (externalMother->GetNode(index) != baselineMotherNodes[index]) {
@@ -393,13 +428,18 @@ private:
         throw error;
       }
     }
-    edm::LogInfo("ShiftLssGeometry")
-        << "Preserved the standard CMSSW Extended geometry and attached the unwrapped external assembly below "
-        << externalMotherVolumeName_ << " with transformed z bounds [" << bounds[4] / dd4hep::cm << ", "
-        << bounds[5] / dd4hep::cm << "] cm (GDML container bounds [" << artifactBounds[4] / dd4hep::cm << ", "
-        << artifactBounds[5] / dd4hep::cm << "] cm); all " << baselineWorldDaughters
-        << " pre-existing CMS world daughter(s) and " << baselineMotherDaughters
-        << " pre-existing mother-volume daughter(s) remain unchanged";
+    for (unsigned int placementIndex = 0; placementIndex < rotations.size(); ++placementIndex) {
+      auto const& bounds = protectedBoundsByPlacement[placementIndex];
+      auto const& artifactBounds = artifactBoundsByPlacement[placementIndex];
+      edm::LogInfo("ShiftLssGeometry")
+          << "Attached external LSS placement " << placementIndex + 1 << "/" << rotations.size() << " below "
+          << externalMotherVolumeName_ << " with transformed z bounds [" << bounds[4] / dd4hep::cm << ", "
+          << bounds[5] / dd4hep::cm << "] cm (GDML container bounds [" << artifactBounds[4] / dd4hep::cm << ", "
+          << artifactBounds[5] / dd4hep::cm << "] cm)";
+    }
+    edm::LogInfo("ShiftLssGeometry") << "Preserved all " << baselineWorldDaughters
+                                     << " pre-existing CMS world daughter(s) and " << baselineMotherDaughters
+                                     << " pre-existing mother-volume daughter(s)";
     return detector;
   }
 
@@ -416,6 +456,7 @@ private:
   std::vector<double> artifactOriginInModelCm_;
   std::vector<double> modelOriginCm_;
   std::array<double, 9> rotation_;
+  bool symmetricTwoSided_;
   double minimumAbsZCm_;
   double overlapToleranceCm_;
   bool checkOverlaps_;

@@ -62,7 +62,12 @@ def _validated_transform(modelOriginCm, modelToCms):
 
 
 def shiftLssCmsIr5_2023Z1100FieldElements(
-    *, modelOriginCm, modelToCms, fieldScale=1.0, dataDirectory=None
+    *,
+    modelOriginCm,
+    modelToCms,
+    fieldScale=1.0,
+    dataDirectory=None,
+    symmetricTwoSided=False,
 ):
     model_origin, rotation = _validated_transform(modelOriginCm, modelToCms)
     field_scale = float(fieldScale)
@@ -72,33 +77,45 @@ def shiftLssCmsIr5_2023Z1100FieldElements(
     if dataDirectory is not None and not os.path.isabs(map_directory):
         raise ValueError("dataDirectory must be an absolute path")
 
-    def cms_origin(origin):
+    def cms_origin(origin, placement_rotation):
         return tuple(
             model_origin[axis]
-            + sum(rotation[3 * axis + local] * origin[local] for local in range(3))
+            + sum(placement_rotation[3 * axis + local] * origin[local] for local in range(3))
             for axis in range(3)
         )
 
     result = []
-    for element in _ELEMENTS:
-        common = dict(
-            originCm=cms_origin(element["origin"]),
-            localToGlobal=rotation,
-            boundsShape=element["bounds_shape"],
-            boundsCenterCm=element["bounds_center"],
-            innerRadiusCm=element["inner_radius"],
-            outerRadiusCm=element["outer_radius"],
-            excludedCylindersCm=element["excluded_cylinders"],
+    placements = [(rotation, "")]
+    if symmetricTwoSided:
+        # Apply the same global R_y(pi) used by the material placement.
+        mirrored = tuple(
+            (-1.0 if row in (0, 2) else 1.0) * rotation[3 * row + column]
+            for row in range(3)
+            for column in range(3)
         )
-        if element["type"] == "uniform":
-            result.append(shiftLssUniformFieldElement(
-                element["name"], element["minimum"], element["maximum"],
-                tuple(field_scale * value for value in element["field"]), **common,
-            ))
-        else:
-            result.append(shiftLssFlukaMap2DFieldElement(
-                element["name"], element["minimum"], element["maximum"],
-                f"{map_directory}/{element['map_file']}",
-                field_scale * element["field_scale"], **common,
-            ))
+        placements.append((mirrored, ".cmsY180"))
+
+    for placement_rotation, name_suffix in placements:
+        for element in _ELEMENTS:
+            common = dict(
+                originCm=cms_origin(element["origin"], placement_rotation),
+                localToGlobal=placement_rotation,
+                boundsShape=element["bounds_shape"],
+                boundsCenterCm=element["bounds_center"],
+                innerRadiusCm=element["inner_radius"],
+                outerRadiusCm=element["outer_radius"],
+                excludedCylindersCm=element["excluded_cylinders"],
+            )
+            name = element["name"] + name_suffix
+            if element["type"] == "uniform":
+                result.append(shiftLssUniformFieldElement(
+                    name, element["minimum"], element["maximum"],
+                    tuple(field_scale * value for value in element["field"]), **common,
+                ))
+            else:
+                result.append(shiftLssFlukaMap2DFieldElement(
+                    name, element["minimum"], element["maximum"],
+                    f"{map_directory}/{element['map_file']}",
+                    field_scale * element["field_scale"], **common,
+                ))
     return result

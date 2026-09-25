@@ -14,6 +14,9 @@ from PhysicsTools.ShiftMuonSegments.shiftLssMagneticField_cfi import (
 from PhysicsTools.ShiftMuonSegments.shiftLssIr1AtlasProxy_cff import (
     shiftLssIr1AtlasProxyFieldElements,
 )
+from PhysicsTools.ShiftMuonSegments.shiftLssCmsIr5_2023Z1100_cff import (
+    shiftLssCmsIr5_2023Z1100FieldElements,
+)
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cfi import shiftMuonTable
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_cff import addShiftMuonSegments
 from PhysicsTools.ShiftMuonSegments.shiftMuonSegments_customise import (
@@ -192,6 +195,21 @@ class ShiftLssConfigurationTest(unittest.TestCase):
                 includeMappedFields=False,
                 includeConstantFields=False,
             )
+
+    def test_cms_ir5_symmetric_field_uses_matching_y_rotation(self):
+        elements = shiftLssCmsIr5_2023Z1100FieldElements(
+            modelOriginCm=(10.0, 20.0, 30.0),
+            modelToCms=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+            symmetricTwoSided=True,
+        )
+        self.assertEqual(len(elements), 44)
+        self.assertEqual(list(elements[0].originCm), [10.0, 20.0, 2645.0])
+        self.assertEqual(list(elements[22].originCm), [10.0, 20.0, -2585.0])
+        self.assertEqual(
+            list(elements[22].localToGlobal),
+            [-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
+        )
+        self.assertEqual(elements[22].name.value(), "MQXA.QXA1R__a.cmsY180")
 
     def test_packaged_proxy_maps_match_frozen_checksums_and_shapes(self):
         expected_shapes = {

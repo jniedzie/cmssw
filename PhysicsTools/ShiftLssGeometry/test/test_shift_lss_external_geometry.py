@@ -28,6 +28,7 @@ class ShiftLssExternalGeometryTest(unittest.TestCase):
             modelOriginCm=(0.0, 0.0, 3000.0),
             modelToCms=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
             minimumAbsZCm=2750.0,
+            symmetricTwoSided=True,
             checkOverlaps=False,
         )
         self.assertFalse(hasattr(process, "DDDetectorESProducerFromDB"))
@@ -38,6 +39,22 @@ class ShiftLssExternalGeometryTest(unittest.TestCase):
         )
         self.assertTrue(process.shiftLssGeometryContract.standardCmsGeometryPreserved.value())
         self.assertTrue(process.shiftLssGeometryContract.externalExtensionOnly.value())
+        self.assertTrue(process.shiftLssGeometryESSource.symmetricTwoSided.value())
+        self.assertEqual(process.shiftLssGeometryContract.placementCount.value(), 2)
+
+    def test_single_sided_remains_the_default(self):
+        process = self.process()
+        customiseShiftLssExternalGeometry(
+            process,
+            gdmlFile="PhysicsTools/ShiftLssGeometry/test/fixtures/bounded_external.gdml",
+            artifactOriginInModelCm=(0.0, 0.0, 0.0),
+            modelOriginCm=(0.0, 0.0, 3000.0),
+            modelToCms=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+            minimumAbsZCm=2750.0,
+            checkOverlaps=False,
+        )
+        self.assertFalse(process.shiftLssGeometryESSource.symmetricTwoSided.value())
+        self.assertEqual(process.shiftLssGeometryContract.placementCount.value(), 1)
 
     def test_fails_closed_without_standard_db_geometry(self):
         process = cms.Process("TEST")

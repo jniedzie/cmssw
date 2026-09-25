@@ -4,6 +4,8 @@ This is a model-frame software test. It does not approve the absolute CMS
 alignment, source-side convention, or native FLUKA field reference.
 """
 
+import os
+
 import FWCore.ParameterSet.Config as cms
 
 from PhysicsTools.ShiftMuonSegments.shiftLssCmsIr5_2023Z1100_cff import (
@@ -23,6 +25,7 @@ process.UniformMagneticFieldESProducer.ZFieldInTesla = cms.double(3.8)
 
 model_origin = (100.0, 200.0, -100.0)
 model_to_test = (0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+field_data_directory = os.environ.get("SHIFT_LSS_CMS_IR5_FIELD_DATA_DIRECTORY")
 process = customiseShiftLssMagneticField(
     process,
     baseMagneticFieldProducer="UniformMagneticFieldESProducer",
@@ -30,6 +33,8 @@ process = customiseShiftLssMagneticField(
         modelOriginCm=model_origin,
         modelToCms=model_to_test,
         fieldScale=1.0,
+        dataDirectory=field_data_directory,
+        symmetricTwoSided=True,
     ),
 )
 
@@ -77,6 +82,26 @@ process.validateCmsIr5LssField = cms.EDAnalyzer(
             name=cms.string("MBRC constant dipole vector rotation"),
             pointCm=cms.vdouble(*global_point(1.0, 0.0, 15790.0)),
             expectedTesla=cms.vdouble(-2.7099984571548212, 0.0, 0.0),
+            toleranceTesla=cms.double(1.0e-6),
+        ),
+        cms.PSet(
+            name=cms.string("mirrored MQXA analytic core"),
+            pointCm=cms.vdouble(
+                model_origin[0],
+                model_origin[1] + 1.0,
+                model_origin[2] - 2615.0,
+            ),
+            expectedTesla=cms.vdouble(1.9741973648239945, 0.0, 0.0),
+            toleranceTesla=cms.double(1.0e-6),
+        ),
+        cms.PSet(
+            name=cms.string("mirrored MBXW analytic kick core"),
+            pointCm=cms.vdouble(
+                model_origin[0],
+                model_origin[1] + 1.0,
+                model_origin[2] - 6132.2,
+            ),
+            expectedTesla=cms.vdouble(-1.2553669967398966, 0.0, 0.0),
             toleranceTesla=cms.double(1.0e-6),
         ),
         cms.PSet(

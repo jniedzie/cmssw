@@ -1,8 +1,11 @@
 """Attach the ownership-partitioned CMS IR5 LSS geometry and field together.
 
-Identity retains the delivered model frame only for software closure. This test
-does not approve the absolute model-to-CMS survey transform or source side.
+Identity retains the delivered model frame only for software closure. The
+second placement is rotated by pi around CMS y. This test does not approve the
+absolute model-to-CMS survey transform.
 """
+
+import os
 
 import FWCore.ParameterSet.Config as cms
 
@@ -27,16 +30,22 @@ process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(1))
 
 model_origin = (0.0, 0.0, 0.0)
 model_to_test = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-process = customiseShiftLssExternalGeometry(
-    process,
-    gdmlFile=(
+gdml_file = os.environ.get(
+    "SHIFT_LSS_CMS_IR5_GDML",
+    (
         "PhysicsTools/ShiftLssGeometry/data/cms_ir5_2023_z1100/"
         "lhc_ir5_2023_physical_z1100.gdml"
     ),
+)
+field_data_directory = os.environ.get("SHIFT_LSS_CMS_IR5_FIELD_DATA_DIRECTORY")
+process = customiseShiftLssExternalGeometry(
+    process,
+    gdmlFile=gdml_file,
     artifactOriginInModelCm=(-500.0, 2550.0, 9550.5),
     modelOriginCm=model_origin,
     modelToCms=model_to_test,
     minimumAbsZCm=1100.0,
+    symmetricTwoSided=True,
     overlapToleranceCm=0.0001,
     checkOverlaps=True,
 )
@@ -46,6 +55,8 @@ process = customiseShiftLssMagneticField(
         modelOriginCm=model_origin,
         modelToCms=model_to_test,
         fieldScale=1.0,
+        dataDirectory=field_data_directory,
+        symmetricTwoSided=True,
     ),
 )
 process.verifyShiftLssGeometry = cms.EDAnalyzer("ShiftLssGeometryVerifier")
@@ -61,6 +72,18 @@ process.validateShiftLssField = cms.EDAnalyzer(
         cms.PSet(
             name=cms.string("MBXW shared geometry-field model frame"),
             pointCm=cms.vdouble(1.0, 0.0, 6132.2),
+            expectedTesla=cms.vdouble(0.0, -1.2553669967398966, 0.0),
+            toleranceTesla=cms.double(1.0e-6),
+        ),
+        cms.PSet(
+            name=cms.string("MQXA mirrored geometry-field model frame"),
+            pointCm=cms.vdouble(-1.0, 0.0, -2615.0),
+            expectedTesla=cms.vdouble(0.0, 1.9741973648239945, 0.0),
+            toleranceTesla=cms.double(1.0e-6),
+        ),
+        cms.PSet(
+            name=cms.string("MBXW mirrored geometry-field model frame"),
+            pointCm=cms.vdouble(-1.0, 0.0, -6132.2),
             expectedTesla=cms.vdouble(0.0, -1.2553669967398966, 0.0),
             toleranceTesla=cms.double(1.0e-6),
         ),
