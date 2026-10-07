@@ -1,0 +1,1 @@
+/afs/cern.ch/work/j/jniedzie/private/shift_cmssw/shift_cmssw_workflow/Configuration/GenProduction/plugins/ShiftMpiEventClassHook.cc
