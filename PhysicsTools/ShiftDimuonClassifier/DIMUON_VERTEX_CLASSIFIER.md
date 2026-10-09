@@ -639,6 +639,84 @@ launch/status information is recorded separately in `pilot_submission.json`,
 markers under `validation/dimuon_score_production_20261009/`.
 Instructions are in the workflow `docs/dimuon_classifier_scores.md`.
 
+The bulk launch then encountered a concurrent EOS metadata-only storage
+migration. Fifteen materialized batches became held after original source
+Nano paths returned XRootD [3011], while source completion receipts were
+still reachable. Eleven returned file records had passed before the failure,
+including reuse of one pilot output. Together with the pilot, these represent
+13 distinct scored files. This is an input-location interruption, not a ROOT
+writer, score or memory failure; no original data was deleted by this task.
+
+The storage migration has an explicit incomplete `path_map.json` guard.
+Its audit reports no missing originals or metadata mismatches, and 52 new
+files from this score campaign. A separate exact additions manifest is being
+retained for that audit. Existing frozen jobs/configuration, successful files,
+logs and failure archives remain unchanged. No release, retry or cancellation
+was performed. The reusable preparer is being extended to freeze a completed
+map and the canonical storage helper and to use the dated process-bin output
+layout. Production recovery must wait for the completed migration audit;
+the BDT remains technically ready for scores and unready for a physics cut.
+
+The migration-aware preparer is now complete and committed as workflow
+`255d359`, following initial scoring deployment commit `e31d187`. Its 19 tests
+passed. Completed maps and the canonical storage helper are frozen by digest;
+logical source/receipt identities stay unchanged, while transport paths use
+the map. Outputs use a dated process-bin campaign with direct `nanoAOD` and
+separate metadata tiers. The worker checks the map at startup and before each
+file. An actual preparation against the workspace's incomplete guard exited
+nonzero and created no deployment, recorded in `migration_gate_check.json`.
+No recovery jobs were submitted. The portable scorer, model export and log
+rename are committed as CMSSW `59c392b255e`.
+
+The storage owner then completed the migration. Its final audit passes with
+649,598 files, 447,355,565,782 bytes and 117,097 ROOT files on both sides, with
+no missing/unexpected files, metadata mismatches, duplicated IDs or layout
+errors. The completed map's audit digest and the audit's planned-map digest
+match; all four mapping sections are identical to the audited plan.
+
+Independent reconciliation in `concurrent_additions.json` verifies all 13
+scored publications: 52 artifacts, 250 events, two pairs and 18,681,525 bytes.
+Every relocated Nano, receipt and log SHA-256 and every completion-marker byte
+matches its original marker. Sizes, Adler checksums and mtimes agree with the
+migration snapshot. The historical unexpected-52 set is explained exactly;
+the completed audit has zero unexpected files.
+
+Prepared the fresh immutable
+`validation/dimuon_score_production_20261009_v2/` deployment with 9,911 files,
+199 batches and the completed 221 MiB map. Output campaign
+`shift_detector_20261009_v10_bdt_v2` uses the canonical dated process-bin
+layout. New pilot `12879278.0` was submitted at 12:27:32 UTC. Bulk recovery
+waits for this pilot's complete output validation and measured peak memory;
+the large map makes measured memory use a required runtime check.
+
+The new pilot passed, normal exit zero at 12:38:18 UTC after 473 seconds.
+It completed exactly three publications, 60 events and one pair, with no
+pending input. Independent native XRootD readback checked all 12 published
+objects. Nano/receipt/log hashes and exact completion-marker bytes match.
+The actual score arrays are finite `double[]`/Float64, aligned with existing
+vertex counts; the J/psi pair score is `0.5272693221696033`. Original-content
+and exact re-scoring verification passed in the worker. The independent
+receipt is `pilot_readback.json` in the v2 deployment.
+
+The site's actual allocation/request was 3,000 MB despite the submit file's
+2,000 MB request. Terminal RSS/image size was 1,500,000 KB, corresponding to
+about 1,465 MB reported peak usage and 1,535 MB observed allocation margin.
+PSS was unavailable. The 2 GB value describes the submission request, not a
+measured hard limit. These runtime results allow bulk launch with the existing
+sealed plan and resource submission. `selection_applied`, `physics_ready` and
+`normalization_transfer_validated` remain false.
+
+After the independent pilot checks, submitted the complete v2 production as
+Condor `12879319` at 12:46:04 UTC: 199 logical batches covering 9,911 existing
+v10 Nano files. At 12:47:36 UTC, 12 jobs were running and five idle, with no
+holds. Materialization is capped at 20 jobs and idle jobs at five. The exact
+pilot publications are reusable by their same-plan bulk batches. Submission
+and initial queue receipts are `production_submission.json` and
+`production_queue_initial.json` in the v2 deployment. This is a running
+campaign, not evidence that all 9,911 outputs are complete. The earlier held
+campaign `12879017` and its outputs/evidence remain untouched. The source
+files and original sampling weights remain the normalization authority.
+
 Run from this directory. The environment is read-only; packages are not
 installed into or built with the shared CMSSW release. Generated tables,
 models and plots remain under ignored `artifacts/`.
