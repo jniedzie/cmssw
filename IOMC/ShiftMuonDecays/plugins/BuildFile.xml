@@ -1,0 +1,13 @@
+<library file="*.cc" name="IOMCShiftMuonDecaysPlugins">
+  <flags EDM_PLUGIN="1"/>
+  <use name="FWCore/AbstractServices"/>
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/MessageLogger"/>
+  <use name="FWCore/ParameterSet"/>
+  <use name="FWCore/ServiceRegistry"/>
+  <use name="FWCore/Utilities"/>
+  <use name="GeneratorInterface/Pythia8Interface"/>
+  <use name="SimDataFormats/GeneratorProducts"/>
+  <use name="hepmc"/>
+  <use name="pythia8"/>
+</library>
