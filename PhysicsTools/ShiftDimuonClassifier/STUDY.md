@@ -450,6 +450,47 @@ configuration are owned by `SHIFT_BSM.md` and the workflow repository.
 
 ## Reproduction
 
+### 2026-10-09: real-signal scoring canary and evidence retention
+
+The reusable classifier study was committed as `f7a521c6bd4`. A separate
+`signal_grid_audit.py` evaluates the locked SM benchmark on explicit, hashed
+signal Nano inputs without retraining or choosing a threshold on signal.
+It reads only reconstructed columns for prediction, then reads truth for
+labels and parent-ancestry auditing. Removing all truth branches physically
+preserves exact scores and decisions on both tested signal files.
+
+The completed two-event prompt 15 GeV replay contains two authentic A' dimuon
+pairs, both passing `uniform_bdt_3p0_s71` at the locked threshold
+`0.4403188643890805`. The two-event displaced replay has no retained dimuon
+pairs upstream (zero or one ShiftMuon per event); conditional classifier
+efficiency is undefined. These tiny files validate scoring and denominator
+bookkeeping only. Neither sample demonstrates mass/lifetime closure.
+
+Receipts are in `artifacts/signal_canary_v1/`, with the frozen source inventory
+in `artifacts/signal_canary_v1_inputs.json`. The complete suite has 66 passing
+tests. Nano-event fractions include zero-pair events; full-GEN and recording
+efficiencies remain undefined without a reconciled production ledger.
+
+Keep source, tests, runners and this log in Git. Keep frozen tables, split
+identities, model/threshold locks, predictions, source inventories and final
+audits outside Git as reproducibility evidence. Preserve existing failed-run
+logs until their replacement and failure explanation are recorded. Only
+truth-stripped fixture ROOT files, caches and superseded scratch plots may be
+removed after successful grid validation and after confirming they are not
+needed by a reproduction command. No study or campaign evidence was deleted.
+
+The first proposed signal grid uses 15, 30 and 50 GeV, each with prompt,
+approximately 5 m and approximately 30 m **mean lab flight**. Its physical
+epsilon values and proper decay lengths are derived consistently from the
+native width authority. The signal model and grid execution plan are owned by
+the workspace `SHIFT_BSM.md` and the workflow generation instructions.
+
+```bash
+python3 signal_grid_audit.py --manifest artifacts/signal_canary_v1_inputs.json \
+  --results artifacts/phase2_seed71_72 --model uniform_bdt_3p0_s71 \
+  --output artifacts/signal_canary_reproduction
+```
+
 Run from this directory. The environment is read-only; packages are not
 installed into or built with the shared CMSSW release. Generated tables,
 models and plots remain under ignored `artifacts/`.
