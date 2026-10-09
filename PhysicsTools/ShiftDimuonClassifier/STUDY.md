@@ -446,7 +446,8 @@ configuration are owned by `SHIFT_BSM.md` and the workflow repository.
    BSM or transferring N_eff.
 5. Integrate canonical blinding and data-path gates before any collision-data
    run. No final physics threshold is frozen; all model deployment flags stay
-   false. The user authorized preparation with SM simulation only.
+   false. Model fitting uses SM simulation; signal MC supplies held-out
+   transfer checks, without retuning the model or threshold.
 
 ## Reproduction
 
@@ -490,6 +491,77 @@ python3 signal_grid_audit.py --manifest artifacts/signal_canary_v1_inputs.json \
   --results artifacts/phase2_seed71_72 --model uniform_bdt_3p0_s71 \
   --output artifacts/signal_canary_reproduction
 ```
+
+### 2026-10-09: nine-point GEN qualification and second signal canary
+
+The first 3 by 3 grid is frozen in the workspace
+`validation/bsm_grid_20261009/grid_pilot/plan.json`. Columns refer to prompt,
+approximately 5 m and approximately 30 m **mean lab flight**, not proper decay
+lengths. This assumption was stated while the optional parameterization
+question remained unanswered. A strict Cartesian epsilon grid is also
+supported by the preparer's `--epsilons` option.
+
+| Mass (GeV) | Prompt epsilon | 5 m epsilon | 30 m epsilon | Proper mean length for 5 m / 30 m (mm) |
+| --- | --- | --- | --- | --- |
+| 15 | 1e-3 | 1.0955803944e-7 | 4.4726882308e-8 | 62.178 / 373.071 |
+| 30 | 1e-3 | 6.9521347018e-8 | 2.8381971071e-8 | 73.529 / 441.174 |
+| 50 | 1e-3 | 4.7888347820e-8 | 1.9550336131e-8 | 78.087 / 468.521 |
+
+Measured unfiltered reference boosts are 80.4137 +/- 3.4871, 68.0003 +/- 3.2296
+and 64.0313 +/- 2.2056 (standard errors). Native physical widths, independently
+checked partial widths, physical branching fractions and resolvable proposal
+support passed for all nine points. The physical exponential is retained;
+the approximate mean flights inherit the finite reference uncertainty.
+
+All nine 100-event GEN pilots passed in the verified native CMSSW context:
+900 distinct persisted event identities, unit weights and matching complete
+contracts; 5,402 technical Pythia trials, 900 selected and 900 accepted events.
+The qualification took 153.9 seconds and the whole preparation/evidence
+directory uses about 30 MB. No outside-cylinder decay was observed in these
+900 draws; the full unfiltered denominator and escaped-outcome retention
+policy are unchanged. Historical long-lived references retain such outcomes.
+The native attempt followed an independently preserved sandbox startup crash
+before any events. Neither attempt rebuilt the release or altered live jobs.
+
+The authoritative receipt is `grid_pilot/gen_qualification.json`, with all
+per-point payload/audit hashes, source equality and timing. Native seeds/run
+numbers are 24694357 through 24694365. `grid/` is the initial preflight and
+`grid_ready/` preserves the failed sandbox qualification; keep these receipts.
+The added finite-sample exponential mean gate also passed on all 900 stored
+proper lengths in `grid_pilot/independent_lifetime_check.json`, preserving the
+original validation reports. This GEN-only qualification launched no detector
+jobs; it is separate from the workspace's bounded detector production plan.
+
+The additional `artifacts/signal_canary_v2/` audit checked six existing, fully
+audited Nano events. Four 15 GeV, epsilon=1e-8 events have no ShiftMuon rows or
+pairs, so conditional classifier efficiency is undefined. Two 50 GeV,
+epsilon=3e-8 events contain one authentic direct A' pair. It passes with score
+0.51874605 at the fixed 0.44031886 threshold (1/1 pairs, Wilson 95% interval
+20.7-100%; 1/2 recorded events). Exact scores and decisions survive physical
+truth removal for both files. These counts validate machinery only.
+
+Durable code is committed on the required branches: CMSSW classifier
+`f7a521c6bd4` and signal audit `31e6942eeb0`, signal adapter `5dc3b2cbc50`,
+natural-hadron decayer `82134fbfe32`; workflow tools `2c8bec1` and finite-sample
+GEN gate `5655e88`; TEA histogram worker `2eacfaa`. Focused validation passed:
+66 classifier, 63 dark-photon/model/grid/GEN-gate, 13 proposal-ledger, 13 common
+worker and seven histogram-worker tests (162 total). No push was performed.
+Actively changing plotting, merging and retirement work is preserved for its
+own review. Production cards, ROOT files, plots, models and runtime records
+remain outside Git.
+
+AFS briefly filled and blocked a commit. Removed only 317 untracked,
+regenerable bytecode cache files (3,460,053 bytes); the receipt is retained in
+`validation/bsm_grid_20261009/bytecode_cleanup.json`. An attempted test-fixture
+archive stopped on an unexpected nested directory before any deletion; all
+original fixtures and other study evidence remain. One-time reference and
+qualification probes are retained as hashed evidence copies under validation;
+their scratch copies are retired only after byte-identical verification.
+
+Mass/lifetime transfer, full detector/recording efficiency and a common N_eff
+remain unvalidated. The next step is to score grid Nano outputs with this same
+locked benchmark, including zero-pair events and reconciled full-GEN exposure,
+then assess supported conditional acceptance at each mass/lifetime separately.
 
 Run from this directory. The environment is read-only; packages are not
 installed into or built with the shared CMSSW release. Generated tables,
