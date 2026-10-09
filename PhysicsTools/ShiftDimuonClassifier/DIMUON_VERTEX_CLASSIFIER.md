@@ -176,6 +176,17 @@ without a duplicate. Watcher state/log/submission receipts are under
 individual-file cluster `12879319` stays held; it must not be released for
 this merged-group test. No jobs were cancelled and no data/logs were deleted.
 
+The watcher started on `lxplus988` at 14:48:46 UTC on 2026-10-09, PID
+`1037514`. Its first verified state is `waiting_for_old_jobs`, with nine
+running, one idle and four held jobs in cluster `12879497`. It will wait up
+to eight hours, then stop if the old jobs have not drained. The latest
+validated publication snapshot is 240/503 groups at 14:41:35 UTC; this is a
+checkpoint count, not a final completion count. `continuation/launch.json`
+records the controller hash and PID; inspect `state.json` and any submission
+receipt before restarting it. The watcher does not run the final histogram
+merge or performance analysis. The detailed evaluation handoff is
+`validation/dimuon_merged_score_test_20261009/PERFORMANCE_HANDOFF.md`.
+
 On restart:
 
 1. Read this checkpoint and workflow `docs/dimuon_classifier_scores.md`.
