@@ -91,8 +91,29 @@ def restore_missing_streamers(source, scored):
                 elif streamer_schema(info.tojson()) != streamer_schema(replacement.tojson()):
                     raise ValueError('Scoring changed an original ROOT streamer schema: ' + name)
         if missing:
-            with uproot.update(scored) as writable:
-                writable.file._cascading.streamers.update_streamers(writable.file.sink, missing)
+            # Some valid hadd files have no standalone root-directory TKey at
+            # fBEGIN. Metadata repair does not need that directory: bootstrap
+            # only the file header, free-space records and streamer list.
+            from uproot.sink.file import FileSink
+            from uproot.writing._cascade import (FileHeader, Key, FreeSegmentsData,
+                                                FreeSegments, TListOfStreamers)
+            with FileSink(str(scored)) as sink:
+                raw = sink.read(0, uproot.reading._file_header_fields_big.size,
+                                insist=uproot.reading._file_header_fields_small.size)
+                header = FileHeader.deserialize(raw, 0)
+                raw = sink.read(header.free_location, header.free_num_bytes)
+                free_key = Key.deserialize(raw, header.free_location, sink.in_path)
+                free_data = FreeSegmentsData.deserialize(raw[free_key.num_bytes:],
+                    header.free_location + free_key.num_bytes,
+                    header.free_num_bytes - free_key.num_bytes, header.free_num_slices, sink.in_path)
+                free = FreeSegments(free_key, free_data, header)
+                raw = sink.read(header.info_location, header.info_num_bytes)
+                key = Key.deserialize(raw, header.info_location, sink.in_path)
+                streamers, _ = TListOfStreamers.deserialize(raw[key.num_bytes:],
+                    header.info_location + key.num_bytes, key, free, sink.file_path, header.uuid)
+                streamers.update_streamers(sink, missing)
+                sink.set_file_length(header.end)
+                sink.flush()
     return [dict(name=info.name, class_version=info.class_version) for info in missing]
 
 

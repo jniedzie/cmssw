@@ -164,6 +164,39 @@ class OriginalStreamerRestorationTest(unittest.TestCase):
             self.assertEqual(array_digest(root["Events"][DEFAULT_BRANCH].array(library="ak")), score_digest)
         self.assertTrue(self.verify_scored_file()["all_scores_recomputed_equal"])
 
+    def test_missing_descriptor_restores_without_root_directory_key_bootstrap(self):
+        # Real hadd inputs can have an obsolete/unreadable TKey at fBEGIN,
+        # while ROOT's directory header and every actual object remain valid.
+        # The high-level update writer wrongly bootstraps that obsolete key.
+        rewrite_streamer_list(self.scored, remove={self.missing})
+        original_content = content(self.scored)
+        for path in (self.source, self.scored):
+            with open_root(path) as root:
+                begin = root.file.fBEGIN
+            with path.open("r+b") as stream:
+                stream.seek(begin + 4)
+                stream.write(b"\x00\x00")  # Unsupported TKey version, not event data.
+        self.assertEqual(content(self.scored), original_content)
+        with self.assertRaises(ValueError):
+            with uproot.update(self.scored):
+                pass
+        source_hash = file_digest(self.source)
+        with self.scored.open("rb") as stream:
+            stream.seek(100)
+            directory_prefix = stream.read(64)
+
+        restored = restore_missing_streamers(self.source, self.scored)
+        self.assertEqual(restored, [{"name": self.missing[0], "class_version": self.missing[1]}])
+        self.assertEqual(file_digest(self.source), source_hash)
+        self.assertEqual(content(self.scored), original_content)
+        with self.scored.open("rb") as stream:
+            stream.seek(100)
+            self.assertEqual(stream.read(64), directory_prefix)
+        verification = self.verify_scored_file()
+        self.assertTrue(verification["streamer_schemas_equal"])
+        self.assertTrue(verification["all_original_content_equal"])
+        self.assertTrue(verification["all_scores_recomputed_equal"])
+
 
 if __name__ == "__main__":
     unittest.main()

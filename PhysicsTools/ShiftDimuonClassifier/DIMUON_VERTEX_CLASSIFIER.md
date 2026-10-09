@@ -10,7 +10,9 @@ The first seven-model pilot and fresh 26-fit SM comparison are complete.
 The uniformity BDT is the strongest current candidate for further study, but
 no model passes the required independence gates. Quantitative results follow.
 It is ready to store provisional scores without a cut in existing simulation
-Nano files. The final selection and common N_eff are not validated.
+Nano files. A mass/lifetime-independent final classifier selection is not
+validated. N_eff is the effective MC normalization fitted to collision data;
+it is separate from the classifier efficiency/AUC reported in this study.
 
 Select two distinct genuine muons from a common physical vertex. Preserve genuine
 DY and genuine QCD vertices alongside J/psi. Reject accidental different-vertex
@@ -80,6 +82,139 @@ track PCA/reference coordinates, not measurements of a production vertex.
 The current common-line pair vertex is not a fully prior-free fit.
 
 ## Activity log
+
+### 2026-10-09: merged-group first test and performance terminology
+
+The user clarified that N_eff is the effective MC normalization fitted to
+data. Classifier AUC and fixed-cut acceptance are separate quantities. The
+new evaluation code and plots use those names. AUC constancy alone does not
+establish uniform efficiency at a fixed cut, so both quantities are reported.
+Historical frozen metadata flags are retained for provenance, not interpreted
+as measurements of MC-to-data normalization.
+
+The first test now uses the existing small merged groups, not whole-bin event
+trees. Frozen source inventory is
+`validation/dimuon_merged_score_test_20261009/source_inventory.json`: 501 SM
+group files, 9,911 original Nano jobs, 187,214 events, 12,019,841,124 bytes and
+all 19 SM bins. Each group contains up to 20 original files; every group keeps
+its own scored output and histogram output. The inventory pins EOS identity,
+Adler checksum, size and original receipt event counts. Two validated prompt
+signal files add 40 events and 11 candidate pairs. Seven signal grid points
+have no completed input yet and are explicitly unmeasured. Full V10 remains
+incomplete by 149 detector jobs; original full GEN exposure remains the
+normalization authority.
+
+Added standalone BDT histogram and plotting tools without modifying the
+live/shared TEA histogram configuration or C++ implementation. They retain
+all candidates, require a Double score even for zero-pair files, and use
+sampling weights once. Genuine/accidental/unknown score spectra and score
+versus reconstructed mass/z/r are booked for all seven existing topologies.
+SM bins are combined with sigma/full-parent-GEN-sumw before process shape
+normalization. Each signal point stays separate and carries no rate claim.
+Fifteen histogram/plot tests and real J/psi, DY and QCD pilots passed, along
+with actual TEA PDF/PNG rendering.
+
+New performance evaluation validates the frozen model and saved training
+partitions, excludes fitted/validation events, reports empirical and
+physics-mixture weighted ROC separately, and resamples whole events. It uses
+proper c-tau from signal contracts, not reconstructed radius or estimated
+laboratory mean flight. Unknown labels are excluded with counts retained;
+empty/unsupported cells are not assigned a fake efficiency. Eleven tests and
+real ROOT canaries passed. The first four-group canary has only three QCD
+negatives, so its AUC estimates are machinery checks, not precision results.
+Its 15 GeV prompt signal retains four of five genuine pairs at the locked cut.
+
+The merged scorer exposed ROOT omission of an unused original STL descriptor
+(`vector<edm::ProcessHistory>`, version 6). Restoring the original descriptor
+kept all 32 source schemas, all 1,898 event branches, original key payloads
+and exact recomputed scores. A second source layout has no writer-readable
+directory TKey at fBEGIN, already present in the input before scoring.
+Metadata-only repair now bootstraps the file header/free-space/streamer records
+without parsing that obsolete directory key. Both actual failed-file probes
+and six synthetic streamer tests plus four original scorer tests passed.
+Existing schema changes still fail before publication; no guard was weakened.
+
+The combined worker uses the frozen standard TEA runtime/application plus
+the new score histograms. It verifies the legacy ordered Float32 cutflow sum
+separately from exact Double BDT weight sums. Twenty-six worker tests passed,
+including actual ROOT weight branches and native C++ arithmetic. The local
+four-group canary completed 1,209 events and 58 pairs, with every published
+object read back before its completion marker.
+
+Initial grouped production was submitted as `12879497` from frozen
+`deployment_v2`, 101 batches of five groups, capped at 20 materialized jobs.
+After the user's small-group clarification, the earlier individual-file
+campaign `12879319` was reversibly held: all 20 materialized jobs stopped;
+completed outputs and logs remain. The small-group campaign never merges
+whole-bin ntuples; only final histogram outputs will be merged by bin.
+
+The two unsupported-directory cases failed in batches 2 and 3 before
+publication. Good completed groups remain intact. `deployment_v3` freezes the
+qualified metadata-only repair and proves identical 503 input/output rows,
+101 batches, model, predictors, labels, weights, standard app and histogram
+definitions before accepting old completed publications. Only writer/resume
+code can differ. A bounded recovery canary is processing the five groups in
+the first failed batch; no live/frozen configuration was edited.
+
+### 2026-10-09: wrap-up and continuation checkpoint
+
+The five-group recovery canary completed all files 10--14: 2,000 events,
+65 pairs and no pending input. Standard histogram counts and legacy Float32
+cutflow arithmetic, Double BDT histograms, original source contents and all
+serialized schemas passed. `deployment_v3/recovery_canary_batch_status.json`
+is the immutable gate for continuation. The repaired scorer uses only ROOT
+header/free-space/streamer records; it never edits an event value or changes
+the model, threshold or histogram selections.
+
+Leave the valid grouped production running while it drains. The bounded
+continuation watcher waits for cluster `12879497` to have no active/idle/
+transferring/suspended jobs, then holds only that obsolete cluster and submits
+the qualified v3 recovery once. It preserves all completed publications and
+logs. Query failures are unknown, and ambiguous submission results stop
+without a duplicate. Watcher state/log/submission receipts are under
+`validation/dimuon_merged_score_test_20261009/continuation/`. The older
+individual-file cluster `12879319` stays held; it must not be released for
+this merged-group test. No jobs were cancelled and no data/logs were deleted.
+
+On restart:
+
+1. Read this checkpoint and workflow `docs/dimuon_classifier_scores.md`.
+   Inspect continuation state/submission receipts before any submit/release.
+   Reconcile queue/history, all 101 v3 returned statuses and exact EOS markers.
+   Old publication hashes are accepted only through the frozen compatibility
+   proof; every recovery batch status must have v3 plan SHA
+   `9fb387d477c10f5c3ba99205a866cd4fcb475b65deca0d741f33c86e22fad6b5`.
+2. If every one of the 503 groups is verified, run
+   `merge_merged_dimuon_bdt_histograms.py` with that plan and a new work
+   directory. It validates all source histograms and merges only histograms
+   into 19 SM-bin and two signal-point outputs. Preserve missing/corrupt
+   inputs as explicit failures; never silently skip a group.
+3. Prepare process shape inputs using `prepare_shift_bdt_plots.py` and the
+   merger's `bin_histogram_inputs.json`. Its sigma/full-parent-GEN exposure
+   mixture preserves the original normalization ledger. Use
+   `SHIFT_BDT_PLOT_INPUTS` with the dedicated `shift_bdt_plotter_config.py`.
+   Tell the user the exact ready manifest and plot command only after merging
+   and checks pass. Standard plus BDT histograms are present in the merged
+   outputs; original small scored ntuples remain split by group.
+4. Refresh `performance_inputs.json` using the preserved manifest-preparation
+   tool and v3/compatible-old markers. Run `bdt_performance.py` with the frozen
+   portable model and phase2 seed-71/72 training artifacts. Produce empirical
+   and MC-mixture weighted ROC, fixed-cut efficiency and AUC maps versus
+   proper c-tau/mass, reconstructed displacement maps and counts/intervals.
+   Keep train/validation events excluded; weights and truth enter evaluation
+   only. Empty/pending/unsupported cells remain unmeasured, with no claim of
+   uniformity from a tiny or weight-dominated sample.
+5. Re-query the remaining seven signal detector points. Add only completed,
+   checksum-validated points via a new frozen inventory. Then increase signal
+   statistics enough to compare common-threshold acceptance and AUC across
+   mass/lifetime. Keep this classifier work separate from N_eff fitted to
+   collision data; no collision-data access or N_eff fit is part of this test.
+
+No final readiness announcement has been made: group production/recovery,
+21 histogram merges and the full ROC/maps remain to be completed. Code is
+committed on the required branches; runtime datasets, models, frozen plans,
+ROOT files, receipts and logs remain outside Git. Shared CMSSW and live
+campaign configurations were not rebuilt or changed.
 
 ### 2026-10-09: initial inspection and preparation
 
@@ -577,7 +712,8 @@ The locked benchmark is technically ready to add a score column. It retains
 These are conditional pair efficiencies after the existing reconstruction and
 pair selection. Genuine radius-bin efficiency still spans 81.7-94.6%, z-bin
 efficiency 83.5-93.3%, with inadequate joint/per-process support. A final cut
-or mass/lifetime-independent normalization is therefore not ready.
+with validated mass/lifetime-independent classifier performance is therefore
+not ready. These metrics do not measure the MC-to-data normalization N_eff.
 
 The v10 workers publish only Nano, their completed receipt and evidence.
 No retained SM v10 AOD archive was found; four local BSM AOD pilots exist.
