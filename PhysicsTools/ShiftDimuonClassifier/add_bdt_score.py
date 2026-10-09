@@ -73,6 +73,29 @@ def streamer_schema(value):
     return value
 
 
+def restore_missing_streamers(source, scored):
+    """Retain original type descriptors omitted by ROOT's emulated dictionaries.
+
+    ROOT UPDATE may omit an unused old STL class version in a hadd-produced
+    Nano file. Append its original serialized descriptor with Uproot's pinned
+    streamers writer. Existing schemas must match; no changed schema is repaired
+    or ignored, and the full content/score verification still runs afterward.
+    """
+    missing = []
+    with open_root(source) as original, open_root(scored) as output:
+        for name, versions in original.file.streamers.items():
+            for version, info in versions.items():
+                replacement = output.file.streamers.get(name, {}).get(version)
+                if replacement is None:
+                    missing.append(info)
+                elif streamer_schema(info.tojson()) != streamer_schema(replacement.tojson()):
+                    raise ValueError('Scoring changed an original ROOT streamer schema: ' + name)
+        if missing:
+            with uproot.update(scored) as writable:
+                writable.file._cascading.streamers.update_streamers(writable.file.sink, missing)
+    return [dict(name=info.name, class_version=info.class_version) for info in missing]
+
+
 def verify_original_content(source, output, branch, metadata_key, model, chunk_events):
     """Check the complete original schema/content, then recompute every score."""
     with open_root(source) as original, open_root(output) as scored:
@@ -203,6 +226,7 @@ def add_score(source, output, model_path, *, sample_kind, branch=DEFAULT_BRANCH,
         ROOT.TObjString(json.dumps(metadata, sort_keys=True, allow_nan=False)).Write(metadata_key)
         root.Close()
         root = None
+        report['restored_original_streamers'] = restore_missing_streamers(source, partial)
         report['verification'] = verify_original_content(source, partial, branch, metadata_key, model, chunk_events)
         if file_digest(source) != source_sha256 or file_digest(model_path) != model_sha256:
             raise ValueError('Input or frozen model changed during scoring')
