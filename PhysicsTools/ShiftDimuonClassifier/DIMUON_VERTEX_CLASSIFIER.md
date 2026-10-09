@@ -1,4 +1,4 @@
-# SHIFT common-vertex classifier study
+# SHIFT dimuon vertex classifier
 
 Started 2026-10-09. Owner: this task log for standalone classifier experiments.
 The canonical analysis contract remains in `../../../../SHIFT_ANALYSIS.md`;
@@ -9,6 +9,8 @@ reconstruction findings remain in `SHIFT_RECONSTRUCTION.md`.
 The first seven-model pilot and fresh 26-fit SM comparison are complete.
 The uniformity BDT is the strongest current candidate for further study, but
 no model passes the required independence gates. Quantitative results follow.
+It is ready to store provisional scores without a cut in existing simulation
+Nano files. The final selection and common N_eff are not validated.
 
 Select two distinct genuine muons from a common physical vertex. Preserve genuine
 DY and genuine QCD vertices alongside J/psi. Reject accidental different-vertex
@@ -562,6 +564,80 @@ Mass/lifetime transfer, full detector/recording efficiency and a common N_eff
 remain unvalidated. The next step is to score grid Nano outputs with this same
 locked benchmark, including zero-pair events and reconciled full-GEN exposure,
 then assess supported conditional acceptance at each mass/lifetime separately.
+
+### 2026-10-09: descriptive log name and scored-Nano preparation
+
+Renamed this task log from the generic `STUDY.md` to
+`DIMUON_VERTEX_CLASSIFIER.md` at the user's request. Updated active analysis
+and BSM references; historical frozen receipts are unchanged.
+
+The locked benchmark is technically ready to add a score column. It retains
+357/396 genuine held-out SM pairs (90.2%), 113/122 genuine DY (92.6%) and
+244/274 genuine J/psi (89.1%), and rejects 56/82 accidental QCD pairs (68.3%).
+These are conditional pair efficiencies after the existing reconstruction and
+pair selection. Genuine radius-bin efficiency still spans 81.7-94.6%, z-bin
+efficiency 83.5-93.3%, with inadequate joint/per-process support. A final cut
+or mass/lifetime-independent normalization is therefore not ready.
+
+The v10 workers publish only Nano, their completed receipt and evidence.
+No retained SM v10 AOD archive was found; four local BSM AOD pilots exist.
+The existing Nano already supplies every predictor, so direct augmentation
+preserves the exact sample and its sampling weights. Re-running plain Step 4
+would also require recovering the sampling metadata by event identity.
+An active grid worker uses the shared CMSSW release; no rebuild is performed.
+
+Added an explicit JSON export of the 160-tree uniform BDT. `export_bdt.py`
+and `portable_inference.py` preserve the frozen medians, Float32 tree-input
+rounding, Float64 thresholds, ordered coefficients and sigmoid exactly.
+All 3,494 comparison scores and historical threshold decisions agree bitwise
+with the trusted pickle (maximum difference zero). Production imports neither
+sklearn nor SciPy and does not load pickle models. Save scores as Float64:
+casting to Float32 changes one decision at an observed threshold tie.
+The model and parity receipt are under `artifacts/portable_bdt_v1/`.
+
+`add_bdt_score.py` appends `ShiftDimuonVertex_bdtScore` as a Double array in a
+distinct copy, with one value per original pair. No threshold, filter, pairing
+or ordering change is applied. All original event values/types and non-Events
+payloads are checked, along with ROOT type/checksum/streamer schemas (excluding
+only runtime TObject `fBits`). Native ROOT fixtures exercise zero/multiple
+pairs, large event IDs, nonfinite mass targets, weight preservation, failure
+without filtered publication and no overwrite. Prediction no longer requires
+the unused mass target; invalid geometry features receive frozen imputation.
+
+The complete classifier suite passed 82 tests. Five actual-file pilots
+preserved 82 events and ten pairs across v10 J/psi, DY, QCD, a QCD file with
+zero pairs and an existing 50 GeV signal. Every original branch value/type,
+key payload and all 32 original streamer schemas per file are preserved.
+Receipts are in `artifacts/scored_nano_pilot_v2/`, with a separate dictionary
+check. The earlier prototype is retained in `scored_nano_pilot_v1/`.
+
+The workflow preparer passed 15 tests and froze
+`validation/dimuon_score_production_20261009/plan.json`: 9,911 existing files
+across all 19 SM bins, 199 batches of up to 50 files, plus a three-file pilot.
+The 149 missing files relative to the 10,060 expected inventory are explicit.
+The deployment pins the model, source, original inventory and LCG_108 runtime.
+Its worker uses XRootD staging, verifies the original published source checksum,
+and publishes new Nano, score receipt and scorer log, with readbacks before a
+completion marker. Complete exact-plan outputs can be resumed; orphans and
+unknown state stop without overwrite. Failed-file evidence is retained.
+
+The three-file production pilot, Condor `12878715.0`, passed: exit code zero,
+normal termination, 175 seconds on the worker, 60 events and one retained pair.
+The returned status has no pending files. All three published Nano, receipt
+and scorer-log checksums were independently verified; their source weights,
+original content and exact recomputed scores agree. Two zero-pair files are
+retained. Sandbox Condor DNS resolution failed; the verified native context
+successfully submitted and queried the jobs.
+
+After that check, started the complete 199-batch score production as Condor
+`12879017`, with at most 20 materialized jobs. Initial status was five idle
+jobs, no holds. The new EOS tree is the existing v10 campaign name with
+`_bdt_v1` appended; no source ntuple is modified. Exact pilot publications
+are reused by the same-plan campaign. The frozen plan remains immutable;
+launch/status information is recorded separately in `pilot_submission.json`,
+`production_submission.json`, returned batch statuses and EOS completion
+markers under `validation/dimuon_score_production_20261009/`.
+Instructions are in the workflow `docs/dimuon_classifier_scores.md`.
 
 Run from this directory. The environment is read-only; packages are not
 installed into or built with the shared CMSSW release. Generated tables,

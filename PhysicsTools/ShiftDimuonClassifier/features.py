@@ -23,6 +23,7 @@ RECO_BRANCHES = tuple(dict.fromkeys(
     + tuple("ShiftDimuonVertex_" + k for k in
             ("muonIdx1", "muonIdx2", "mass") + PAIR_QUALITY + PAIR_GEOMETRY)
 ))
+PREDICTOR_BRANCHES = tuple(k for k in RECO_BRANCHES if k != "ShiftDimuonVertex_mass")
 
 
 def signed_log(values):
@@ -34,14 +35,17 @@ def required_reco_branches():
     return RECO_BRANCHES
 
 
-def extract_reco(arrays):
+def extract_reco(arrays, *, include_nuisance=True):
     """Only access the allowlisted branches, including when extra branches exist.
 
     Each output row corresponds to an already retained ShiftDimuonVertex.
     Nonfinite feature values are preserved for training-only fitted imputation.
     Invalid pair references fail closed; no truth participates in row selection.
     """
-    missing = set(RECO_BRANCHES) - set(arrays)
+    required = RECO_BRANCHES if include_nuisance else PREDICTOR_BRANCHES
+    pair_fields = (("muonIdx1", "muonIdx2", "mass") if include_nuisance
+                   else ("muonIdx1", "muonIdx2")) + PAIR_QUALITY + PAIR_GEOMETRY
+    missing = set(required) - set(arrays)
     if missing:
         raise ValueError("Missing reconstructed branches: " + ", ".join(sorted(missing)))
     rows, ids, event_indices, pair_indices, muon_indices, nuisances = [], [], [], [], [], []
@@ -51,7 +55,7 @@ def extract_reco(arrays):
         for k in MUON_QUALITY + MUON_KINEMATICS:
             if len(arrays["ShiftMuon_" + k][event_index]) != n_mu:
                 raise ValueError("Muon collection lengths differ")
-        for k in ("muonIdx1", "muonIdx2", "mass") + PAIR_QUALITY + PAIR_GEOMETRY:
+        for k in pair_fields:
             if len(arrays["ShiftDimuonVertex_" + k][event_index]) != n_pair:
                 raise ValueError("Pair collection lengths differ")
         for pair_index in range(n_pair):
@@ -63,8 +67,8 @@ def extract_reco(arrays):
             def mu(i, k):
                 return float(arrays["ShiftMuon_" + k][event_index][i])
             ordered = sorted((first, second), key=lambda i: (-mu(i, "pt"), i))
-            vecs = [np.array([mu(i, "pt") * math.cos(mu(i, "phi")),
-                              mu(i, "pt") * math.sin(mu(i, "phi")), mu(i, "pz")])
+            vecs = [np.array([mu(i, "pt") * (math.cos(mu(i, "phi")) if math.isfinite(mu(i, "phi")) else np.nan),
+                              mu(i, "pt") * (math.sin(mu(i, "phi")) if math.isfinite(mu(i, "phi")) else np.nan), mu(i, "pz")])
                     for i in ordered]
             denominator = np.linalg.norm(vecs[0]) * np.linalg.norm(vecs[1])
             angle = (math.acos(float(np.clip(np.dot(*vecs) / denominator, -1, 1)))
@@ -84,18 +88,19 @@ def extract_reco(arrays):
             event_indices.append(event_index)
             pair_indices.append(pair_index)
             muon_indices.append((first, second))
-            nuisances.append((pair("mass"), pair("vz"), math.hypot(pair("vx"), pair("vy"))))
+            if include_nuisance:
+                nuisances.append((pair("mass"), pair("vz"), math.hypot(pair("vx"), pair("vy"))))
     result = dict(
         X=np.asarray(rows, dtype=float).reshape(-1, len(FEATURE_NAMES)),
         ids=np.asarray(ids, dtype=np.uint64).reshape(-1, 3),
         event_index=np.asarray(event_indices, dtype=int), pair_index=np.asarray(pair_indices, dtype=int),
         muon_indices=np.asarray(muon_indices, dtype=int).reshape(-1, 2),
-        nuisance=np.asarray(nuisances, dtype=float).reshape(-1, 3),
+        nuisance=(np.asarray(nuisances, dtype=float).reshape(-1, 3) if include_nuisance else None),
         feature_names=np.asarray(FEATURE_NAMES),
     )
-    if result["nuisance"].size and not np.isfinite(result["nuisance"]).all():
+    if include_nuisance and result["nuisance"].size and not np.isfinite(result["nuisance"]).all():
         raise ValueError("Nonfinite reconstructed mass or vertex nuisance")
-    if result["nuisance"].size and (result["nuisance"][:, 0] < 0).any():
+    if include_nuisance and result["nuisance"].size and (result["nuisance"][:, 0] < 0).any():
         raise ValueError("Negative reconstructed mass nuisance")
     return result
 
