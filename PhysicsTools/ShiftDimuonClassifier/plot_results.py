@@ -206,8 +206,7 @@ def plot_overview(reco, y, split, metrics, scores, destination):
                 "Reconstructed coordinates are displacement proxies.",
                 ha="center", fontsize=8)
     figure.tight_layout(rect=(0, 0.075, 1, 0.94))
-    for extension in ("pdf", "png"):
-        figure.savefig(destination / ("overview." + extension), dpi=180)
+    figure.savefig(destination / "overview.pdf", dpi=180)
     plt.close(figure)
 
 
@@ -287,7 +286,7 @@ def main():
     plot_joint(reco, y, split, metrics, scores, destination)
     print(json.dumps({"sample_kind": "simulation_only", "held_out_labelled_pairs": int(((split == 2) & (y >= 0)).sum()),
                       "models": list(scores), "figures": [str(destination / filename)
-                         for filename in ("overview.pdf", "overview.png", "joint_efficiency.pdf")],
+                         for filename in ("overview.pdf", "joint_efficiency.pdf")],
                       "lifetime_independence_validated": False}), flush=True)
 
 

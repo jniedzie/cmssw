@@ -70,8 +70,7 @@ def plot_profiles(report, metrics, model, output):
     fig.text(.5,.02,"Grey bins: fewer than 20 genuine test pairs, unvalidated. 95% Wilson intervals approximate pair independence.\n"
              "Only reliably labelled SM pairs; no lifetime or normalization closure.",ha="center",fontsize=8)
     fig.tight_layout(rect=(0,.065,1,.93))
-    for ext in ("pdf","png"):
-        fig.savefig(output/("acceptance_profiles."+ext),dpi=160)
+    fig.savefig(output/"acceptance_profiles.pdf",dpi=160)
     plt.close(fig)
 
 

@@ -57,6 +57,36 @@ def _uniformity_log_update(local_efficiency, global_efficiency, strength, rate):
     return np.clip((global_efficiency - local_efficiency) * strength * rate, -1.0, 1.0)
 
 
+def _adaptive_uniformity_log_update(local_efficiency, global_efficiency,
+                                   post_classification_weights, strength,
+                                   beta_cap=6.0, error_floor=1.e-6):
+    """Stabilized single-point variant inspired by uBoost equations 2.3--2.4.
+
+    Weights are normalized over *all* training rows after classification updates;
+    only valid positives are passed here. Background and missing-nuisance rows
+    contribute zero to the error. Unlike the constant update, beta already is
+    the update coefficient: no additional classification learning rate applies.
+    Clipping beta nonnegative prevents reversing the desired update direction.
+    This is not the publication's multi-operating-point uBoost ensemble.
+    """
+    local=np.asarray(local_efficiency,dtype=float)
+    weights=np.asarray(post_classification_weights,dtype=float)
+    if local.ndim!=1 or weights.shape!=local.shape or not np.isfinite(local).all():
+        raise ValueError('Adaptive local efficiencies and weights must be aligned finite vectors')
+    if (not np.isfinite(weights).all() or (weights<0).any() or weights.sum()>1+1.e-10
+            or (local<0).any() or (local>1).any()
+            or not math.isfinite(global_efficiency) or not 0<=global_efficiency<=1):
+        raise ValueError('Adaptive probabilities and normalized weights are invalid')
+    if (not math.isfinite(strength) or strength<0 or not math.isfinite(beta_cap) or beta_cap<=0
+            or not math.isfinite(error_floor) or not 0<error_floor<.5):
+        raise ValueError('Adaptive strength/stabilization controls are invalid')
+    error=float(weights@np.abs(global_efficiency-local))
+    bounded=float(np.clip(error,error_floor,1-error_floor))
+    beta=float(np.clip(np.log((1-bounded)/bounded),0,beta_cap))
+    correction=np.clip(strength*beta*(global_efficiency-local),-1.,1.)
+    return correction,error,beta
+
+
 class UniformityBDT:
     """Pickle-compatible tree ensemble whose inference needs reconstructed X only.
 
@@ -95,7 +125,9 @@ class UniformityBDT:
 
 
 def train_uniform_bdt(X_train, y_train, w_train, Z_train, *, seed=42,
-                      strength=1.0, n_estimators=160, target_efficiency=0.9):
+                      strength=1.0, n_estimators=160, target_efficiency=0.9,
+                      max_depth=2, min_samples_leaf=None, uniformity_mode="constant",
+                      adaptive_beta_cap=6.0, adaptive_error_floor=1.e-6):
     """Return ``(model, history)`` using training rows only.
 
     ``Z_train`` has three columns: reconstructed log1p mass, signed-log1p
@@ -103,7 +135,9 @@ def train_uniform_bdt(X_train, y_train, w_train, Z_train, *, seed=42,
     Input labels must be 0/1; exclude unknown labels before calling. All
     genuine vertices, including QCD examples, must be labelled positive.
 
-    Each depth-two tree minimizes its weighted classification criterion.
+    Each tree (depth two by default) minimizes its weighted classification criterion.
+    Explicit depth/leaf controls support bounded capacity studies; omitted controls
+    reproduce the historical training settings.
     Its AdaBoost coefficient is 0.25 * 0.5 * log((1-error)/error); weights
     get the standard exp(-coefficient * signed_label * signed_prediction)
     update. A positive-only neighborhood correction then multiplies weights
@@ -123,8 +157,18 @@ def train_uniform_bdt(X_train, y_train, w_train, Z_train, *, seed=42,
     """
     if not math.isfinite(strength) or strength < 0:
         raise ValueError("strength must be finite and nonnegative")
+    if uniformity_mode not in ("constant","adaptive"):
+        raise ValueError("uniformity_mode must be constant or adaptive")
+    if (not math.isfinite(adaptive_beta_cap) or adaptive_beta_cap<=0
+            or not math.isfinite(adaptive_error_floor) or not 0<adaptive_error_floor<.5):
+        raise ValueError("Invalid adaptive stabilization controls")
     if not isinstance(n_estimators, (int, np.integer)) or n_estimators < 1:
         raise ValueError("n_estimators must be a positive integer")
+    if not isinstance(max_depth, (int, np.integer)) or max_depth < 1:
+        raise ValueError("max_depth must be a positive integer")
+    if min_samples_leaf is not None and (
+            not isinstance(min_samples_leaf, (int, np.integer)) or min_samples_leaf < 1):
+        raise ValueError("min_samples_leaf must be a positive integer or None")
     if not math.isfinite(target_efficiency) or not 0 < target_efficiency < 1:
         raise ValueError("target_efficiency must lie strictly between zero and one")
     raw = _matrix(X_train, "X_train")
@@ -190,10 +234,11 @@ def train_uniform_bdt(X_train, y_train, w_train, Z_train, *, seed=42,
     rng = np.random.default_rng(seed)
     signed_label = 2.0 * y - 1.0
     stopping_reason = "requested number of estimators reached"
-    min_leaf = max(2, min(12, int(np.count_nonzero(w > 0)) // 30))
+    min_leaf = (max(2, min(12, int(np.count_nonzero(w > 0)) // 30))
+                if min_samples_leaf is None else int(min_samples_leaf))
     for iteration in range(n_estimators):
         current_weights = np.exp(log_weights)
-        tree = DecisionTreeClassifier(max_depth=2, min_samples_leaf=min_leaf,
+        tree = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_leaf,
                                       random_state=int(rng.integers(0, 2**31 - 1)))
         tree.fit(X, y, sample_weight=current_weights)
         predicted = tree.predict(X)
@@ -222,7 +267,13 @@ def train_uniform_bdt(X_train, y_train, w_train, Z_train, *, seed=42,
             local = _local_efficiencies(passed[valid], neighbors, base_weights[valid])
             # The global target includes missing-nuisance positives. Such rows
             # themselves get no correction; coverage is explicit in history.
-            correction = _uniformity_log_update(local, achieved, strength, rate)
+            if uniformity_mode=="adaptive":
+                post_weights=np.exp(log_weights-logsumexp(log_weights))
+                correction,adaptive_error,beta=_adaptive_uniformity_log_update(
+                    local,achieved,post_weights[valid],strength,adaptive_beta_cap,adaptive_error_floor)
+                record.update(adaptive_post_classification_error=adaptive_error,adaptive_beta=beta)
+            else:
+                correction = _uniformity_log_update(local, achieved, strength, rate)
             log_weights[valid_rows] += correction
             record.update(neighborhood_efficiency_rms=float(np.sqrt(np.average(
                               (local - achieved) ** 2, weights=base_weights[valid]))),
@@ -247,8 +298,12 @@ def train_uniform_bdt(X_train, y_train, w_train, Z_train, *, seed=42,
     history = dict(algorithm="single-working-point neighborhood-uniformity AdaBoost variant",
                    source="https://arxiv.org/abs/1305.7248", seed=int(seed), strength=float(strength),
                    target_efficiency=float(target_efficiency), requested_estimators=int(n_estimators),
-                   fitted_estimators=len(trees), learning_rate=rate, max_depth=2,
+                   fitted_estimators=len(trees), learning_rate=rate, max_depth=int(max_depth),
                    min_samples_leaf=min_leaf, class_totals="0.5 each, renormalized after each update",
+                   uniformity_mode=uniformity_mode,adaptive_beta_cap=float(adaptive_beta_cap),
+                   adaptive_error_floor=float(adaptive_error_floor),
+                   adaptive_error_weights="All-row normalized weights after classification update; sum deviations over valid positives only",
+                   adaptive_formula="clip(strength * clip(log((1-e)/e),0,beta_cap) * (global-local),-1,1); no extra rate factor",
                    local_efficiency_weights="fixed original within-class input weights",
                    uniformity_log_update_clip=[-1.0, 1.0], neighborhoods=metadata,
                    training_cut_space="raw sum of weighted signed tree predictions",

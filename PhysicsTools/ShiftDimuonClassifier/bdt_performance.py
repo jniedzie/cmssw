@@ -501,55 +501,74 @@ def make_plots(report, output):
     import matplotlib.pyplot as plt
     def save(fig, name):
         fig.savefig(output / (name + ".pdf"), bbox_inches="tight")
-        fig.savefig(output / (name + ".png"), dpi=160, bbox_inches="tight")
         plt.close(fig)
-    fig, axis = plt.subplots(figsize=(7, 6))
-    for name, title in (("heldout_genuine_vs_qcd_accidental", "All SM genuine"),
-                        ("jpsi_genuine_vs_qcd_accidental", "J/psi genuine"),
-                        ("dy_genuine_vs_qcd_accidental", "DY genuine")):
-        roc = report["roc"][name]
-        if roc["auc"] is not None:
-            lo, hi = roc["auc_ci95_event_bootstrap"]
-            interval = f", 95% [{lo:.3f}, {hi:.3f}]" if lo is not None else ""
-            axis.plot(roc["fpr"], roc["tpr"], label=f"{title}: AUC {roc['auc']:.3f}{interval}")
-    axis.plot([0, 1], [0, 1], "k:", linewidth=1)
-    axis.set(xlabel="QCD accidental-pair acceptance", ylabel="Genuine-pair acceptance", xlim=(0, 1), ylim=(0, 1),
-             title="Empirical unweighted held-out BDT ROC; DY is a genuine-pair control")
-    if axis.get_legend_handles_labels()[0]:
-        axis.legend(loc="lower right", fontsize=8)
-    axis.grid(alpha=.2)
-    save(fig, "heldout_roc")
-    fig, axis = plt.subplots(figsize=(7, 6))
-    for point, entry in report["signal_points"].items():
-        roc = entry["roc_vs_heldout_qcd_accidental"]
-        if roc["auc"] is not None:
-            axis.plot(roc["fpr"], roc["tpr"], label=f"{point}: AUC {roc['auc']:.3f}, n={roc['positive_pairs']}")
-    axis.plot([0, 1], [0, 1], "k:", linewidth=1)
-    axis.set(xlabel="Same held-out QCD accidental-pair acceptance", ylabel="Genuine signal-pair acceptance", xlim=(0, 1), ylim=(0, 1),
-             title="Empirical unweighted signal BDT ROC; missing points remain unmeasured")
-    if axis.get_legend_handles_labels()[0]:
-        axis.legend(loc="lower right", fontsize=8)
-    save(fig, "signal_roc")
-    for signal_plot in (False, True):
-        fig, axis = plt.subplots(figsize=(7, 6))
-        curves = ({point: entry["roc_vs_heldout_qcd_accidental"] for point, entry in report["signal_points"].items()}
-                  if signal_plot else {name: report["roc"][name] for name in
-                                      ("heldout_genuine_vs_qcd_accidental", "jpsi_genuine_vs_qcd_accidental", "dy_genuine_vs_qcd_accidental")})
-        for name, comparison in curves.items():
-            roc = comparison["physics_mixture_weighted"]
-            if roc["auc"] is not None:
+    def support_note(roc):
+        if roc.get("supported") is True:
+            return ""
+        pair_min = report.get("support_minimum_pairs_per_class")
+        event_min = report.get("support_minimum_independent_events_per_class")
+        limits = []
+        for prefix, label in (("positive", "genuine"), ("negative", "QCD")):
+            pairs, events = roc.get(prefix + "_pairs"), roc.get(prefix + "_events")
+            if pair_min is not None and pairs is not None and pairs < pair_min:
+                limits.append(f"{label} pairs {pairs} < {pair_min}")
+            if event_min is not None and events is not None and events < event_min:
+                limits.append(f"{label} events {events} < {event_min}")
+            effective = roc.get(prefix + "_weight_effective_events")
+            if event_min is not None and effective is not None and effective < event_min:
+                limits.append(f"{label} effective events {effective:.2f} < {event_min}")
+        return "; ".join(limits) or "insufficient statistical support"
+
+    sm_titles = (("heldout_genuine_vs_qcd_accidental", "All SM genuine"),
+                 ("jpsi_genuine_vs_qcd_accidental", "J/psi genuine"),
+                 ("dy_genuine_vs_qcd_accidental", "DY genuine"))
+    for weighted in (False, True):
+        for signal_plot in (False, True):
+            fig, axis = plt.subplots(figsize=(7, 6))
+            curves = []
+            if signal_plot:
+                for point, entry in report["signal_points"].items():
+                    metadata = entry["metadata"]
+                    title = f"m = {metadata['mass_gev']:g} GeV, proper cτ = {metadata['proper_ctau_mm']:.3g} mm"
+                    curves.append((title, entry["roc_vs_heldout_qcd_accidental"]))
+            else:
+                curves = [(title, report["roc"][name]) for name, title in sm_titles]
+            unsupported, unavailable = False, []
+            for title, comparison in curves:
+                roc = comparison["physics_mixture_weighted"] if weighted else comparison
+                if roc["auc"] is None:
+                    unavailable.append(title)
+                    continue
+                note = support_note(roc)
+                unsupported = unsupported or bool(note)
                 lo, hi = roc["auc_ci95_event_bootstrap"]
                 interval = f", 95% [{lo:.3f}, {hi:.3f}]" if lo is not None else ""
-                axis.plot(roc["fpr"], roc["tpr"], label=f"{name}: AUC {roc['auc']:.3f}{interval}")
-        axis.plot([0, 1], [0, 1], "k:", linewidth=1)
-        axis.set(xlabel="Weighted QCD accidental-pair acceptance", ylabel="Weighted genuine-pair acceptance", xlim=(0, 1), ylim=(0, 1),
-                 title="Physics-mixture weighted " + ("signal" if signal_plot else "held-out SM") + " BDT ROC")
-        if axis.get_legend_handles_labels()[0]:
-            axis.legend(loc="lower right", fontsize=7)
-        else:
-            axis.text(.5, .2, "Weighted probability ROC unavailable\nSee weights and class-support audit", ha="center")
-        axis.grid(alpha=.2)
-        save(fig, ("signal_roc" if signal_plot else "heldout_roc") + "_physics_mixture_weighted")
+                label = f"{title}\nAUC {roc['auc']:.3f}{interval}"
+                if note:
+                    # Keep counts in the legend; styling alone must not suggest
+                    # that an unsupported AUC is an established measurement.
+                    import textwrap
+                    label += "\n" + textwrap.fill(note, width=65)
+                axis.plot(roc["fpr"], roc["tpr"], linestyle="--" if note else "-", label=label)
+            axis.plot([0, 1], [0, 1], "k:", linewidth=1)
+            prefix = "Physics-mixture weighted" if weighted else "Empirical unweighted"
+            title = prefix + (" signal" if signal_plot else " held-out SM") + " BDT ROC"
+            if unsupported:
+                title += "\nDashed curves: insufficient statistical support"
+            axis.set(xlabel=("Weighted " if weighted else "") + "QCD accidental-pair acceptance",
+                     ylabel=("Weighted " if weighted else "") + "Genuine-pair acceptance",
+                     xlim=(0, 1), ylim=(0, 1), title=title)
+            if axis.get_legend_handles_labels()[0]:
+                axis.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize=8,
+                            borderaxespad=0, frameon=False, labelspacing=1.)
+            else:
+                axis.text(.5, .2, "Probability ROC unavailable\nSee weights and class-support audit", ha="center")
+            if unavailable:
+                axis.text(0, -.18, "Unmeasured: " + "; ".join(unavailable),
+                          transform=axis.transAxes, fontsize=8, wrap=True)
+            axis.grid(alpha=.2)
+            name = "signal_roc" if signal_plot else "heldout_roc"
+            save(fig, name + ("_physics_mixture_weighted" if weighted else ""))
     for metric, title, weighted in (("efficiency", "Fixed-cut genuine signal-pair efficiency", False),
                                     ("auc", "Signal vs QCD accidental-pair AUC", False),
                                     ("efficiency", "Weighted fixed-cut genuine signal-pair efficiency", True),

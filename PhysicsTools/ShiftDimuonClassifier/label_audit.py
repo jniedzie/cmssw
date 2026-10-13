@@ -285,7 +285,6 @@ def make_figure(report, output):
     fig.suptitle(f'Label completeness: {report["overall"]["unknown"]}/{report["overall"]["n"]} unknown reconstructed pairs\n'
                  "Simulation only; reconstruction-quality bins use all retained pairs; intervals are pair-level approximations", fontsize=13)
     fig.savefig(output / "label_audit.pdf")
-    fig.savefig(output / "label_audit.png", dpi=160)
     plt.close(fig)
 
 

@@ -7,16 +7,27 @@ reconstruction findings remain in `SHIFT_RECONSTRUCTION.md`.
 ## Aim and current status
 
 The first seven-model pilot and fresh 26-fit SM comparison are complete.
-The uniformity BDT is the strongest current candidate for further study, but
-no model passes the required independence gates. Quantitative results follow.
-It is ready to store provisional scores without a cut in existing simulation
-Nano files. A mass/lifetime-independent final classifier selection is not
+The original uniformity BDT remains the frozen ntuple benchmark. A subsequent
+25-fit capacity/uniformity/data-size study improves rejection substantially,
+but no candidate passes all acceptance gates. Quantitative results follow.
+Provisional scores, histograms and held-out evaluation are complete for 510
+simulation Nano files spanning all 19 SM bins and nine signal points (October
+12 first look below). No score cut was applied. A mass/lifetime-independent final classifier selection is not
 validated. N_eff is the effective MC normalization fitted to collision data;
 it is separate from the classifier efficiency/AUC reported in this study.
 
+The October 13 follow-up completes 70 neural fits, a BDT overtraining audit
+and category-resolved diagnostics. A penalized DNN improves genuine Near-Both
+retention at approximately the same rejection as the flatter BDT. It does not
+improve pooled rejection substantially, and category/seed dependence remains.
+All new results and PDF figures are inside
+`tea_shift_cmssw/plots/DNN_vertex_20261013/`. The original deployed BDT remains
+unchanged. See the new activity entry and the study README for exact results.
+
 Select two distinct genuine muons from a common physical vertex. Preserve genuine
 DY and genuine QCD vertices alongside J/psi. Reject accidental different-vertex
-pairs and duplicated muon legs. This is an exploratory SM-only study; no final
+pairs and duplicated muon legs. Training uses SM samples; the first evaluation
+also includes the small signal grid. No final
 selection, normalization, collision-data access or physics readiness is claimed.
 
 Only reconstructed collision-data quantities may be classifier inputs or
@@ -82,6 +93,413 @@ track PCA/reference coordinates, not measurements of a production vertex.
 The current common-line pair vertex is not a fully prior-free fit.
 
 ## Activity log
+
+### 2026-10-13: overtraining audit, vertex categories and penalized DNNs
+
+The strong BDT's repeated energy boundary is already present in early trees.
+At 50 trees the training/validation AUC is 0.8925/0.8853; at 400 it is
+0.9083/0.8894, while the development-test AUC improves from 0.8979 to 0.9029.
+This is a modest generalization gap, not evidence of a numerical bug or
+runaway overtraining. The validation-selected 150-tree prefix gains only
+1.32 percentage points in fake rejection over 400 trees, with paired 95%
+interval [-0.33, 2.98]. It retains the energy-related acceptance bias.
+Trimming late trees does not resolve the physics problem. The two genuine
+score peaks also persist within Both-Both; category mixing alone cannot
+explain them. Audit receipts and four PDFs are in `bdt_overtraining/`, and
+the category-resolved BDT PDFs are in `bdt_categories/` under the new study.
+
+The neural study preserves the existing labels, raw 50-input inference
+contract and physical-event split; geometry variants transform or subset
+these inputs internally. Its four validation-only rounds contain 22 initial,
+20 stronger-penalty, 16 relative-geometry and 12 scheduled-penalty fits.
+Signals are excluded from fitting, checkpoint choice and model selection.
+The representative DNN has two hidden layers (64 and 32 nodes), a fixed
+signed-log transform, imputation/scaling fitted on training only, dropout
+and weight decay. Its loss
+penalizes joint reconstructed mass/z/r dependence within labels, additional
+genuine dependence within each supported SM process, and genuine score
+dependence on vertex category. Process/category information is used for
+training and validation/checkpointing, never passed to inference, which
+receives reconstructed inputs only. These targets do not directly
+measure lifetime or establish signal independence.
+
+Balanced training draws use replacement and correct inverse-probability
+weights. Best checkpoints are restored exactly. Introducing penalties over
+20 optimization epochs improves some seed pairs, while checkpoint choice
+uses the full intended validation loss from the first epoch. Stronger losses
+can still collapse classification, so neither training software correctness
+nor a low dependence statistic establishes useful separation. Relative
+direction/DCA/fit-residual features did not recover the lost rejection in
+these trials. They are straight-line proxies, not calibrated uncertainties.
+
+The authoritative global lock is `comparison/selection_locked.json`, sealed
+before any neural development-test score generation. It selects three roles
+over all 70 validation fits and then evaluates those models and their paired
+seeds only. The original expanded SM test was inspected during prior BDT
+work; these are development results, not a new independent background test.
+All cuts retain exactly 2,516/2,795 validation genuine pairs and are frozen.
+
+| Expanded SM development test | Genuine retained | Fake rejected | Near-Both genuine retained | Lowest DY mass bin retained |
+| --- | ---: | ---: | ---: | ---: |
+| Current uniform BDT | 90.73% | 49.10% | 66.03% | 72.79% |
+| Strong BDT | 90.61% | 70.80% | 64.38% | 47.79% |
+| Flatter BDT | 91.52% | 40.62% | 78.36% | 85.29% |
+| Rejection-selected DNN | 90.35% | 72.10% | 64.93% | 54.41% |
+| Flatness-objective DNN | 90.88% | 45.19% | 84.38% | 84.56% |
+| Full-envelope validation-selected DNN | 90.95% | 40.95% | 88.77% | 86.76% |
+
+Names of the three selected neural models are respectively
+`dnn_signedlog_class_l0_s71`, `dnn_r2_l3_c1_e0_h64_s72` and
+`dnn_r4_l3_c3_e0_h64_s71`. The last model improves Near-Both by 38/365 pairs
+relative to the flatter BDT: +10.41 percentage points, paired event-bootstrap
+95% interval [6.03, 14.79]. Its pooled fake-rejection difference is only
++0.33 points, interval [-4.08, 4.57]. There is no demonstrated pooled-power
+gain. Both-Both genuine retention is 90.97%, Both-Far 96.62%, Near-Far
+94.12% (34 genuine pairs), and Other 81.13% (53 genuine pairs).
+
+The last model reduces the worst supported one-dimensional acceptance span
+to 6.59 points and maximum class-conditional joint distance correlation to
+0.104. However, its test category span is 15.49 points, just beyond the
+predeclared 15-point validation limit. Its paired seed gives 48.45% rejection
+but retains only 73.58% of Other genuine pairs. A supported J/psi joint
+mass/z/r cell retains 20/28 pairs (71.43%, Wilson interval 52.94--84.75%);
+not every cell is supported. Therefore the
+model is promising for category preservation, not certified acceptance-safe.
+No test or signal result triggers further model selection in this study.
+
+QCD contributes 89 fake and 14 unknown test pairs, with zero genuine pairs.
+At the frozen diagnostic cuts the rejection-selected DNN rejects 91.01% of
+QCD fakes; the full-envelope candidate rejects 44.94%. No genuine-QCD
+efficiency, ROC, signal/background rate or normalization closure is claimed.
+The empirical fractions above are unweighted; exposure-weighted comparisons
+and finite-support flags are shown separately in the PDF diagnostics.
+
+The new signal-transfer cache contains six complete production points,
+1,200 unique GEN parents, 960 zero-pair parents, and 240 reconstructed pairs:
+173 genuine signal-associated, 11 accidental and 56 unknown. It has no event
+overlap with the original cache. The six-point inference is performed only
+after the global lock, with all validation cuts unchanged. The unfinished
+nine-point production cannot establish full mass/lifetime uniformity.
+At unchanged cuts the full-envelope DNN keeps 160/173 genuine signal pairs,
+compared with 147/173 for the flatter BDT and 173/173 for the strong BDT.
+For the 50 GeV prompt point it keeps 26/29 versus the flatter BDT's 17/29.
+Observed point retention spans 87.88--96.97%, compared with 58.62--100% for
+the flatter BDT. Each point has only 24--33 genuine pairs; uncertainties
+are wide. This is encouraging relative to the flatter BDT, not a general
+advantage over the strong BDT. Signal results, full denominators, source
+hashes and plots are linked by the study README. Pair retention is conditional
+on existing reconstruction; it is not efficiency from the full GEN denominator.
+
+All 132 standalone classifier tests and 18 targeted TEA tests pass, including
+checkpoint restoration,
+geometry contracts, scheduled-loss parity, provenance mutation guards and
+existing ROOT augmentation tests. No shared CMSSW rebuild, deployed model
+replacement, new ntuple selection or electronics change was made.
+
+### 2026-10-12: stronger discrimination and the acceptance tradeoff
+
+The user requested harder work after the broad process-score overlay. The
+follow-up separates genuine, accidental and unknown truth classes explicitly,
+then freezes each candidate protocol before fitting. It completes 25 new fits:
+eight capacity/ordinary-boosting candidates, eight constant/adaptive uniformity
+variants, five quality-only/quality-plus-angle capacity controls, and four
+fixed recipes trained with the expanded available SM cache. Original training
+and validation partitions alone select the first three phases. Previously
+inspected test populations are consumed development evidence throughout.
+
+The first portable winner, `uniform_d3_s0_n400`, rejects 71.24% of validation
+accidentals versus 52.29% for the benchmark, both retaining exactly 379/420
+genuine pairs (90.24%). Its AUC is 0.903 versus 0.798. On the larger original
+held-out development population, the corresponding rejection is 65.76% versus
+49.31%, with genuine retention 88.90% versus 89.01%. These cuts are the
+validation empirical 90% cuts, distinct from the immutable published benchmark
+cut 0.4403188643890805. Quality-only capacity controls do not improve the
+acceptance-aware selection objective.
+
+Adaptive local-efficiency reweighting tests a stabilized single-operating-point
+variant inspired by [uBoost equations 2.3--2.4](https://arxiv.org/pdf/1305.7248).
+It is not the paper's full ensemble. The better-flatness adaptive candidate
+reduces the validation worst supported marginal acceptance span from 26.1 to
+13.3 percentage points, while accidental rejection falls from 52.3% to 38.6%.
+The historical constant-update defaults and scores are bitwise unchanged.
+
+Expanded training uses exactly 20,173 SM retained pairs from the frozen cache;
+39 signal pairs are excluded from fitting and selection. Deterministic
+physical-event split seed 71 preserves every original pair's partition and
+integer identity. Training has 9,826 known labels (8,046 genuine, 1,780
+accidental), validation 3,400 (2,795/605), and development test 3,255
+(2,642/613). Unknown labels number 2,245/714/733 in those partitions and are
+excluded from supervised fitting. The expanded test excludes all newly used
+training/validation events; 13,395 rows previously called held out are now
+explicitly excluded. Signals remain inference/transfer checks only.
+
+| Expanded development test | Genuine retained | Accidental rejected | AUC |
+| --- | ---: | ---: | ---: |
+| Frozen benchmark, expanded-validation diagnostic cut | 90.73% | 49.10% | 0.8294 |
+| New `expanded_d3_s0_n400` | 90.61% | 70.80% | 0.9029 |
+| New `expanded_d3_s3_n400` | 91.52% | 40.62% | 0.7548 |
+
+All three diagnostic cuts retain exactly 2,516/2,795 validation genuine pairs
+(90.018%). Thresholds are respectively 0.43534065598545313,
+0.3529367670215394 and 0.2941898337347876, with inclusive comparison. None
+changes the benchmark ntuple score or published threshold. The previous
+first-phase winner remains the overall expanded-validation rejection winner
+(66.28% versus 65.95% for the best newly trained recipe). The figures compare
+the benchmark and the two newly fitted validation-selected candidates.
+
+The stronger rejection is not acceptance-safe. Its pooled z-third retention
+is 74.15/98.00/98.27%, versus benchmark 83.33/95.99/92.03%. Its lowest DY mass
+third retains only about half of genuine pairs. The flatter candidate gives
+pooled mass 92.17/92.05/90.38%, z 89.98/92.30/92.15% and radius
+92.55/92.04/89.94%, but rejects fewer accidentals. Process dependence and
+unsupported weighted populations remain; no new model passes the full
+benchmark acceptance envelope. This is useful separation improvement with a
+measured tradeoff, not a final physics selection.
+
+The existing sigmoid score uses normalized tree votes and is uncalibrated;
+its mathematical range is approximately 0.1192--0.8808. All 1,010,600 cached
+predictor values are finite, so missing-value imputation is inactive. Score
+stretching or endpoint peaks are not used as improvement criteria. The
+feature audit finds lost-hit counts constant and valid-hit/muon-hit counts
+identical. Independent min/max ordering loses association between per-leg
+pt errors and momenta; exact relative per-leg errors require the original
+associated Nano fields. Tested symmetric relative uncertainty/quality scales
+do not individually outperform the existing fit-quality observables and are
+not calibrated significances. No feature, label or reconstruction convention
+was changed in this round.
+
+At the already locked expanded-validation cuts, the original nine-point
+signal cache retains 26/26 signal-associated genuine pairs for both the
+benchmark and stronger rejection candidate, and 24/26 for the flatter
+candidate. The latter loses one pair each at 15 GeV prompt and 30 GeV prompt.
+Each point has only 1--5 genuine signal pairs, so this does not establish
+mass/lifetime efficiency. The 39-pair population also contains one genuine
+non-signal pair, 11 unknowns and one accidental; all remain explicit rather
+than changing the signal denominator. The separate PDF/receipt is under
+`signal_transfer/` and the project's `signal_transfer_genuine_retention.pdf`.
+
+Read-only scheduler/publication checks verify all 60 completed QCD V11 pilot
+jobs, 1,200 events, Nano hashes, identities and native/sampling weights.
+Before BDT label/score inspection, 1,085 parents were reserved after excluding
+115 overlaps with the old cache. They contain only nine retained pairs and
+had prior non-BDT physics inspection. Four models and expanded-validation
+cuts are locked before unblinding; this is a small independent-parent BDT
+pipeline check, not a complete or pristine SM performance test. It contains
+zero genuine, seven accidental and two unknown pairs. Accidental passage is
+4/7 for the current model, 2/7 for the first stronger winner, 3/7 for the new
+rejection candidate and 5/7 for the new flatter candidate. Genuine efficiency
+and AUC are unavailable. The test preserves all 1,076 zero-pair parents and
+has only about six effective accidental observations. Its exact receipt is
+under `data_readiness/` in the study directory; no fitting follows unblinding.
+
+The active larger signal stage is replacement DAG 12903259, with retained
+workers from intentionally held original manager 12902110. Its current
+ownership/collection authority is
+[`validation/bsm_repartition_20261012/HANDOFF.md`](../../../../validation/bsm_repartition_20261012/HANDOFF.md).
+Do not release the original manager or combine duplicate parents. This study
+does not alter either campaign or the held QCD production supervisors.
+The 14:09 snapshot has 1,770/1,800 successful detector events and five completed
+points; three failed Nano-processing chunks require qualified recovery before
+full collection. The mechanism finding and next diagnostic step are recorded
+only in [SHIFT_RECONSTRUCTION.md](../../../../SHIFT_RECONSTRUCTION.md).
+
+Protocols, source snapshots, selection locks, native/portable models, scores
+and reports are in workspace
+`validation/bdt_discrimination_improvement_20261012/`. Four expanded exports
+reproduce native scores and threshold decisions bitwise on all 20,212 cached
+pairs. The 103 classifier tests, 52 analysis tests and eight reserved-test
+contracts pass; ten existing mixing tests are skipped in this environment.
+Their logs are in the same directory. Reviewed PDF-only plots
+are directly available through
+[`tea_shift_cmssw/plots/BDT_improvement_20261012/README.md`](../../../../tea_shift_cmssw/plots/BDT_improvement_20261012/README.md).
+
+Next: preserve these two ends of the rejection/acceptance tradeoff, investigate
+reconstructed quality information with correct leg associations and
+covariances, and obtain sufficient independent labelled SM support before
+calling any replacement validated. Collect the new signal stage only through
+its current handoff's publication/identity gates; do not tune on it or count
+unknown labels as fake.
+
+### 2026-10-12: fixed-model acceptance study and independent signal expansion
+
+The one-hour follow-up study compares the saved quality-only BDT with the
+uniformity-strength-3 benchmark on exactly the same physical events. The
+selective scan reproduces every first-look identity, label, stored score,
+mass/position nuisance and evaluation weight: 510 files, 187,394 events and
+20,212 retained candidates. Audit-only truth positions and association details
+are stored separately from the reconstructed predictors. The quality-only
+bundle reproduces all 3,494 original saved predictions exactly. Neither model
+is fitted or retuned; their original validation thresholds remain 0.3562883480311365
+and 0.4403188643890805 respectively.
+
+The held-out SM comparison contains 11,832 genuine, 2,383 accidental and 3,168
+unknown pairs. It excludes all original training/validation identities and uses
+200 physical-event bootstrap replicates, including paired model differences.
+This is the previously inspected diagnostic population, not a fresh final test.
+
+| Held-out empirical result | Uniformity BDT | Quality-only BDT |
+| --- | ---: | ---: |
+| Genuine retention | 88.83% | 86.65% |
+| All-accidental rejection | 49.85% | 53.04% |
+| Genuine SM radius thirds | 93.11%, 91.32%, 81.62% | 97.44%, 91.49%, 70.05% |
+| Genuine DY mass thirds | 67.96%, 86.94%, 96.10% | 67.79%, 84.65%, 94.32% |
+
+Uniformity gains 2.18 percentage points of genuine retention (paired 95%
+interval 1.51--2.93), while retaining 3.19 points more accidentals
+(0.88--5.75). The simpler model does not solve mass dependence and has stronger
+radius dependence. Keep the uniformity model as the diagnostic benchmark;
+neither cut passes the physics acceptance gates. With the declared MC mixture,
+genuine DY retention is 63.56% for uniformity and 65.57% for quality-only,
+demonstrating that the selected unweighted mixture is insufficient for a
+physics-efficiency claim. Weighted accidentals have only 12.84 effective
+independent events and fail the minimum-support requirement.
+
+The dominant genuine QCD pair is traced to two distinct hit-associated muons
+from an omega decay, with identical production positions. Original Nano,
+generator ancestry, source descriptor, sampling ledger and normalization
+records agree. Its weight arithmetic and 96.50% contribution to full-sample
+genuine-SM weight are correct; it belongs to the original validation split
+and is absent from held-out performance. The source still has provisional
+physics/normalization gates: checking arithmetic does not close them. A
+common-origin pair label does not certify the fitted mass or vertex position;
+the new fit-precision finding is recorded only in
+[SHIFT_RECONSTRUCTION.md](../../../../SHIFT_RECONSTRUCTION.md).
+
+The full retained population has 3,703 unknown labels (18.32%): 17.95% DY,
+18.46% J/psi, 18.71% QCD and 28.21% signal. Unknowns become more frequent at
+larger radius and with poorer detector coverage. Most unavailable legs fail
+the producer's hit-purity gate; relaxing downstream conventions cannot restore
+discarded identities. Tighter purity 0.90 removes 9,378 labels, while tested
+common-position tolerances change no known class. Angular matching remains a
+diagnostic and does not replace hit-based labels. A separate identification
+limits report reuses the exhaustively tested unknown-assignment calculation;
+its bounds are conditional on correct known labels, not physics uncertainties
+or efficiency corrections.
+For the held-out SM population, uniformity's count-only genuine-retention
+extrema are 84.07--90.78% and accidental-rejection extrema 24.33--60.85%.
+These marginal endpoints need not share one unknown-label assignment and
+must not be used as a paired model comparison. `paired_support.json` separately
+flags all 180 empirical/weighted model differences, preserving the original
+report; weighted interval availability is distinct from sufficient support.
+
+Evidence is in workspace `validation/bdt_acceptance_study_20261012/`:
+`comparison/results/comparison.json`, acceptance CSVs, paired differences,
+joint/topology maps and before/after shapes; the inspected variants are in
+`comparison/plots_reviewed/`. `comparison/validation.json` checks population,
+partition, weight/flow and source-snapshot closure. `label_audit/` contains the
+QCD source trace, match-completeness and convention audits, and full/held-out
+fit-residual diagnostics. All original first-look outputs are preserved.
+
+Signal DAG `12902110` was submitted at 10:18:33 UTC after nine new GEN audits,
+resolved-config/two-event detector checks, empty/nonempty score/histogram probes
+and seven publication/union contract tests. It contains 1,800 fresh GEN parents
+across nine points, 90 twenty-event detector chunks and nine automatic complete-
+point merging/scoring/histogram finalizers. Runs 25101201--25101209 are disjoint
+from the original grid. All events and native weights remain; no BDT cut is
+applied. Signals are validation-only, with roughly 10--50 genuine pairs per
+point forecast from the small pilot, not the eventual 400-pair precision target.
+At 10:20 UTC all 20 initial detector workers were running without holds or
+failures. See `production/HANDOFF.md` and `submission_receipt.json` for current
+scheduler reconciliation and post-completion collection. The existing QCD v11
+pilot and bulk hold remain unchanged; overlapping V10/V11 parents prevent naive
+combination or an independence claim. No shared release was rebuilt.
+
+Fourteen focused comparison/statistics tests, seven label tests, seven
+production contract tests, five identification-bound tests (including 1,555
+exhaustive patterns) and nine post-completion reconciliation tests pass.
+Independent production review verifies all 204 sealed files, 21 runtime
+fingerprints, exact chunk unions and current shared/private dependencies.
+Worker checks do not enforce every shared Python/private geometry digest;
+current agreement is verified separately and the standing no-edit rule remains
+essential. Before collecting new inputs, use the archived reconciliation tool
+in `label_audit/postcompletion_tools/reconcile_signal.py`: it checks current
+dependencies, all EOS publications and point receipts, then permits the sealed
+collector with `--collect`. Its validation receipt gives the exact command.
+The current preflight stops as incomplete without writing manifests. No live
+or sealed file was modified to add this gate.
+
+Next: inspect this independently generated signal stage, reconcile exact
+publication receipts/hashes before collecting its evaluator inputs, and reserve
+fresh SM final-test parents before any optimization of joint mass/position
+acceptance. Preserve unknown regions and keep the score diagnostic throughout.
+
+### 2026-10-12: completed score recovery and full signal-grid extension
+
+The October 12 review found the original grouped production finished, but the
+expired continuation had never submitted its repaired deployment. EOS marker
+and receipt checks verified 494/503 publications. The old cluster's event log
+records 97 successful batches and four failures, followed by removal of its
+remaining jobs and factory on October 10.
+
+After immutable-plan/dependency checks and scheduler reconciliation, recovery
+`12901333` ran all 101 sealed v3 batches. All exited zero, independently
+confirmed in Condor history. They verified/reused 494 outputs and completed
+the nine missing groups (17--19, 128--129, 196--199). All 503 publications
+preserve 187,254 events and 20,184 candidate pairs. The locked model, labels,
+original branches, pair ordering, weights and no-cut policy are unchanged.
+
+All nine physical signal points now have completed detector inputs. A separate
+seven-point extension adds 140 events and 28 retained candidates, with 18
+common-vertex genuine labels and 10 unknown labels. The upstream direct-parent
+diagnostic identifies 17 authentic pairs in these seven files; that narrower
+definition is kept distinct. Frozen scoring and histogram tools preserve all
+original branches and streamer schemas, reproduce every score exactly, and
+apply native `genWeight` once. Evidence and immutable manifests are under
+`validation/bdt_signal_extension_20261012/`. One sandbox histogram attempt
+timed out; its evidence is retained and the unchanged native rerun passed.
+
+The combined first-look manifest covers 510 files, 187,394 events and 20,212
+retained candidates across all 19 SM bins and all nine signal points. The SM
+population remains the original 9,911-job snapshot, excluding 149 jobs from
+the detector target; it is not a completed production-yield measurement.
+The evaluator excludes final-model training/validation identities, uses the
+unchanged threshold, and reports empirical and correctly weighted companions.
+Results and figures are under `validation/bdt_first_look_20261012/`.
+
+The full evaluation completed with 200 event-group bootstrap replicas.
+It excludes 2,790 training/validation pairs; the remaining SM population
+contains 11,832 genuine and 2,383 accidental pairs, including 107 accidental
+QCD pairs. Empirical genuine-versus-all-accidental AUC is 0.803116
+(95% interval 0.791711--0.812122); versus accidental QCD it is 0.876269
+(0.842897--0.903102). At the frozen score threshold 0.4403188643890805:
+
+| Held-out category | Passing / total | Retention |
+| --- | ---: | ---: |
+| Genuine J/psi | 6,813 / 7,745 | 87.97% |
+| Genuine DY | 3,697 / 4,087 | 90.46% |
+| All genuine SM | 10,510 / 11,832 | 88.83% |
+| Accidental QCD | 37 / 107 | 34.58% |
+| All accidental SM | 1,195 / 2,383 | 50.15% |
+
+These empirical results describe the selected reconstructed sample. The
+physics-mixture-weighted genuine-versus-QCD AUC is 0.895516
+(0.849311--0.941967), but its QCD side has only 12.819 effective independent
+events, below the required 20: `supported` remains false. This statistical
+weight measure is distinct from the MC-to-data normalization N_eff.
+The all-retained weighted genuine-SM score distribution is dominated by
+one QCD genuine pair (96.5% of the class weight). It is excluded by the
+training/validation veto; held-out genuine QCD performance is unmeasured.
+The annotated label-comparison plots state this dominance explicitly.
+
+All nine signal points are populated but have only 1--5 genuine direct-parent
+pairs each: m15 prompt retains 4/5 and the other points retain 21/21 in total.
+The aggregate 25/26 is descriptive only. The broad finite-count intervals
+and unsupported grid cells do not establish mass/lifetime independence.
+The completed report, input/source hashes, evaluation rows, CSV tables and
+original figures are preserved in `performance/`; direct class overlays
+are in `label_separation_annotated/` and all-sample shapes in `plots_all/`.
+`performance_annotated/` rerenders that same frozen report with explicit
+insufficient-support annotations and readable ROC labels. It preserves the
+original figures and records a separate plotter/rendering receipt; no scores,
+metrics, weights or evaluation populations are changed.
+
+The histogram-merger/plot-preparer interface now accepts the production
+`rows` manifest, keeps EOS path provenance, and labels combined SM processes
+correctly. Full-grid and SM-only plot scopes have readable legends. Direct
+genuine/accidental/unknown overlays use all retained pairs and are explicitly
+separate from held-out performance. The 55 workflow and 12 ROOT plot-preparer
+tests passed, together with actual signal scoring/histogram pilots and a signed
+histogram display check. No shared CMSSW or TEA executable was rebuilt.
 
 ### 2026-10-09: merged-group first test and performance terminology
 

@@ -13,7 +13,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from uniform_bdt import (
-    UniformityBDT, _local_efficiencies, _uniformity_log_update, train_uniform_bdt,
+    UniformityBDT, _local_efficiencies, _uniformity_log_update, _adaptive_uniformity_log_update, train_uniform_bdt,
 )
 
 
@@ -27,6 +27,54 @@ def synthetic_data(n=120, seed=19):
 
 
 class UniformityMechanism(unittest.TestCase):
+    def test_adaptive_update_matches_weighted_error_and_direction(self):
+        local=np.array([.4,.95]);weights=np.array([.1,.3])
+        update,error,beta=_adaptive_uniformity_log_update(local,.9,weights,.5)
+        self.assertAlmostEqual(error,.1*.5+.3*.05)
+        self.assertAlmostEqual(beta,np.log((1-error)/error))
+        np.testing.assert_allclose(update,.5*beta*(.9-local))
+        self.assertGreater(update[0],0);self.assertLess(update[1],0)
+        _,_,smaller_error_beta=_adaptive_uniformity_log_update([.89,.91],.9,weights,.5)
+        self.assertGreater(smaller_error_beta,beta)
+
+    def test_adaptive_boundaries_cannot_reverse_or_explode(self):
+        update,error,beta=_adaptive_uniformity_log_update([.9,.9],.9,[.2,.3],2.)
+        np.testing.assert_array_equal(update,0.);self.assertEqual(error,0.);self.assertEqual(beta,6.)
+        update,_,beta=_adaptive_uniformity_log_update([0.],.9,[1.],2.)
+        self.assertEqual(beta,0.);np.testing.assert_array_equal(update,0.)
+        update,_,_=_adaptive_uniformity_log_update([0.],.9,[.01],100.)
+        np.testing.assert_array_equal(update,1.)
+        for kwargs in ({'beta_cap':0},{'error_floor':0},{'error_floor':.5}):
+            with self.assertRaises(ValueError):_adaptive_uniformity_log_update([.5],.9,[.5],1.,**kwargs)
+        with self.assertRaises(ValueError):_adaptive_uniformity_log_update([.5],.9,[2.],1.)
+
+    def test_adaptive_mode_keeps_defaults_and_zero_strength_predictions(self):
+        X,y,w,Z=synthetic_data()
+        a,_=train_uniform_bdt(X,y,w,Z,n_estimators=5)
+        b,_=train_uniform_bdt(X,y,w,Z,n_estimators=5,uniformity_mode='constant')
+        np.testing.assert_array_equal(a.predict_proba(X),b.predict_proba(X))
+        a,_=train_uniform_bdt(X,y,w,Z,n_estimators=5,strength=0.)
+        b,h=train_uniform_bdt(X,y,w,Z,n_estimators=5,strength=0.,uniformity_mode='adaptive')
+        np.testing.assert_array_equal(a.predict_proba(X),b.predict_proba(X))
+        self.assertEqual(h['uniformity_mode'],'adaptive')
+        for row in h['rounds']:
+            self.assertTrue(np.isfinite(row['adaptive_beta']))
+            np.testing.assert_allclose(row['class_weight_totals'],[.5,.5])
+
+    def test_capacity_controls_preserve_default_and_enforce_bounds(self):
+        X,y,w,Z=synthetic_data()
+        default,historical=train_uniform_bdt(X,y,w,Z,n_estimators=5)
+        explicit,_=train_uniform_bdt(X,y,w,Z,n_estimators=5,max_depth=2,min_samples_leaf=8)
+        np.testing.assert_array_equal(default.predict_proba(X),explicit.predict_proba(X))
+        deeper,history=train_uniform_bdt(X,y,w,Z,n_estimators=5,max_depth=3,min_samples_leaf=15)
+        self.assertEqual(history['max_depth'],3)
+        self.assertEqual(history['min_samples_leaf'],15)
+        self.assertTrue(all(tree.get_depth()<=3 for tree in deeper.estimators_))
+        for tree in deeper.estimators_:
+            self.assertTrue(np.all(tree.tree_.n_node_samples[tree.tree_.children_left<0]>=15))
+        for kwargs in ({'max_depth':0},{'max_depth':1.5},{'min_samples_leaf':0}):
+            with self.assertRaises(ValueError):train_uniform_bdt(X,y,w,Z,**kwargs)
+
     def test_underaccepted_neighborhood_gets_more_attention(self):
         # Two supported neighborhoods have 0% and 100% true-pair acceptance.
         passed = np.array([False, False, True, True])
