@@ -1,0 +1,6 @@
+<!-- Code style: AI-code. AI-generated RPC input-identity regression target. -->
+<bin file="testRPCRecHitSharesInput.cc" name="testRPCRecHitSharesInput">
+  <use name="DataFormats/RPCRecHit"/>
+  <use name="FWCore/Utilities"/>
+</bin>
+<test name="testRPCRecHitSharesInput" command="testRPCRecHitSharesInput"/>
