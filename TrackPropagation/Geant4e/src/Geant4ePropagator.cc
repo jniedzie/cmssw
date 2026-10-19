@@ -1,3 +1,4 @@
+// Code style: human-code.
 #include <sstream>
 #include <array>
 #include <map>
@@ -8,6 +9,7 @@
 // Geant4e
 #include "TrackPropagation/Geant4e/interface/ConvertFromToCLHEP.h"
 #include "TrackPropagation/Geant4e/interface/Geant4ePropagator.h"
+#include "TrackPropagation/Geant4e/interface/Geant4eFieldContext.h"
 #include "TrackPropagation/Geant4e/interface/FieldGradientJacobian.h"
 #include "TrackPropagation/Geant4e/interface/IonizationVariance.h"
 
@@ -256,6 +258,10 @@ std::pair<TrajectoryStateOnSurface, double> Geant4ePropagator::propagateGeneric(
   materialEndpointBoundaryAmbiguous_ = false;
   startMeanCurvatureMaterial_.clear();
   endMeanCurvatureMaterial_.clear();
+  if (!TrackPropagation::ensureGeant4eFieldContext(*theG4eManager)) {
+    edm::LogError("Geant4e") << "Cannot initialize backward-aware transport in the current G4 magnetic field";
+    return TsosPP(TrajectoryStateOnSurface(), 0.);
+  }
   ///////////////////////////////
   // Construct the target surface
   //
