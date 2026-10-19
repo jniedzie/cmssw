@@ -1,3 +1,4 @@
+// Code style: human-code
 #ifndef RecoMuon_TrackingTools_MuonTrajectoryCleaner_H
 #define RecoMuon_TrackingTools_MuonTrajectoryCleaner_H
 
@@ -33,6 +34,10 @@ public:
   void clean(TrajectoryContainer& muonTrajectories,
              edm::Event& evt,
              const edm::Handle<edm::View<TrajectorySeed> >& seeds);  //used by reference...
+
+  /// Offline option using the standard shared-input fraction and fit-quality score.
+  /// It does not implement the L2 ghost-seed association.
+  void cleanBySharedHits(TrajectoryContainer& muonTrajectories);
 
   /// Clean the candidates container, erasing the (worst) clone trajectory
   void clean(CandidateContainer& muonTrajectories);  //used by reference...

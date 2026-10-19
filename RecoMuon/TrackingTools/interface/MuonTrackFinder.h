@@ -1,3 +1,4 @@
+// Code style: human-code
 #ifndef RecoMuon_TrackingTools_MuonTrackFinder_H
 #define RecoMuon_TrackingTools_MuonTrackFinder_H
 
@@ -48,6 +49,12 @@ public:
   edm::OrphanHandle<reco::TrackCollection> reconstruct(const edm::Handle<edm::View<TrajectorySeed> >&,
                                                        edm::Event&,
                                                        const edm::EventSetup&);
+
+  /// Explicit offline shared-hit-cleaner option; existing callers keep the original path.
+  edm::OrphanHandle<reco::TrackCollection> reconstruct(const edm::Handle<edm::View<TrajectorySeed> >&,
+                                                       edm::Event&,
+                                                       const edm::EventSetup&,
+                                                       bool useSharedHitCleaner);
 
   /// reconstruct global tracks starting from a collection of
   /// standalone tracks and one of trakectories. If the latter

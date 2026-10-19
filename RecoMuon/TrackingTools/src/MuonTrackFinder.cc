@@ -1,3 +1,4 @@
+// Code style: human-code
 /** \class MuonTrackFinder
  *  Concrete Track finder for the Muon Reco
  *
@@ -67,6 +68,14 @@ void MuonTrackFinder::load(CandidateContainer& muonCands, Event& event, const Tr
 // reconstruct trajectories
 edm::OrphanHandle<reco::TrackCollection> MuonTrackFinder::reconstruct(
     const edm::Handle<edm::View<TrajectorySeed> >& seeds, edm::Event& event, const edm::EventSetup& es) {
+  return reconstruct(seeds, event, es, false);
+}
+
+edm::OrphanHandle<reco::TrackCollection> MuonTrackFinder::reconstruct(
+    const edm::Handle<edm::View<TrajectorySeed> >& seeds,
+    edm::Event& event,
+    const edm::EventSetup& es,
+    bool useSharedHitCleaner) {
   const string metname = "Muon|RecoMuon|MuonTrackFinder";
   LogTrace(metname) << "SA Recostruction starting from: " << seeds->size() << endl;
 
@@ -91,8 +100,12 @@ edm::OrphanHandle<reco::TrackCollection> MuonTrackFinder::reconstruct(
 
   // clean the clone traj
   LogTrace(metname) << "Clean the trajectories container" << endl;
-  if (theTrajCleaner)
-    theTrajCleaner->clean(muonTrajectories, event, seeds);  //used by reference...
+  if (theTrajCleaner) {
+    if (useSharedHitCleaner)
+      theTrajCleaner->cleanBySharedHits(muonTrajectories);
+    else
+      theTrajCleaner->clean(muonTrajectories, event, seeds);  //used by reference...
+  }
 
   // convert the trajectories into tracks and load them in to the event
   LogTrace(metname) << "Convert the trajectories into tracks and load them in to the event" << endl;

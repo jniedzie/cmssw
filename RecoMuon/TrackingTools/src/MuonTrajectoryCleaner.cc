@@ -1,3 +1,4 @@
+// Code style: human-code
 /**
  *  A selector for muon tracks
  *
@@ -12,10 +13,32 @@
 #include "DataFormats/MuonSeed/interface/L2MuonTrajectorySeedCollection.h"
 #include "DataFormats/TrackingRecHit/interface/RecSegment.h"
 #include "RecoMuon/TransientTrackingRecHit/interface/MuonTransientTrackingRecHitBreaker.h"
+#include "TrackingTools/TrajectoryCleaning/interface/TrajectoryCleanerBySharedHits.h"
+#include "FWCore/Utilities/interface/Exception.h"
 
 using namespace std;
 
 typedef edm::AssociationMap<edm::OneToMany<L2MuonTrajectorySeedCollection, L2MuonTrajectorySeedCollection> > L2SeedAssoc;
+
+void MuonTrajectoryCleaner::cleanBySharedHits(TrajectoryContainer& trajectories) {
+  if (reportGhosts_)
+    throw cms::Exception("Configuration") << "Shared-hit muon cleaning does not support L2 ghost-seed reporting";
+
+  TrajectoryCleanerBySharedHits::TrajectoryPointerContainer pointers;
+  pointers.reserve(trajectories.size());
+  for (auto const& trajectory : trajectories) {
+    if (trajectory)
+      pointers.push_back(trajectory.get());
+  }
+
+  // Use CMSSW's native defaults: fractionShared=.19, score=5*found-20*lost-chi2.
+  TrajectoryCleanerBySharedHits cleaner;
+  cleaner.clean(pointers);
+  trajectories.erase(std::remove_if(trajectories.begin(),
+                                    trajectories.end(),
+                                    [](auto const& trajectory) { return !trajectory || !trajectory->isValid(); }),
+                     trajectories.end());
+}
 
 void MuonTrajectoryCleaner::clean(TrajectoryContainer& trajC,
                                   edm::Event& event,
