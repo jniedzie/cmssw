@@ -1,3 +1,4 @@
+// Code style: human-code.
 #include "CommonTools/Statistics/interface/ChiSquaredProbability.h"
 #include "DataFormats/NanoAOD/interface/FlatTable.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
@@ -97,7 +98,10 @@
 #include <Eigen/Cholesky>
 #include <map>
 #include "PhysicsTools/ShiftMuonSegments/interface/CommonVertexRefit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/PositionOnlyVertexRefit.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/DimuonKinematicCovariance.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/DimuonInvariantMass.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/MeasuredMuonClonePolicy.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/HitTruthAssociation.h"
 #include <array>
 #include <cmath>
@@ -315,11 +319,7 @@ namespace {
     double materialPath = 0.;
   };
 
-  struct HitFingerprint {
-    uint32_t detId;
-    float localX;
-    float localY;
-  };
+  using HitFingerprint = shift::MuonHitFingerprint;
 
   struct Candidate {
     reco::Track const* track;
@@ -2559,6 +2559,27 @@ public:
         maxDimuonVertices_(parameters.getParameter<unsigned int>("maxDimuonVertices")),
         requireOppositeSign_(parameters.getParameter<bool>("requireOppositeSign")),
         maxGenDeltaR_(parameters.getParameter<double>("maxGenDeltaR")) {
+    if (parameters.existsAs<bool>("requireSharedInputsForDuplicates"))
+      requireSharedInputsForDuplicates_ = parameters.getParameter<bool>("requireSharedInputsForDuplicates");
+    if (parameters.existsAs<bool>("preferFitQualityAmongBoth"))
+      preferFitQualityAmongBoth_ = parameters.getParameter<bool>("preferFitQualityAmongBoth");
+    if (parameters.existsAs<bool>("usePositionOnlyVertexRefit"))
+      usePositionOnlyVertexRefit_ = parameters.getParameter<bool>("usePositionOnlyVertexRefit");
+    if (parameters.existsAs<double>("positionOnlyBeamLineResolution"))
+      positionOnlyBeamLineResolution_ = parameters.getParameter<double>("positionOnlyBeamLineResolution");
+    if (parameters.existsAs<bool>("directionalRefitUseDetailedTransportCorrections"))
+      directionalRefitUseDetailedTransportCorrections_ =
+          parameters.getParameter<bool>("directionalRefitUseDetailedTransportCorrections");
+    if (directionalRefitUseDetailedTransportCorrections_ &&
+        (!useImprovedMomentumRefit_ || !directionalRefitUseMaterialEffects_ ||
+         !directionalRefitUseDetailedMaterialEffects_))
+      throw cms::Exception("Configuration")
+          << "Detailed refit transport corrections require the improved refit and detailed-material KF transport";
+    if (!(positionOnlyBeamLineResolution_ >= 0.) || !std::isfinite(positionOnlyBeamLineResolution_))
+      throw cms::Exception("Configuration") << "positionOnlyBeamLineResolution must be finite and nonnegative";
+    if (usePositionOnlyVertexRefit_ &&
+        (!useImprovedMomentumRefit_ || !(useDetailedMaterialPropagation_ || targetUseDetailedMaterialPropagation_)))
+      throw cms::Exception("Configuration") << "Position-only vertex refit requires improved refit and detailed material transport";
     if ((useMaterialAwarePcaTransport_ || useMaterialAwareVertexTransport_) && !useDetailedMaterialPropagation_)
       throw cms::Exception("Configuration")
           << "Material-aware PCA/vertex transport requires useDetailedMaterialPropagation";
@@ -2816,6 +2837,14 @@ public:
                                               lssGeant4eMomentumLimitGeV_,
                                               lssGeant4eMaximumStepLengthMm_,
                                               lssGeant4eMaximumPathLengthCm_);
+      if (directionalRefitUseDetailedTransportCorrections_) {
+        // These corrections belong to the detector fit, independently from
+        // target-transport options. Fitter/smoother clones retain them.
+        detailedRefitMaterialPropagator->setUseConsistentBackwardCovariance(true);
+        detailedRefitMaterialPropagator->setUseMeanEnergyLossJacobian(true);
+        detailedRefitMaterialPropagator->setUseFieldGradientJacobian(true);
+        detailedRefitMaterialPropagator->setUseUnquenchedIonizationVariance(true);
+      }
       directionalRefitFitterPropagator = detailedRefitMaterialPropagator.get();
       directionalRefitSmootherPropagator = detailedRefitMaterialPropagator.get();
     } else if (useImprovedMomentumRefit_ && directionalRefitUseMaterialEffects_) {
@@ -3527,6 +3556,9 @@ public:
     });
 
     auto duplicates = [this](Candidate const& first, Candidate const& second) {
+      if (requireSharedInputsForDuplicates_)
+        return shift::shareMuonHitFingerprints(first.hitFingerprints, second.hitFingerprints,
+                                               minSharedDetIds_, minSharedHitFraction_);
       // A chamber/detId is much coarser than a hit.  Two nearby J/psi muons,
       // or the two legs of a through-going track, often cross the same
       // chambers at different local positions and must not be merged for
@@ -3634,6 +3666,32 @@ public:
       for (auto const member : group)
         if (betterRepresentative(member, representative))
           representative = member;
+      if (preferFitQualityAmongBoth_) {
+        std::vector<unsigned int> bothCandidates;
+        for (auto const member : group) {
+          auto const& item = candidates[member];
+          auto const geometry = muonGeometryDiagnostics(*item.track, trackingGeometry, eventSourceSide,
+                                                         item.physicalDirectionSign);
+          if (measuredMuonTopology(geometry, eventSourceSideValid) == static_cast<int>(MuonTopology::bothEndcaps))
+            bothCandidates.push_back(member);
+        }
+        // Preserve the legacy winner's topology. Only rerank its Both clones;
+        // a failed Both candidate must not displace a valid near-only winner.
+        // Restrict the whole group first so the ranking remains a total order.
+        if (std::find(bothCandidates.begin(), bothCandidates.end(), representative) != bothCandidates.end()) {
+          auto quality = [&candidates](unsigned int index) {
+            auto const& item = candidates[index];
+            return shift::BothMuonCloneQuality{item.directionalRefitValid, item.timingDirectionSign,
+                item.track->normalizedChi2(), item.track->ndof(),
+                static_cast<unsigned int>(item.track->hitPattern().muonStationsWithValidHits()),
+                item.track->numberOfValidHits(), item.source, item.sourceIndex};
+          };
+          representative = bothCandidates.front();
+          for (auto const member : bothCandidates)
+            if (shift::betterBothMuonClone(quality(member), quality(representative)))
+              representative = member;
+        }
+      }
       auto& candidate = candidates[representative];
       if (produceTargetConstrainedMomentum_ && candidate.targetConstraintInput.isValid()) {
         double const configuredTargetZ = targetUseInferredSide_ ? eventSourceSide * std::abs(targetZ_) : targetZ_;
@@ -5165,11 +5223,17 @@ public:
     std::vector<float> vertexMaterialTransportedMass, vertexMaterialTransportedPt, vertexMaterialTransportedPz,
         vertexMaterialTransportedEta, vertexMaterialTransportedPhi, vertexMaterialTransportedVx,
         vertexMaterialTransportedVy, vertexMaterialTransportedVz;
+    std::array<std::vector<float>, 2> materialTransportedMuonPt, materialTransportedMuonPz, materialTransportedMuonPhi;
     std::array<std::vector<float>, 5> vertexRefittedKinematicErrors;
     std::vector<float> vertexRefittedMinQoverPSignificance;
     std::vector<float> vertexRefittedMass, vertexRefittedPt, vertexRefittedPz, vertexRefittedEta,
         vertexRefittedPhi, vertexRefittedVx, vertexRefittedVy, vertexRefittedVz,
         vertexRefittedVxErr, vertexRefittedVyErr, vertexRefittedVzErr, vertexRefittedChi2;
+    std::vector<int> positionOnlyStatus, positionOnlyIterations, positionOnlyPlaneEvaluations, positionOnlyTransportCalls;
+    std::vector<float> positionOnlyMass, positionOnlyPt, positionOnlyPz, positionOnlyEta, positionOnlyPhi,
+        positionOnlyVx, positionOnlyVy, positionOnlyVz, positionOnlyVxErr, positionOnlyVyErr, positionOnlyVzErr,
+        positionOnlyChi2, positionOnlyMaxUpdateCm, positionOnlyNormalizedUpdate, positionOnlyJointUpdate;
+    std::array<std::vector<float>, 2> positionOnlyMuonPt, positionOnlyMuonPz, positionOnlyMuonPhi;
 
     struct PairChoice {
       unsigned int first;
@@ -5292,14 +5356,12 @@ public:
       vertexMaterialTransportIterations.push_back(transportIterations);
       vertexMaterialTransportValid.push_back(transportStatus == 1);
       if (transportStatus == 1) {
-        double const px = firstAtVertex.momentum.x() + secondAtVertex.momentum.x();
-        double const py = firstAtVertex.momentum.y() + secondAtVertex.momentum.y();
-        double const pz = firstAtVertex.momentum.z() + secondAtVertex.momentum.z();
+        double const px = double(firstAtVertex.momentum.x()) + secondAtVertex.momentum.x();
+        double const py = double(firstAtVertex.momentum.y()) + secondAtVertex.momentum.y();
+        double const pz = double(firstAtVertex.momentum.z()) + secondAtVertex.momentum.z();
         double const pt = std::hypot(px, py);
-        double const energy = std::sqrt(firstAtVertex.momentum.mag2() + muonMass * muonMass) +
-                              std::sqrt(secondAtVertex.momentum.mag2() + muonMass * muonMass);
         vertexMaterialTransportedMass.push_back(
-            std::sqrt(std::max(0., energy * energy - px * px - py * py - pz * pz)));
+            shift::dimuonInvariantMass(firstAtVertex.momentum, secondAtVertex.momentum, muonMass));
         vertexMaterialTransportedPt.push_back(pt);
         vertexMaterialTransportedPz.push_back(pz);
         vertexMaterialTransportedEta.push_back(
@@ -5319,7 +5381,14 @@ public:
         vertexMaterialTransportedVy.push_back(0.);
         vertexMaterialTransportedVz.push_back(0.);
       }
-      // Preserve the established unconstrained, LLP-safe hypothesis. The
+      std::array<PropagatedState, 2> const materialLegStates{firstAtVertex, secondAtVertex};
+      for (unsigned int leg = 0; leg < 2; ++leg) {
+        auto const& momentum = materialLegStates[leg].momentum;
+        materialTransportedMuonPt[leg].push_back(transportStatus == 1 ? momentum.perp() : 0.);
+        materialTransportedMuonPz[leg].push_back(transportStatus == 1 ? momentum.z() : 0.);
+        materialTransportedMuonPhi[leg].push_back(transportStatus == 1 ? std::atan2(momentum.y(), momentum.x()) : 0.);
+      }
+      // Preserve the established unconstrained hypothesis. The
       // common-plane material result is experimental and stored separately.
       fit = choice.fit;
       firstAtVertex = choice.firstAtVertex;
@@ -5337,10 +5406,6 @@ public:
       double const pairPx = firstP[0] + secondP[0];
       double const pairPy = firstP[1] + secondP[1];
       double const pairPz = firstP[2] + secondP[2];
-      double const firstEnergy = std::sqrt(firstState.momentum.mag2() + muonMass * muonMass);
-      double const secondEnergy = std::sqrt(secondState.momentum.mag2() + muonMass * muonMass);
-      double const mass2 =
-          std::pow(firstEnergy + secondEnergy, 2) - pairPx * pairPx - pairPy * pairPy - pairPz * pairPz;
       double const pairPt = std::hypot(pairPx, pairPy);
 
       vertexMuonIdx1.push_back(first);
@@ -5376,12 +5441,85 @@ public:
       vertexDcaX.push_back(choice.approach.midpoint.x());
       vertexDcaY.push_back(choice.approach.midpoint.y());
       vertexDcaZ.push_back(choice.approach.midpoint.z());
-      vertexMass.push_back(std::sqrt(std::max(0., mass2)));
+      vertexMass.push_back(shift::dimuonInvariantMass(firstState.momentum, secondState.momentum, muonMass));
       vertexPt.push_back(pairPt);
       vertexPz.push_back(pairPz);
       vertexEta.push_back(pairPt > 0. ? std::asinh(pairPz / pairPt)
                                       : std::copysign(std::numeric_limits<float>::infinity(), pairPz));
       vertexPhi.push_back(std::atan2(pairPy, pairPx));
+
+      // This additional hypothesis cannot alter the selected tracks or pair.
+      // Transport original detector posteriors to each common plane; fit only
+      // their positions and retain their independently transported momenta.
+      shift::PositionOnlyVertexFit positionFit;
+      int positionStatus = 0;
+      unsigned int positionTransportCalls = 0;
+      std::array<GlobalVector, 2> positionMomenta;
+      if (usePositionOnlyVertexRefit_) {
+        positionStatus = -1;
+        if (selected[first]->detectorStateValid && selected[second]->detectorStateValid) {
+          std::array<FreeTrajectoryState, 2> const detectorStates{
+              selected[first]->detectorState, selected[second]->detectorState};
+          auto transportPositions = [&](double z, std::array<shift::VertexTrack, 2>& tracks) {
+            for (unsigned int leg = 0; leg < 2; ++leg) {
+              // A decay must precede its first measured detector state along
+              // the fitted physical direction; this is not a target-z prior.
+              if ((detectorStates[leg].position().z() - z) * detectorStates[leg].momentum().z() <= 0.)
+                return false;
+              ++positionTransportCalls;
+              auto const transported = materialStateAtZ(detectorStates[leg], *detailedMaterialPropagator, z);
+              if (!transported.first.isValid() || !transported.first.hasError() ||
+                  !finiteTrajectoryState(transported.first)) return false;
+              auto const& parameters = transported.first.localParameters().vector();
+              if (parameters[0] == 0.) return false;
+              auto const momentum = transported.first.globalMomentum();
+              double const magnitude = std::hypot(double(momentum.x()), double(momentum.y()), double(momentum.z()));
+              if (!(magnitude > 0.) || !std::isfinite(magnitude)) return false;
+              auto const& covariance = transported.first.localError().matrix();
+              for (unsigned int row = 0; row < 5; ++row) {
+                tracks[leg].parameters[row] = parameters[row];
+                for (unsigned int column = 0; column < 5; ++column)
+                  tracks[leg].covariance(row, column) = covariance(row, column);
+              }
+              positionMomenta[leg] = momentum;
+            }
+            return true;
+          };
+          shift::PositionOnlyVertexOptions options;
+          options.beamLineSigma = positionOnlyBeamLineResolution_;
+          positionFit = shift::fitPositionOnlyVertex(fit.position.z(), transportPositions, options);
+          positionStatus = positionFit.status == shift::PositionOnlyVertexFit::invalidInput ? -8 : positionFit.status;
+        }
+      }
+      bool const positionValid = positionStatus == 1 && positionFit.valid;
+      positionOnlyStatus.push_back(positionStatus);
+      positionOnlyIterations.push_back(positionFit.iterations);
+      positionOnlyPlaneEvaluations.push_back(positionFit.planeEvaluations);
+      positionOnlyTransportCalls.push_back(positionTransportCalls);
+      double const positionPx = positionValid ? double(positionMomenta[0].x()) + positionMomenta[1].x() : 0.;
+      double const positionPy = positionValid ? double(positionMomenta[0].y()) + positionMomenta[1].y() : 0.;
+      double const positionPz = positionValid ? double(positionMomenta[0].z()) + positionMomenta[1].z() : 0.;
+      double const positionPt = std::hypot(positionPx, positionPy);
+      positionOnlyMass.push_back(positionValid ? shift::dimuonInvariantMass(positionMomenta[0], positionMomenta[1], muonMass) : 0.);
+      positionOnlyPt.push_back(positionPt);
+      positionOnlyPz.push_back(positionPz);
+      positionOnlyEta.push_back(positionValid && positionPt > 0. ? std::asinh(positionPz / positionPt) : 0.);
+      positionOnlyPhi.push_back(positionValid ? std::atan2(positionPy, positionPx) : 0.);
+      positionOnlyVx.push_back(positionValid ? positionFit.position[0] : 0.);
+      positionOnlyVy.push_back(positionValid ? positionFit.position[1] : 0.);
+      positionOnlyVz.push_back(positionValid ? positionFit.position[2] : 0.);
+      positionOnlyVxErr.push_back(positionValid ? std::sqrt(positionFit.covariance(0, 0)) : 0.);
+      positionOnlyVyErr.push_back(positionValid ? std::sqrt(positionFit.covariance(1, 1)) : 0.);
+      positionOnlyVzErr.push_back(positionValid ? std::sqrt(positionFit.covariance(2, 2)) : 0.);
+      positionOnlyChi2.push_back(positionValid ? positionFit.chi2 : 0.);
+      positionOnlyMaxUpdateCm.push_back(positionFit.maximumUpdateCm);
+      positionOnlyNormalizedUpdate.push_back(positionFit.normalizedUpdate);
+      positionOnlyJointUpdate.push_back(positionFit.jointUpdate);
+      for (unsigned int leg = 0; leg < 2; ++leg) {
+        positionOnlyMuonPt[leg].push_back(positionValid ? positionMomenta[leg].perp() : 0.);
+        positionOnlyMuonPz[leg].push_back(positionValid ? positionMomenta[leg].z() : 0.);
+        positionOnlyMuonPhi[leg].push_back(positionValid ? std::atan2(positionMomenta[leg].y(), positionMomenta[leg].x()) : 0.);
+      }
 
       VertexRefitResult vertexRefit;
       if (useVertexConstrainedRefit_) {
@@ -5441,20 +5579,18 @@ public:
       // GlobalVector stores floats. Promote each component before forming
       // energies or adding momenta: E^2 - p^2 otherwise loses precision for
       // boosted pairs and disagrees with the persisted individual tracks.
-      double refittedPx = 0., refittedPy = 0., refittedPz = 0., refittedEnergy = 0.;
+      double refittedPx = 0., refittedPy = 0., refittedPz = 0.;
       if (vertexRefitValid) {
         for (auto const& momentum : vertexRefit.momenta) {
           double const px = momentum.x(), py = momentum.y(), pz = momentum.z();
           refittedPx += px;
           refittedPy += py;
           refittedPz += pz;
-          refittedEnergy += std::sqrt(px * px + py * py + pz * pz + muonMass * muonMass);
         }
       }
       double const refittedPt = std::hypot(refittedPx, refittedPy);
-      vertexRefittedMass.push_back(std::sqrt(std::max(0., refittedEnergy * refittedEnergy -
-                                                         refittedPx * refittedPx - refittedPy * refittedPy -
-                                                         refittedPz * refittedPz)));
+      vertexRefittedMass.push_back(vertexRefitValid ?
+          shift::dimuonInvariantMass(vertexRefit.momenta[0], vertexRefit.momenta[1], muonMass) : 0.);
       vertexRefittedPt.push_back(refittedPt);
       vertexRefittedPz.push_back(refittedPz);
       vertexRefittedEta.push_back(refittedPt > 0. ? std::asinh(refittedPz / refittedPt) : 0.);
@@ -5531,17 +5667,12 @@ public:
       if (bothConstrained) {
         auto const& constrainedFirstMomentum = selected[first]->constrainedState.momentum;
         auto const& constrainedSecondMomentum = selected[second]->constrainedState.momentum;
-        double const constrainedPairPx = constrainedFirstMomentum.x() + constrainedSecondMomentum.x();
-        double const constrainedPairPy = constrainedFirstMomentum.y() + constrainedSecondMomentum.y();
-        double const constrainedPairPz = constrainedFirstMomentum.z() + constrainedSecondMomentum.z();
+        double const constrainedPairPx = double(constrainedFirstMomentum.x()) + constrainedSecondMomentum.x();
+        double const constrainedPairPy = double(constrainedFirstMomentum.y()) + constrainedSecondMomentum.y();
+        double const constrainedPairPz = double(constrainedFirstMomentum.z()) + constrainedSecondMomentum.z();
         double const constrainedPairPt = std::hypot(constrainedPairPx, constrainedPairPy);
-        double const constrainedFirstEnergy = std::sqrt(constrainedFirstMomentum.mag2() + muonMass * muonMass);
-        double const constrainedSecondEnergy = std::sqrt(constrainedSecondMomentum.mag2() + muonMass * muonMass);
-        double const constrainedMass2 = std::pow(constrainedFirstEnergy + constrainedSecondEnergy, 2) -
-                                        constrainedPairPx * constrainedPairPx -
-                                        constrainedPairPy * constrainedPairPy -
-                                        constrainedPairPz * constrainedPairPz;
-        vertexConstrainedMass.push_back(std::sqrt(std::max(0., constrainedMass2)));
+        vertexConstrainedMass.push_back(
+            shift::dimuonInvariantMass(constrainedFirstMomentum, constrainedSecondMomentum, muonMass));
         vertexConstrainedPt.push_back(constrainedPairPt);
         vertexConstrainedPz.push_back(constrainedPairPz);
         vertexConstrainedEta.push_back(
@@ -5671,6 +5802,39 @@ public:
                                   "experimental common-plane material-transported vertex y; status must be 1");
     vertexTable->addColumn<float>("materialTransportedVz", vertexMaterialTransportedVz,
                                   "experimental common-plane material-transported vertex z; status must be 1");
+    for (unsigned int leg = 0; leg < 2; ++leg) {
+      std::string const prefix = "materialTransportedMuon" + std::to_string(leg + 1);
+      vertexTable->addColumn<float>(prefix + "Pt", materialTransportedMuonPt[leg], "common-plane transported leg pT; transport status must be 1");
+      vertexTable->addColumn<float>(prefix + "Pz", materialTransportedMuonPz[leg], "common-plane transported leg pz; transport status must be 1");
+      vertexTable->addColumn<float>(prefix + "Phi", materialTransportedMuonPhi[leg], "common-plane transported leg phi; transport status must be 1");
+    }
+    vertexTable->addColumn<int>("positionOnlyStatus", positionOnlyStatus,
+        "0 disabled, 1 converged, -1 no detector posterior, -2 transport, -3 covariance, -4 singular geometry, "
+        "-5 no descent, -6 iteration limit, -7 transport budget, -8 invalid input; canonical pair is always retained");
+    vertexTable->addColumn<int>("positionOnlyIterations", positionOnlyIterations, "position-only vertex iterations attempted");
+    vertexTable->addColumn<int>("positionOnlyPlaneEvaluations", positionOnlyPlaneEvaluations, "position-only two-track plane evaluations");
+    vertexTable->addColumn<int>("positionOnlyTransportCalls", positionOnlyTransportCalls, "actual position-only single-leg transport calls");
+    vertexTable->addColumn<float>("positionOnlyMass", positionOnlyMass, "position-only common-plane dimuon mass; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyPt", positionOnlyPt, "position-only common-plane dimuon pT; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyPz", positionOnlyPz, "position-only common-plane dimuon pz; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyEta", positionOnlyEta, "position-only common-plane dimuon eta; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyPhi", positionOnlyPhi, "position-only common-plane dimuon phi; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyVx", positionOnlyVx, "position-only vertex x; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyVy", positionOnlyVy, "position-only vertex y; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyVz", positionOnlyVz, "position-only vertex z; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyVxErr", positionOnlyVxErr, "local position-only vertex x error; coverage unqualified");
+    vertexTable->addColumn<float>("positionOnlyVyErr", positionOnlyVyErr, "local position-only vertex y error; coverage unqualified");
+    vertexTable->addColumn<float>("positionOnlyVzErr", positionOnlyVzErr, "local position-only vertex z error; coverage unqualified");
+    vertexTable->addColumn<float>("positionOnlyChi2", positionOnlyChi2, "position-only moment-fit chi2; status must be 1");
+    vertexTable->addColumn<float>("positionOnlyMaxUpdateCm", positionOnlyMaxUpdateCm, "last full proposed vertex update, maximum absolute coordinate [cm]");
+    vertexTable->addColumn<float>("positionOnlyNormalizedUpdate", positionOnlyNormalizedUpdate, "last full vertex update, maximum marginal sigma units");
+    vertexTable->addColumn<float>("positionOnlyJointUpdate", positionOnlyJointUpdate, "last full vertex update, correlated Mahalanobis units");
+    for (unsigned int leg = 0; leg < 2; ++leg) {
+      std::string const prefix = "positionOnlyMuon" + std::to_string(leg + 1);
+      vertexTable->addColumn<float>(prefix + "Pt", positionOnlyMuonPt[leg], "unchanged independently transported leg pT; status must be 1");
+      vertexTable->addColumn<float>(prefix + "Pz", positionOnlyMuonPz[leg], "unchanged independently transported leg pz; status must be 1");
+      vertexTable->addColumn<float>(prefix + "Phi", positionOnlyMuonPhi[leg], "unchanged independently transported leg phi; status must be 1");
+    }
     vertexTable->addColumn<float>("vx", vertexVx, "unbounded common-line fit vertex x");
     vertexTable->addColumn<float>("vy", vertexVy, "unbounded common-line fit vertex y");
     vertexTable->addColumn<float>("vz", vertexVz, "unbounded common-line fit vertex z");
@@ -5790,6 +5954,8 @@ public:
     description.add<bool>("useMaterialAwareVertexTransport", false);
     description.add<bool>("useVertexConstrainedRefit", false);
     description.add<bool>("useForwardCommonVertexFit", false);
+    description.add<bool>("usePositionOnlyVertexRefit", false);
+    description.add<double>("positionOnlyBeamLineResolution", 0.);
     description.add<std::string>("forwardVertexDerivativeAudit", "none");
     edm::ParameterSetDescription lssTransportDescription;
     lssTransportDescription.add<std::string>("magneticFieldLabel", "");
@@ -5802,6 +5968,7 @@ public:
     description.add<bool>("directionalRefitUseFirstPrinciplesMaterialEffects", false);
     description.add<double>("directionalRefitFirstPrinciplesStepCm", 0.2);
     description.add<bool>("directionalRefitUseDetailedMaterialEffects", false);
+    description.add<bool>("directionalRefitUseDetailedTransportCorrections", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother", false);
@@ -5851,6 +6018,8 @@ public:
     description.add<double>("targetSigmaX", 0.1);
     description.add<double>("targetSigmaY", 0.1);
     description.add<double>("targetSigmaZ", 50.0);
+    description.add<bool>("requireSharedInputsForDuplicates", false);
+    description.add<bool>("preferFitQualityAmongBoth", false);
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -5930,6 +6099,8 @@ private:
   bool useMaterialAwareVertexTransport_;
   bool useVertexConstrainedRefit_;
   bool useForwardCommonVertexFit_;
+  bool usePositionOnlyVertexRefit_ = false;
+  double positionOnlyBeamLineResolution_ = 0.;
   std::string forwardVertexDerivativeAudit_;
   double lssMaterialBoundaryAbsZCm_;
   double lssGeant4eMomentumLimitGeV_;
@@ -5939,6 +6110,7 @@ private:
   bool directionalRefitUseFirstPrinciplesMaterialEffects_;
   double directionalRefitFirstPrinciplesStepCm_;
   bool directionalRefitUseDetailedMaterialEffects_;
+  bool directionalRefitUseDetailedTransportCorrections_ = false;
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;
   bool directionalRefitUseGeometryMaterialEffectsInSmoother_;
@@ -5988,6 +6160,8 @@ private:
   double targetSigmaX_;
   double targetSigmaY_;
   double targetSigmaZ_;
+  bool requireSharedInputsForDuplicates_ = false;
+  bool preferFitQualityAmongBoth_ = false;
   double minSharedHitFraction_;
   unsigned int minSharedDetIds_;
   double maxDuplicateAngle_;
