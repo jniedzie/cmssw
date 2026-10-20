@@ -1,3 +1,4 @@
+// Code style: human-code.
 /** \file CosmicMuonSmoother
  *
  *  The class refit muon trajectories based on MuonTrackReFitter
@@ -11,6 +12,8 @@
  */
 
 #include "RecoMuon/CosmicMuonProducer/interface/CosmicMuonSmoother.h"
+#include "RecoMuon/CosmicMuonProducer/interface/BeamHaloClassification.h"
+#include "RecoMuon/CosmicMuonProducer/interface/ReverseMuonDirection.h"
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "TrackingTools/KalmanUpdators/interface/KFUpdator.h"
@@ -36,6 +39,10 @@ CosmicMuonSmoother::CosmicMuonSmoother(const ParameterSet& par, const MuonServic
   thePropagatorAlongName = par.getParameter<string>("PropagatorAlong");
   thePropagatorOppositeName = par.getParameter<string>("PropagatorOpposite");
   theErrorRescaling = par.getParameter<double>("RescalingFactor");
+  theExperimentalUseAbsoluteEtaForBeamHalo =
+      par.getUntrackedParameter<bool>("experimentalUseAbsoluteEtaForBeamHalo", false);
+  theExperimentalUseConsistentReversalCovariance =
+      par.getUntrackedParameter<bool>("experimentalUseConsistentReversalCovariance", false);
 
   category_ = "Muon|RecoMuon|CosmicMuon|CosmicMuonSmoother";
 }
@@ -408,8 +415,10 @@ TrajectoryStateOnSurface CosmicMuonSmoother::initialState(const Trajectory& t) c
 
   TrajectoryStateOnSurface result;
 
-  bool beamhaloFlag = (t.firstMeasurement().updatedState().globalMomentum().eta() > 4.0 ||
-                       t.lastMeasurement().updatedState().globalMomentum().eta() > 4.0);
+  bool beamhaloFlag = cosmic_muon::isBeamHaloForSmoothing(
+      t.firstMeasurement().updatedState().globalMomentum().eta(),
+      t.lastMeasurement().updatedState().globalMomentum().eta(),
+      theExperimentalUseAbsoluteEtaForBeamHalo);
 
   if (!beamhaloFlag) {  //initialState is the top one
     if (t.firstMeasurement().updatedState().globalPosition().y() >
@@ -419,7 +428,8 @@ TrajectoryStateOnSurface CosmicMuonSmoother::initialState(const Trajectory& t) c
       result = t.lastMeasurement().updatedState();
     }
     if (result.globalMomentum().y() > 1.0)  //top tsos should pointing down
-      theUtilities->reverseDirection(result, &*theService->magneticField());
+      cosmic_muon::reverseMuonDirection(
+          result, &*theService->magneticField(), *theUtilities, theExperimentalUseConsistentReversalCovariance);
   } else {
     if (t.firstMeasurement().updatedState().globalPosition().z() *
             t.lastMeasurement().updatedState().globalPosition().z() >

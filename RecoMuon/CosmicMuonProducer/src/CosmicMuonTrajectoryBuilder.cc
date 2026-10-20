@@ -1,4 +1,7 @@
+// Code style: human-code.
 #include "RecoMuon/CosmicMuonProducer/interface/CosmicMuonTrajectoryBuilder.h"
+#include "RecoMuon/CosmicMuonProducer/interface/CSCEndcapCoverage.h"
+#include "RecoMuon/CosmicMuonProducer/interface/ReverseMuonDirection.h"
 /** \file CosmicMuonTrajectoryBuilder
  *
  *  class to build trajectories of cosmic muons and beam-halo muons
@@ -89,7 +92,12 @@ CosmicMuonTrajectoryBuilder::CosmicMuonTrajectoryBuilder(const edm::ParameterSet
 
   theStrict1LegFlag = par.getParameter<bool>("Strict1Leg");
 
+  theExperimentalSkipSecondHalfWithCSCEndcaps =
+      par.getUntrackedParameter<bool>("experimentalSkipSecondHalfWithCSCEndcaps", false);
+
   ParameterSet smootherPSet = par.getParameter<ParameterSet>("MuonSmootherParameters");
+  theExperimentalUseConsistentReversalCovariance =
+      smootherPSet.getUntrackedParameter<bool>("experimentalUseConsistentReversalCovariance", false);
 
   theNavigationPSet = par.getParameter<ParameterSet>("MuonNavigationParameters");
 
@@ -362,9 +370,20 @@ MuonTrajectoryBuilder::TrajectoryContainer CosmicMuonTrajectoryBuilder::trajecto
   }
 
   if (theTraversingMuonFlag && (allUnusedHits.size() >= 2)) {
-    //      LogTrace(category_)<<utilities()->print(allUnusedHits);
-    LogTrace(category_) << "Building trajectory in second hemisphere...";
-    buildSecondHalf(myTraj);
+    cosmic_muon::CSCEndcapCoverage cscCoverage;
+    if (theExperimentalSkipSecondHalfWithCSCEndcaps && theStrict1LegFlag)
+      for (auto const& measurement : myTraj.measurements()) {
+        auto const& hit = measurement.recHit();
+        if (hit)
+          cscCoverage.addMeasurement(hit->isValid(), hit->geographicalId());
+      }
+    // Experimental: avoiding a repeated CSC scan also changes the fitted
+    // momentum and orientation. Keep the prior second-half build by default.
+    if (!cscCoverage.skipSecondHalf(
+            theExperimentalSkipSecondHalfWithCSCEndcaps, theTraversingMuonFlag, theStrict1LegFlag)) {
+      LogTrace(category_) << "Building trajectory in second hemisphere...";
+      buildSecondHalf(myTraj);
+    }
     // check if traversing trajectory has hits in both hemispheres
 
     if (theStrict1LegFlag && !utilities()->isTraversing(myTraj)) {
@@ -730,7 +749,8 @@ void CosmicMuonTrajectoryBuilder::flipTrajectory(Trajectory& traj) const {
   std::reverse(hits.begin(), hits.end());
 
   LogTrace(category_) << "last tsos before flipping " << lastTSOS;
-  utilities()->reverseDirection(lastTSOS, &*theService->magneticField());
+  cosmic_muon::reverseMuonDirection(
+      lastTSOS, &*theService->magneticField(), *utilities(), theExperimentalUseConsistentReversalCovariance);
   LogTrace(category_) << "last tsos after flipping " << lastTSOS;
 
   vector<Trajectory> refittedback = theSmoother->fit(traj.seed(), hits, lastTSOS);
@@ -797,7 +817,8 @@ void CosmicMuonTrajectoryBuilder::estimateDirection(Trajectory& traj) const {
 
   } else {
     std::reverse(hits.begin(), hits.end());
-    utilities()->reverseDirection(lastTSOS, &*theService->magneticField());
+    cosmic_muon::reverseMuonDirection(
+        lastTSOS, &*theService->magneticField(), *utilities(), theExperimentalUseConsistentReversalCovariance);
     vector<Trajectory> refittedback = theSmoother->trajectories(traj.seed(), hits, lastTSOS);
     if (!refittedback.empty())
       traj = refittedback.front();

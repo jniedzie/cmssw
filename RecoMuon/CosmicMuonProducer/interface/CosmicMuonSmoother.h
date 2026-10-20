@@ -1,3 +1,4 @@
+// Code style: human-code.
 #ifndef CosmicMuonProducer_CosmicMuonSmoother_H
 #define CosmicMuonProducer_CosmicMuonSmoother_H
 
@@ -86,6 +87,8 @@ private:
   std::string thePropagatorAlongName;
   std::string thePropagatorOppositeName;
   double theErrorRescaling;
+  bool theExperimentalUseAbsoluteEtaForBeamHalo;
+  bool theExperimentalUseConsistentReversalCovariance;
   std::string category_;
 };
 #endif

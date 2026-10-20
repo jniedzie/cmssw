@@ -1,3 +1,4 @@
+<!-- Code style: human-code. -->
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="RecoMuon/TrackingTools"/>
@@ -14,3 +15,16 @@
 <library file="RealCosmicDataAnalyzer.cc" name="RealCosmicDataAnalyzer">
   <flags EDM_PLUGIN="1"/>
 </library>
+
+<bin file="testCSCEndcapCoverage.cpp" name="testCSCEndcapCoverage">
+  <use name="DataFormats/MuonDetId"/>
+</bin>
+<test name="testCSCEndcapCoverageRun" command="testCSCEndcapCoverage"/>
+<bin file="testBeamHaloClassification.cpp" name="testBeamHaloClassification"/>
+<test name="testBeamHaloClassificationRun" command="testBeamHaloClassification"/>
+<bin file="testReverseMuonDirection.cpp" name="testReverseMuonDirection">
+  <use name="RecoMuon/CosmicMuonProducer"/>
+  <use name="MagneticField/UniformEngine"/>
+  <use name="eigen"/>
+</bin>
+<test name="testReverseMuonDirectionRun" command="testReverseMuonDirection"/>

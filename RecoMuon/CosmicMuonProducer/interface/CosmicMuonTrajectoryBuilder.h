@@ -1,3 +1,4 @@
+// Code style: human-code.
 #ifndef CosmicMuonTrajectoryBuilder_H
 #define CosmicMuonTrajectoryBuilder_H
 /** \file CosmicMuonTrajectoryBuilder
@@ -130,6 +131,8 @@ private:
 
   bool theTraversingMuonFlag;
   bool theStrict1LegFlag;
+  bool theExperimentalSkipSecondHalfWithCSCEndcaps;
+  bool theExperimentalUseConsistentReversalCovariance;
 
   std::string category_;
   int theNTraversing;
