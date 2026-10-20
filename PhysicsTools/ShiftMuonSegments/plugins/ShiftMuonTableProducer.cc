@@ -3,6 +3,8 @@
 #include "DataFormats/NanoAOD/interface/FlatTable.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/DetectorFitAudit.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/CSCFitCoverage.h"
+#include "TrackPropagation/RungeKutta/interface/defaultRKPropagator.h"
+#include <sstream>
 #include "PhysicsTools/ShiftMuonSegments/interface/ExactMuonFitInput.h"
 #include <cstring>
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
@@ -819,24 +821,34 @@ namespace {
 
   PropagatedState materialPca(FreeTrajectoryState const& start,
                               Propagator const& vacuumPropagator,
-                              Propagator const& materialPropagator) {
+                              Propagator const& materialPropagator,
+                              std::string const& traceContext = "",
+                              double initialZ = std::numeric_limits<double>::quiet_NaN()) {
     // The material-free PCA supplies only a starting plane, never a published
     // state. Every trial is transported afresh from the detector likelihood.
-    auto seed = vacuumPropagator.propagateWithPath(
-        start, GlobalPoint(0., 0., -1.), GlobalPoint(0., 0., 1.));
-    double z = seed.first.charge() != 0 ? seed.first.position().z() : start.position().z();
-    if (seed.first.charge() == 0) {
-      // A nearly parallel track can exhaust the line propagator's step budget.
-      // Start an independent plane-based Newton solve from the tangent; every
-      // trial is then propagated through the field from the original state.
-      if (!(start.momentum().perp2() > 1.e-12)) return {};
-      z -= (start.position().x()*start.momentum().x() + start.position().y()*start.momentum().y()) *
-           start.momentum().z()/start.momentum().perp2();
+    double z = initialZ;
+    if (!std::isfinite(z)) {
+      auto seed = vacuumPropagator.propagateWithPath(
+          start, GlobalPoint(0., 0., -1.), GlobalPoint(0., 0., 1.));
+      z = seed.first.charge() != 0 ? seed.first.position().z() : start.position().z();
+      if (seed.first.charge() == 0) {
+        // A nearly parallel track can exhaust the line propagator's step budget.
+        // Start an independent plane-based Newton solve from the tangent; every
+        // trial is then propagated through the field from the original state.
+        if (!(start.momentum().perp2() > 1.e-12)) return {};
+        z -= (start.position().x()*start.momentum().x() + start.position().y()*start.momentum().y()) *
+             start.momentum().z()/start.momentum().perp2();
+      }
     }
     for (unsigned int iteration = 0; iteration < 16; ++iteration) {
       auto transported = materialStateAtZ(start, materialPropagator, z);
-      if (!transported.first.isValid() || !transported.first.freeState())
+      if (!transported.first.isValid() || !transported.first.freeState()) {
+        if (!traceContext.empty())
+          edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext
+              << " stage=pcaPlaneFailed iteration=" << iteration << " z=" << z
+              << " start=" << start.position() << " momentum=" << start.momentum();
         return {};
+      }
       auto const position = transported.first.globalPosition();
       auto const momentum = transported.first.globalMomentum();
       double const transverse2 = momentum.perp2();
@@ -866,9 +878,11 @@ namespace {
                                              Propagator const* materialPropagator,
                                              int sourceSide,
                                              double materialBoundaryAbsZCm,
-                                             bool fullMaterial = false) {
+                                             bool fullMaterial = false,
+                                             bool recoverFailedTargetPca = false,
+                                             std::string const& traceContext = "") {
     if (fullMaterial && materialPropagator)
-      return materialPca(start, vacuumPropagator, *materialPropagator);
+      return materialPca(start, vacuumPropagator, *materialPropagator, traceContext);
     auto const position = start.position();
     // Geant4e samples the active Geant4 geometry and material up to the
     // configured boundary. Continue with vacuum transport only beyond that
@@ -888,6 +902,8 @@ namespace {
             << "Detailed-material propagation failed before the configured boundary: position=" << position
             << " momentum=" << start.momentum() << " charge=" << start.charge() << " sourceSide=" << sourceSide
             << " boundaryZ=" << sourceSide * materialBoundaryAbsZCm;
+        if (!traceContext.empty())
+          edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext << " stage=materialBoundaryFailed";
         return {};
       }
       vacuumStart = *toBoundary.first.freeState();
@@ -903,7 +919,38 @@ namespace {
     // (zero charge and a null field pointer), unlike a TSOS it has no
     // isValid() accessor.  Check its sentinel before accessing position.
     if (propagated.first.charge() == 0) {
-      auto fallback = materialPca(vacuumStart, vacuumPropagator, vacuumPropagator);
+      if (!traceContext.empty())
+        edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext
+            << " stage=vacuumLineFailed boundaryValid=" << materialBoundaryValid
+            << " start=" << vacuumStart.position() << " momentum=" << vacuumStart.momentum();
+      auto fallback = materialPca(vacuumStart, vacuumPropagator, vacuumPropagator, traceContext);
+      if (!fallback.valid && recoverFailedTargetPca) {
+        // Change only the numerical vacuum solver after both existing methods
+        // fail. The field provider is unchanged; material was handled above.
+        defaultRKPropagator::Product numerical(vacuumPropagator.magneticField(), anyDirection);
+        fallback = materialPca(vacuumStart, vacuumPropagator, numerical.propagator, traceContext);
+        if (!traceContext.empty())
+          edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext
+              << " stage=rungeKuttaFallback valid=" << fallback.valid
+              << " position=" << fallback.position << " momentum=" << fallback.momentum;
+        // A root behind the boundary is not a vacuum continuation. Recompute
+        // that entire leg from the detector so field and material are applied
+        // along the estimated origin path, without a round trip to the boundary.
+        if (fallback.valid && materialPropagator && materialBoundaryValid &&
+            sourceSide * fallback.position.z() < materialBoundaryAbsZCm) {
+          auto recovered = materialPca(
+              start, vacuumPropagator, *materialPropagator, traceContext, fallback.position.z());
+          // A production point precedes the source-facing detector state.
+          // The closest approach ahead of it is not a backward-origin solution.
+          if (recovered.valid && !(recovered.path < 0.))
+            recovered.valid = false;
+          if (!traceContext.empty())
+            edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext
+                << " stage=materialPcaRecovery valid=" << recovered.valid << " path=" << recovered.path
+                << " position=" << recovered.position << " momentum=" << recovered.momentum;
+          return recovered;
+        }
+      }
       fallback.path += path;
       fallback.materialBoundaryValid = materialBoundaryValid;
       fallback.materialBoundaryMomentum = materialBoundaryMomentum;
@@ -1463,7 +1510,9 @@ namespace {
                                           std::vector<std::pair<TransientTrackingRecHit::RecHitPointer, bool>> const* extraHits = nullptr,
                                           bool fullMaterial = false,
                                           bool produceAudit = false,
-                                          bool removeExactDuplicates = false) {
+                                          bool removeExactDuplicates = false,
+                                          bool recoverFailedTargetPca = false,
+                                          std::string const& traceContext = "") {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
       double path;
@@ -1593,6 +1642,21 @@ namespace {
       TrajectorySeed const seed(
           PTrajectoryStateOnDet(), TrajectorySeed::RecHitContainer(), alongMomentum);
       int const minimumFoundHits = 3;
+      auto logStage = [&](char const* stage, Trajectory const& trajectory) {
+        if (traceContext.empty())
+          return;
+        double firstP = -1., lastP = -1.;
+        if (!trajectory.empty()) {
+          auto const& first = trajectory.firstMeasurement().updatedState();
+          auto const& last = trajectory.lastMeasurement().updatedState();
+          if (first.isValid()) firstP = first.globalMomentum().mag();
+          if (last.isValid()) lastP = last.globalMomentum().mag();
+        }
+        edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext << " stage=" << stage
+            << " seedP=" << uninflatedSeed.momentum().mag()
+            << " valid=" << trajectory.isValid() << " hits=" << trajectory.foundHits()
+            << " firstP=" << firstP << " lastP=" << lastP;
+      };
       auto fitAndSmooth = [&](Trajectory::RecHitContainer const& iterationHits, int& status) {
         Trajectory invalid;
         auto const firstPredicted = fitMaterialPropagator.propagate(start, *iterationHits.front()->surface());
@@ -1601,6 +1665,7 @@ namespace {
           return invalid;
         }
         auto const filtered = fitter.fitOne(seed, iterationHits, firstPredicted, TrajectoryFitter::standard);
+        logStage("filter", filtered);
         // KFTrajectoryFitter deliberately has a no-fail policy: after a failed
         // propagation/update it can return a trajectory with a poisoned final
         // state. Reject it before the smoother can enter Geant4e.
@@ -1613,6 +1678,7 @@ namespace {
           return invalid;
         }
         auto smoothedCandidate = smoother.trajectory(filtered);
+        logStage("smoother", smoothedCandidate);
         if (smoothedCandidate.foundHits() < minimumFoundHits || smoothedCandidate.empty()) {
           status = 13;
           return invalid;
@@ -1763,10 +1829,11 @@ namespace {
                                      vacuumPropagator,
                                      &targetMaterialPropagator,
                                      sourceSide,
-                                     materialBoundaryAbsZCm, fullMaterial);
+                                     materialBoundaryAbsZCm, fullMaterial, recoverFailedTargetPca, traceContext);
       result.targetStatus = materialTargetState.valid ? 1 : -1;
       vacuumTargetState = propagateStateToTargetLine(
-          upstreamFreeState, vacuumPropagator, nullptr, sourceSide, materialBoundaryAbsZCm);
+          upstreamFreeState, vacuumPropagator, nullptr, sourceSide, materialBoundaryAbsZCm, false,
+          recoverFailedTargetPca, traceContext);
       if (produceAudit)
         result.audit.targetStatus = materialTargetState.valid ? 1 : -1;
       if (!materialTargetState.valid) {
@@ -2705,6 +2772,8 @@ public:
       removeExactDuplicateMuonFitInputs_ = parameters.getParameter<bool>("removeExactDuplicateMuonFitInputs");
     if (parameters.existsAs<bool>("produceDetectorFitAudit"))
       produceDetectorFitAudit_ = parameters.getParameter<bool>("produceDetectorFitAudit");
+    if (parameters.existsAs<bool>("recoverFailedTargetPca"))
+      recoverFailedTargetPca_ = parameters.getParameter<bool>("recoverFailedTargetPca");
     if (parameters.existsAs<bool>("requireDirectionalRefitCSCEndcapCoverage"))
       requireDirectionalRefitCSCEndcapCoverage_ =
           parameters.getParameter<bool>("requireDirectionalRefitCSCEndcapCoverage");
@@ -3453,6 +3522,11 @@ public:
       // applies material updates; flipping a completed fit cannot do that.
       candidate.directionalRefitAttempted = true;
       auto runDirectionalRefit = [&](bool precisionHitsOnly, int hitSideSelection = 0) {
+        std::ostringstream trace;
+        if (logCandidateSelection_)
+          trace << "event=" << event.id() << " source=" << candidate.source
+                << " index=" << candidate.sourceIndex << " precision=" << precisionHitsOnly
+                << " side=" << hitSideSelection;
         return directionalRefit(*candidate.track,
                                 directionSign,
                                 eventSourceSide,
@@ -3477,7 +3551,7 @@ public:
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
                                 &additionalHits, useMaterialAwarePcaTransport_, produceDetectorFitAudit_,
-                                removeExactDuplicateMuonFitInputs_);
+                                removeExactDuplicateMuonFitInputs_, recoverFailedTargetPca_, trace.str());
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -6410,6 +6484,7 @@ public:
     description.add<bool>("directionalRefitUseUnquenchedIonizationVariance", true);
     description.add<bool>("produceDetectorFitAudit", false);
     description.add<bool>("requireDirectionalRefitCSCEndcapCoverage", false);
+    description.add<bool>("recoverFailedTargetPca", false);
     description.add<bool>("removeExactDuplicateMuonFitInputs", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
@@ -6559,6 +6634,7 @@ private:
   bool directionalRefitUseUnquenchedIonizationVariance_ = true;
   bool produceDetectorFitAudit_ = false;
   bool requireDirectionalRefitCSCEndcapCoverage_ = false;
+  bool recoverFailedTargetPca_ = false;
   bool removeExactDuplicateMuonFitInputs_ = false;
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;
