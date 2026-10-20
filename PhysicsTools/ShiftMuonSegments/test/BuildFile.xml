@@ -62,3 +62,11 @@
   <use name="eigen"/>
 </bin>
 <test name="testShiftPositionOnlyVertexRefitRun" command="testShiftPositionOnlyVertexRefit"/>
+<bin file="testDetectorFitAudit.cc" name="testShiftDetectorFitAudit"/>
+<test name="testShiftDetectorFitAuditRun" command="testShiftDetectorFitAudit"/>
+<bin file="testExactMuonFitInput.cc" name="testShiftExactMuonFitInput">
+  <use name="DataFormats/CSCRecHit"/>
+  <use name="DataFormats/TrackingRecHit"/>
+  <use name="clhep"/>
+</bin>
+<test name="testShiftExactMuonFitInputRun" command="testShiftExactMuonFitInput"/>

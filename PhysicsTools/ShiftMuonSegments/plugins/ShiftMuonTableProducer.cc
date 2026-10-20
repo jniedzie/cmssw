@@ -1,6 +1,9 @@
 // Code style: human-code.
 #include "CommonTools/Statistics/interface/ChiSquaredProbability.h"
 #include "DataFormats/NanoAOD/interface/FlatTable.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/DetectorFitAudit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/ExactMuonFitInput.h"
+#include <cstring>
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
@@ -321,6 +324,52 @@ namespace {
 
   using HitFingerprint = shift::MuonHitFingerprint;
 
+  struct DetectorFitSnapshot {
+    bool available = false;
+    bool accepted = false;
+    bool targetAttempted = false;
+    int targetStatus = 0;
+    uint32_t surfaceId = 0;
+    unsigned int hits = 0;
+    double chi2 = -1.;
+    double ndof = -1.;
+    uint64_t inputHash = 0;
+    uint64_t usedHash = 0;
+    TrajectoryStateOnSurface state;
+  };
+
+  // Diagnostic fingerprints describe the ordered measured fit input, including
+  // the retained subset after the existing outlier removal. They are not a
+  // channel/pulse identifier and never participate in reconstruction.
+  uint64_t fitHitHash(TransientTrackingRecHit::ConstRecHitContainer const& hits) {
+    uint64_t hash = 14695981039346656037ULL;
+    auto append = [&hash](uint64_t word) {
+      for (unsigned int byte = 0; byte < 8; ++byte) {
+        hash ^= (word >> (8 * byte)) & 255;
+        hash *= 1099511628211ULL;
+      }
+    };
+    append(hits.size());
+    for (auto const& hit : hits) {
+      append(hit->geographicalId().rawId());
+      append(hit->dimension());
+      auto const parameters = hit->parameters();
+      auto const error = hit->parametersError();
+      for (int row = 0; row < hit->dimension(); ++row) {
+        uint64_t bits = 0;
+        double value = parameters[row];
+        std::memcpy(&bits, &value, sizeof(bits));
+        append(bits);
+        for (int column = 0; column <= row; ++column) {
+          value = error[row][column];
+          std::memcpy(&bits, &value, sizeof(bits));
+          append(bits);
+        }
+      }
+    }
+    return hash;
+  }
+
   struct Candidate {
     reco::Track const* track;
     int source;
@@ -329,6 +378,13 @@ namespace {
     PropagatedState targetLineState;
     FreeTrajectoryState detectorState;
     TrajectoryStateOnSurface targetConstraintInput;
+    DetectorFitSnapshot detectorAudit;
+    int detectorAuditVariant = 0;
+    int detectorAuditIteration = 0;
+    int detectorAuditSnapshotKind = 0;
+    int detectorAuditNativeStatus = 0;
+    int detectorAuditFirstStatus = 0;
+    int detectorAuditSecondStatus = 0;
     bool detectorStateValid = false;
     uint32_t detectorStateDetId = 0;
     int timingDirectionSign = 0;
@@ -377,11 +433,15 @@ namespace {
     double directionalRefitMaterialBoundaryPz = 0.;
     double directionalRefitMaterialPath = 0.;
     unsigned int directionalRefitAllHitsInput = 0;
+    unsigned int directionalRefitAllHitsFitInput = 0;
+    unsigned int directionalRefitAllHitsExactDuplicatesRemoved = 0;
     unsigned int directionalRefitAllHitsOrderingFallback = 0;
     double directionalRefitAllHitsOrderingSpan = 0.;
     unsigned int directionalRefitAllHitsFirstRejected = 0;
     unsigned int directionalRefitAllHitsSecondRejected = 0;
     unsigned int directionalRefitPrecisionInput = 0;
+    unsigned int directionalRefitPrecisionFitInput = 0;
+    unsigned int directionalRefitPrecisionExactDuplicatesRemoved = 0;
     unsigned int directionalRefitPrecisionOrderingFallback = 0;
     double directionalRefitPrecisionOrderingSpan = 0.;
     unsigned int directionalRefitPrecisionFirstRejected = 0;
@@ -892,6 +952,7 @@ namespace {
   }
 
   struct RefitIterationResult {
+    DetectorFitSnapshot audit;
     bool valid = false;
     uint32_t upstreamDetId = 0;
     int status = 0;
@@ -1309,6 +1370,7 @@ namespace {
     int selectedIteration = 0;
     RefitIterationResult selected;
     unsigned int inputHits = 0;
+    unsigned int fitInputHits = 0;
     unsigned int inputStations = 0;
     double inputLeverArm = 0.;
     unsigned int pathOrderingFallbackHits = 0;
@@ -1388,7 +1450,9 @@ namespace {
                                           bool usePathOrdering = true,
                                           int hitSideSelection = 0,
                                           std::vector<std::pair<TransientTrackingRecHit::RecHitPointer, bool>> const* extraHits = nullptr,
-                                          bool fullMaterial = false) {
+                                          bool fullMaterial = false,
+                                          bool produceAudit = false,
+                                          bool removeExactDuplicates = false) {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
       double path;
@@ -1420,6 +1484,7 @@ namespace {
 
     DirectionalRefitResult result;
     result.inputHits = orderedHits.size();
+    result.fitInputHits = result.inputHits;
     std::set<unsigned int> inputStations;
     for (auto const& orderedHit : orderedHits) {
       auto const station = precisionStationKey(orderedHit.hit->geographicalId());
@@ -1476,10 +1541,31 @@ namespace {
     result.inputLeverArm =
         (orderedHits.front().hit->globalPosition() - orderedHits.back().hit->globalPosition()).mag();
 
-    Trajectory::RecHitContainer fitHits;
-    fitHits.reserve(orderedHits.size());
+    Trajectory::RecHitContainer rawFitHits;
+    rawFitHits.reserve(orderedHits.size());
     for (auto const& orderedHit : orderedHits)
-      fitHits.push_back(orderedHit.hit);
+      rawFitHits.push_back(orderedHit.hit);
+
+    // Retain the raw ordered list for provenance. Only the detector fit sees
+    // the separate first-occurrence list; no truth or geometric tolerance is used.
+    Trajectory::RecHitContainer fitHits;
+    fitHits.reserve(rawFitHits.size());
+    for (auto const& hit : rawFitHits) {
+      bool duplicate = false;
+      if (removeExactDuplicates && hit->hit())
+        for (auto const& kept : fitHits)
+          if (kept->hit() && shift::isExactCSCMeasurementCopy(*hit->hit(), *kept->hit())) {
+            duplicate = true;
+            break;
+          }
+      if (!duplicate)
+        fitHits.push_back(hit);
+    }
+    result.fitInputHits = fitHits.size();
+    if (fitHits.size() < 3) {
+      result.status = -1;
+      return result;
+    }
 
     KFUpdator updator;
     auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed,
@@ -1591,6 +1677,18 @@ namespace {
         result.status = 15;
         return result;
       }
+      // Keep this independent snapshot before target transport. Existing
+      // result.valid/upstreamState writes below retain their original meaning.
+      if (produceAudit && upstream->hasError()) {
+        result.audit.available = true;
+        result.audit.state = *upstream;
+        result.audit.surfaceId = smoothed.lastMeasurement().recHitR().geographicalId().rawId();
+        result.audit.hits = smoothed.foundHits();
+        result.audit.chi2 = smoothed.chiSquared();
+        result.audit.ndof = std::max(1., 2. * static_cast<double>(smoothed.foundHits()) - 5.);
+        result.audit.inputHash = fitHitHash(rawFitHits);
+        result.audit.usedHash = fitHitHash(iterationHits);
+      }
       auto const& downstream = smoothed.firstMeasurement().updatedState();
       if (!downstream.isValid()) {
         result.status = 16;
@@ -1627,6 +1725,10 @@ namespace {
         result.status = 18;
         return result;
       }
+      if (produceAudit) {
+        result.audit.accepted = true;
+        result.audit.targetAttempted = true;
+      }
       auto const upstreamFreeState = *upstream->freeState();
       PropagatedState materialTargetState;
       PropagatedState vacuumTargetState;
@@ -1638,6 +1740,8 @@ namespace {
                                      materialBoundaryAbsZCm, fullMaterial);
       vacuumTargetState = propagateStateToTargetLine(
           upstreamFreeState, vacuumPropagator, nullptr, sourceSide, materialBoundaryAbsZCm);
+      if (produceAudit)
+        result.audit.targetStatus = materialTargetState.valid ? 1 : -1;
       if (!materialTargetState.valid) {
         result.status = 17;
         return result;
@@ -2570,6 +2674,23 @@ public:
     if (parameters.existsAs<bool>("directionalRefitUseDetailedTransportCorrections"))
       directionalRefitUseDetailedTransportCorrections_ =
           parameters.getParameter<bool>("directionalRefitUseDetailedTransportCorrections");
+    if (parameters.existsAs<bool>("removeExactDuplicateMuonFitInputs"))
+      removeExactDuplicateMuonFitInputs_ = parameters.getParameter<bool>("removeExactDuplicateMuonFitInputs");
+    if (parameters.existsAs<bool>("produceDetectorFitAudit"))
+      produceDetectorFitAudit_ = parameters.getParameter<bool>("produceDetectorFitAudit");
+    if (parameters.existsAs<bool>("directionalRefitUseConsistentBackwardCovariance"))
+      directionalRefitUseConsistentBackwardCovariance_ = parameters.getParameter<bool>("directionalRefitUseConsistentBackwardCovariance");
+    if (parameters.existsAs<bool>("directionalRefitUseMeanEnergyLossJacobian"))
+      directionalRefitUseMeanEnergyLossJacobian_ = parameters.getParameter<bool>("directionalRefitUseMeanEnergyLossJacobian");
+    if (parameters.existsAs<bool>("directionalRefitUseFieldGradientJacobian"))
+      directionalRefitUseFieldGradientJacobian_ = parameters.getParameter<bool>("directionalRefitUseFieldGradientJacobian");
+    if (parameters.existsAs<bool>("directionalRefitUseUnquenchedIonizationVariance"))
+      directionalRefitUseUnquenchedIonizationVariance_ = parameters.getParameter<bool>("directionalRefitUseUnquenchedIonizationVariance");
+    if (directionalRefitUseDetailedTransportCorrections_ &&
+        !directionalRefitUseConsistentBackwardCovariance_ &&
+        (directionalRefitUseMeanEnergyLossJacobian_ || directionalRefitUseFieldGradientJacobian_ ||
+         directionalRefitUseUnquenchedIonizationVariance_))
+      throw cms::Exception("Configuration") << "Detailed detector covariance corrections require the backward convention";
     if (directionalRefitUseDetailedTransportCorrections_ &&
         (!useImprovedMomentumRefit_ || !directionalRefitUseMaterialEffects_ ||
          !directionalRefitUseDetailedMaterialEffects_))
@@ -2667,6 +2788,8 @@ public:
       trackerSimHitsTokens_.push_back(consumes<edm::PSimHitContainer>(tag));
     produces<nanoaod::FlatTable>();
     produces<nanoaod::FlatTable>("ShiftDimuonVertex");
+    if (produceDetectorFitAudit_)
+      produces<nanoaod::FlatTable>("ShiftDetectorFitAudit");
   }
 
   void produce(edm::Event& event, edm::EventSetup const& setup) override {
@@ -2840,10 +2963,10 @@ public:
       if (directionalRefitUseDetailedTransportCorrections_) {
         // These corrections belong to the detector fit, independently from
         // target-transport options. Fitter/smoother clones retain them.
-        detailedRefitMaterialPropagator->setUseConsistentBackwardCovariance(true);
-        detailedRefitMaterialPropagator->setUseMeanEnergyLossJacobian(true);
-        detailedRefitMaterialPropagator->setUseFieldGradientJacobian(true);
-        detailedRefitMaterialPropagator->setUseUnquenchedIonizationVariance(true);
+        detailedRefitMaterialPropagator->setUseConsistentBackwardCovariance(directionalRefitUseConsistentBackwardCovariance_);
+        detailedRefitMaterialPropagator->setUseMeanEnergyLossJacobian(directionalRefitUseMeanEnergyLossJacobian_);
+        detailedRefitMaterialPropagator->setUseFieldGradientJacobian(directionalRefitUseFieldGradientJacobian_);
+        detailedRefitMaterialPropagator->setUseUnquenchedIonizationVariance(directionalRefitUseUnquenchedIonizationVariance_);
       }
       directionalRefitFitterPropagator = detailedRefitMaterialPropagator.get();
       directionalRefitSmootherPropagator = detailedRefitMaterialPropagator.get();
@@ -3323,7 +3446,8 @@ public:
                                 precisionHitsOnly,
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
-                                &additionalHits, useMaterialAwarePcaTransport_);
+                                &additionalHits, useMaterialAwarePcaTransport_, produceDetectorFitAudit_,
+                                removeExactDuplicateMuonFitInputs_);
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -3363,6 +3487,22 @@ public:
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+      if (produceDetectorFitAudit_) {
+        candidate.detectorAuditVariant = usePrecisionRefit ? 1 : 0;
+        candidate.detectorAuditNativeStatus = refit.status;
+        candidate.detectorAuditFirstStatus = refit.first.status;
+        candidate.detectorAuditSecondStatus = refit.second.status;
+        if (refit.selectedIteration != 0) {
+          candidate.detectorAudit = refit.selected.audit;
+          candidate.detectorAuditIteration = refit.selectedIteration;
+          candidate.detectorAuditSnapshotKind = 1;
+        } else {
+          // Diagnostic fallback only: it does not create a valid native refit.
+          candidate.detectorAudit = refit.first.audit;
+          candidate.detectorAuditIteration = refit.first.audit.available ? 1 : 0;
+          candidate.detectorAuditSnapshotKind = refit.first.audit.available ? 2 : 0;
+        }
+      }
       // Optional failed-tail study: compare the refit with the independently
       // propagated input momentum before publishing it. The full production
       // degraded the dominant near-endcap-only topology, so this guard is off
@@ -3401,13 +3541,15 @@ public:
           allHitsRefit.valid ? allHitsRefit.selected.materialTargetState.momentum.z() : 0.;
       candidate.directionalRefitAllHitsSelectedIteration = allHitsRefit.selectedIteration;
       candidate.directionalRefitAllHitsInput = allHitsRefit.inputHits;
+      candidate.directionalRefitAllHitsFitInput = allHitsRefit.fitInputHits;
+      candidate.directionalRefitAllHitsExactDuplicatesRemoved = allHitsRefit.inputHits - allHitsRefit.fitInputHits;
       candidate.directionalRefitAllHitsOrderingFallback = allHitsRefit.pathOrderingFallbackHits;
       candidate.directionalRefitAllHitsOrderingSpan = allHitsRefit.pathOrderingSpan;
       candidate.directionalRefitAllHitsFirstRejected =
-          allHitsRefit.inputHits > allHitsRefit.first.hits ? allHitsRefit.inputHits - allHitsRefit.first.hits : 0;
+          allHitsRefit.fitInputHits > allHitsRefit.first.hits ? allHitsRefit.fitInputHits - allHitsRefit.first.hits : 0;
       candidate.directionalRefitAllHitsSecondRejected =
-          allHitsRefit.second.valid && allHitsRefit.inputHits > allHitsRefit.second.hits
-              ? allHitsRefit.inputHits - allHitsRefit.second.hits
+          allHitsRefit.second.valid && allHitsRefit.fitInputHits > allHitsRefit.second.hits
+              ? allHitsRefit.fitInputHits - allHitsRefit.second.hits
               : 0;
       candidate.directionalRefitPrecisionValid = precisionRefit.valid;
       candidate.directionalRefitPrecisionHits = precisionRefit.selected.hits;
@@ -3448,13 +3590,15 @@ public:
       candidate.directionalRefitOppositeLegPrecisionTargetPz =
           oppositeLegPrecisionRefit.valid ? oppositeLegPrecisionRefit.selected.materialTargetState.momentum.z() : 0.;
       candidate.directionalRefitPrecisionInput = precisionRefit.inputHits;
+      candidate.directionalRefitPrecisionFitInput = precisionRefit.fitInputHits;
+      candidate.directionalRefitPrecisionExactDuplicatesRemoved = precisionRefit.inputHits - precisionRefit.fitInputHits;
       candidate.directionalRefitPrecisionOrderingFallback = precisionRefit.pathOrderingFallbackHits;
       candidate.directionalRefitPrecisionOrderingSpan = precisionRefit.pathOrderingSpan;
       candidate.directionalRefitPrecisionFirstRejected =
-          precisionRefit.inputHits > precisionRefit.first.hits ? precisionRefit.inputHits - precisionRefit.first.hits : 0;
+          precisionRefit.fitInputHits > precisionRefit.first.hits ? precisionRefit.fitInputHits - precisionRefit.first.hits : 0;
       candidate.directionalRefitPrecisionSecondRejected =
-          precisionRefit.second.valid && precisionRefit.inputHits > precisionRefit.second.hits
-              ? precisionRefit.inputHits - precisionRefit.second.hits
+          precisionRefit.second.valid && precisionRefit.fitInputHits > precisionRefit.second.hits
+              ? precisionRefit.fitInputHits - precisionRefit.second.hits
               : 0;
 
       // Keep the established first/second diagnostic branches tied to the
@@ -3518,6 +3662,18 @@ public:
       }
     }
 
+    std::array<int, 8> detectorAuditCounts{};
+    if (produceDetectorFitAudit_) {
+      detectorAuditCounts[0] = candidates.size();
+      for (auto const& candidate : candidates) {
+        detectorAuditCounts[1] += candidate.directionalRefitAttempted;
+        detectorAuditCounts[2] += candidate.detectorAudit.available;
+        detectorAuditCounts[3] += candidate.detectorAudit.accepted;
+        detectorAuditCounts[4] += candidate.detectorAudit.targetAttempted;
+        detectorAuditCounts[5] += candidate.detectorAudit.targetStatus == 1;
+        detectorAuditCounts[6] += candidate.detectorStateValid;
+      }
+    }
     // Do not select on reconstructed z.  Reject only invalid/empty fits and
     // trajectories which do not point back to the unbounded target line in
     // the transverse plane, or which lack the forward topology of particles
@@ -3656,6 +3812,7 @@ public:
         return a.track->numberOfValidHits() > b.track->numberOfValidHits();
       return a.track->normalizedChi2() < b.track->normalizedChi2();
     };
+    detectorAuditCounts[7] = detectorAuditCounts[0] - candidates.size();
     std::vector<Candidate const*> selected;
     std::vector<unsigned int> duplicateGroupSize, duplicateSourceMask, duplicateDSACount,
         duplicateTraversingCount, duplicateCosmicCount;
@@ -4203,6 +4360,8 @@ public:
         directionalRefitPrecisionHits, directionalRefitPrecisionSecondValid,
         directionalRefitPrecisionSecondConverged, directionalRefitPrecisionSelectedIteration,
         directionalRefitMaterialBoundaryValid, directionalRefitAllHitsInput,
+        directionalRefitAllHitsFitInput, directionalRefitAllHitsExactDuplicatesRemoved,
+        directionalRefitPrecisionFitInput, directionalRefitPrecisionExactDuplicatesRemoved,
         directionalRefitAllHitsOrderingFallback, directionalRefitAllHitsFirstRejected,
         directionalRefitAllHitsSecondRejected, directionalRefitPrecisionInput,
         directionalRefitPrecisionOrderingFallback, directionalRefitPrecisionFirstRejected,
@@ -4387,11 +4546,15 @@ public:
       directionalRefitMaterialBoundaryPz.push_back(candidate->directionalRefitMaterialBoundaryPz);
       directionalRefitMaterialPath.push_back(candidate->directionalRefitMaterialPath);
       directionalRefitAllHitsInput.push_back(candidate->directionalRefitAllHitsInput);
+      directionalRefitAllHitsFitInput.push_back(candidate->directionalRefitAllHitsFitInput);
+      directionalRefitAllHitsExactDuplicatesRemoved.push_back(candidate->directionalRefitAllHitsExactDuplicatesRemoved);
       directionalRefitAllHitsOrderingFallback.push_back(candidate->directionalRefitAllHitsOrderingFallback);
       directionalRefitAllHitsOrderingSpan.push_back(candidate->directionalRefitAllHitsOrderingSpan);
       directionalRefitAllHitsFirstRejected.push_back(candidate->directionalRefitAllHitsFirstRejected);
       directionalRefitAllHitsSecondRejected.push_back(candidate->directionalRefitAllHitsSecondRejected);
       directionalRefitPrecisionInput.push_back(candidate->directionalRefitPrecisionInput);
+      directionalRefitPrecisionFitInput.push_back(candidate->directionalRefitPrecisionFitInput);
+      directionalRefitPrecisionExactDuplicatesRemoved.push_back(candidate->directionalRefitPrecisionExactDuplicatesRemoved);
       directionalRefitPrecisionOrderingFallback.push_back(candidate->directionalRefitPrecisionOrderingFallback);
       directionalRefitPrecisionOrderingSpan.push_back(candidate->directionalRefitPrecisionOrderingSpan);
       directionalRefitPrecisionFirstRejected.push_back(candidate->directionalRefitPrecisionFirstRejected);
@@ -4581,6 +4744,166 @@ public:
     }
 
     auto table = std::make_unique<nanoaod::FlatTable>(selected.size(), "ShiftMuon", false, false);
+    if (produceDetectorFitAudit_) {
+      // Only retained ShiftMuon rows have detailed closure. The singleton
+      // counters below retain the denominator before candidate cuts/cleaning.
+      std::map<std::string, std::vector<int>> integers;
+      std::map<std::string, std::vector<uint32_t>> unsignedIntegers;
+      std::map<std::string, std::vector<double>> doubles;
+      for (auto const* name : {"Available", "FitAccepted", "TargetAttempted", "TargetStatus", "CanonicalAccepted", "Variant", "Iteration", "SnapshotKind", "NativeStatus", "FirstStatus", "SecondStatus", "UsedHits", "Charge", "LocalPzSign", "TruthStatus", "TruthSimTrackId", "TruthCharge", "TruthLocalPzSign", "TruthLowerKind", "TruthUpperKind"})
+        integers[name] = {};
+      for (auto const* name : {"SurfaceId", "InputHashLo", "InputHashHi", "UsedHashLo", "UsedHashHi"})
+        unsignedIntegers[name] = {};
+      for (auto const* name : {"X", "Y", "Z", "Px", "Py", "Pz", "Par0", "Par1", "Par2", "Par3", "Par4", "Cov00", "Cov10", "Cov11", "Cov20", "Cov21", "Cov22", "Cov30", "Cov31", "Cov32", "Cov33", "Cov40", "Cov41", "Cov42", "Cov43", "Cov44", "Chi2", "Ndof", "TruthX", "TruthY", "TruthZ", "TruthPx", "TruthPy", "TruthPz", "TruthPar0", "TruthPar1", "TruthPar2", "TruthPar3", "TruthPar4", "TruthLowerX", "TruthLowerY", "TruthLowerZ", "TruthLowerPx", "TruthLowerPy", "TruthLowerPz", "TruthUpperX", "TruthUpperY", "TruthUpperZ", "TruthUpperPx", "TruthUpperPy", "TruthUpperPz", "TruthLowerLocalZ", "TruthUpperLocalZ", "TruthSpan", "TruthWeight"})
+        doubles[name] = {};
+      auto chamberKey = [](DetId id) -> uint32_t {
+        if (id.det() != DetId::Muon)
+          return id.rawId();
+        if (id.subdetId() == MuonSubdetId::CSC)
+          return CSCDetId(id).chamberId().rawId();
+        if (id.subdetId() == MuonSubdetId::DT)
+          return DTWireId(id).chamberId().rawId();
+        if (id.subdetId() == MuonSubdetId::GEM)
+          return GEMDetId(id).chamberId().rawId();
+        return id.rawId();
+      };
+      for (unsigned int i = 0; i < selected.size(); ++i) {
+        auto const& candidate = *selected[i];
+        auto const& audit = candidate.detectorAudit;
+        auto addInt = [&](std::string const& name, int value) { integers[name].push_back(value); };
+        auto addUInt = [&](std::string const& name, uint32_t value) { unsignedIntegers[name].push_back(value); };
+        auto addDouble = [&](std::string const& name, double value) { doubles[name].push_back(value); };
+        addInt("Available", audit.available);
+        addInt("FitAccepted", audit.accepted);
+        addInt("TargetAttempted", audit.targetAttempted);
+        addInt("TargetStatus", audit.targetStatus);
+        addInt("CanonicalAccepted", candidate.detectorStateValid);
+        addInt("Variant", candidate.detectorAuditVariant);
+        addInt("Iteration", candidate.detectorAuditIteration);
+        addInt("SnapshotKind", candidate.detectorAuditSnapshotKind);
+        addInt("NativeStatus", candidate.detectorAuditNativeStatus);
+        addInt("FirstStatus", candidate.detectorAuditFirstStatus);
+        addInt("SecondStatus", candidate.detectorAuditSecondStatus);
+        addInt("UsedHits", audit.hits);
+        addInt("Charge", audit.available ? audit.state.charge() : 0);
+        addInt("LocalPzSign", audit.available ? audit.state.localParameters().pzSign() : 0);
+        addUInt("SurfaceId", audit.surfaceId);
+        addUInt("InputHashLo", audit.inputHash & 0xffffffffULL);
+        addUInt("InputHashHi", audit.inputHash >> 32);
+        addUInt("UsedHashLo", audit.usedHash & 0xffffffffULL);
+        addUInt("UsedHashHi", audit.usedHash >> 32);
+        std::array<double, 6> state{{-999., -999., -999., -999., -999., -999.}};
+        if (audit.available) {
+          auto const x = audit.state.globalPosition();
+          auto const p = audit.state.globalMomentum();
+          state = {{x.x(), x.y(), x.z(), p.x(), p.y(), p.z()}};
+        }
+        std::array<std::string, 6> const components{{"X", "Y", "Z", "Px", "Py", "Pz"}};
+        for (unsigned int j = 0; j < components.size(); ++j)
+          addDouble(components[j], state[j]);
+        for (unsigned int row = 0; row < 5; ++row) {
+          addDouble("Par" + std::to_string(row), audit.available ? audit.state.localParameters().vector()[row] : -999.);
+          for (unsigned int column = 0; column <= row; ++column)
+            addDouble("Cov" + std::to_string(row) + std::to_string(column),
+                      audit.available ? audit.state.localError().matrix()(row, column) : -999.);
+        }
+        addDouble("Chi2", audit.chi2);
+        addDouble("Ndof", audit.ndof);
+
+        // Independent hit association is evaluation only. Entry/exit points
+        // bracket the ACTUAL fitted surface in its local chart. Momentum at
+        // an exit is a SimHit entry-momentum proxy, never an exact exit state.
+        shift::DetectorTruthBracket bracket;
+        int truthStatus = -1;
+        int truthCharge = 0;
+        if (!audit.available)
+          truthStatus = -2;
+        else if (produceHitTruthAssociation_ && hitSimTrackId[i] >= 0 && simTracks.isValid()) {
+          for (auto const& sim : *simTracks)
+            if (sim.trackId() == static_cast<unsigned int>(hitSimTrackId[i]))
+              truthCharge = sim.charge();
+          auto appendHits = [&](auto const& handle) {
+            if (!handle.isValid())
+              return;
+            for (auto const& hit : *handle) {
+              if (hit.trackId() != static_cast<unsigned int>(hitSimTrackId[i]) ||
+                  chamberKey(DetId(hit.detUnitId())) != chamberKey(DetId(audit.surfaceId)))
+                continue;
+              auto const* detector = trackingGeometry.idToDetUnit(DetId(hit.detUnitId()));
+              if (!detector)
+                continue;
+              auto const momentum = detector->surface().toGlobal(hit.momentumAtEntry());
+              unsigned int kind = 0;
+              for (auto const& local : {hit.entryPoint(), hit.exitPoint()}) {
+                auto const point = detector->surface().toGlobal(local);
+                double const z = audit.state.surface().toLocal(point).z();
+                bracket.add({{{point.x(), point.y(), point.z()}},
+                             {{momentum.x(), momentum.y(), momentum.z()}}, z, static_cast<int>(kind++)});
+              }
+            }
+          };
+          appendHits(cscSimHits);
+          appendHits(dtSimHits);
+          truthStatus = -3;
+        }
+        std::array<double, 3> truthX{{-999., -999., -999.}}, truthP{{-999., -999., -999.}};
+        std::array<double, 5> truthParameters{{-999., -999., -999., -999., -999.}};
+        double weight = -1.;
+        int truthLocalPzSign = 0;
+        if (truthStatus == -3 && bracket.interpolate(truthX, truthP, weight)) {
+          GlobalPoint const globalX(truthX[0], truthX[1], truthX[2]);
+          GlobalVector const globalP(truthP[0], truthP[1], truthP[2]);
+          auto const localX = audit.state.surface().toLocal(globalX);
+          auto const localP = audit.state.surface().toLocal(globalP);
+          if (localP.z() != 0. && std::isfinite(localP.z()) && truthCharge != 0) {
+            truthParameters = {{truthCharge / globalP.mag(), localP.x() / localP.z(), localP.y() / localP.z(),
+                                localX.x(), localX.y()}};
+            truthLocalPzSign = localP.z() > 0. ? 1 : -1;
+            truthStatus = 1;
+            for (auto value : truthParameters)
+              if (!std::isfinite(value))
+                truthStatus = -5;
+          } else
+            truthStatus = -4;
+        }
+        addInt("TruthStatus", truthStatus);
+        addInt("TruthSimTrackId", hitSimTrackId[i]);
+        addInt("TruthCharge", truthCharge);
+        addInt("TruthLocalPzSign", truthLocalPzSign);
+        addInt("TruthLowerKind", bracket.hasLower ? bracket.lower.kind : -1);
+        addInt("TruthUpperKind", bracket.hasUpper ? bracket.upper.kind : -1);
+        for (unsigned int j = 0; j < 3; ++j) {
+          addDouble("Truth" + components[j], truthX[j]);
+          addDouble("Truth" + components[j + 3], truthP[j]);
+          addDouble("TruthLower" + components[j], bracket.hasLower ? bracket.lower.position[j] : -999.);
+          addDouble("TruthUpper" + components[j], bracket.hasUpper ? bracket.upper.position[j] : -999.);
+          addDouble("TruthLower" + components[j + 3], bracket.hasLower ? bracket.lower.momentum[j] : -999.);
+          addDouble("TruthUpper" + components[j + 3], bracket.hasUpper ? bracket.upper.momentum[j] : -999.);
+        }
+        for (unsigned int j = 0; j < 5; ++j)
+          addDouble("TruthPar" + std::to_string(j), truthParameters[j]);
+        addDouble("TruthLowerLocalZ", bracket.hasLower ? bracket.lower.localZ : -999.);
+        addDouble("TruthUpperLocalZ", bracket.hasUpper ? bracket.upper.localZ : -999.);
+        addDouble("TruthSpan", bracket.hasLower && bracket.hasUpper ? bracket.upper.localZ - bracket.lower.localZ : -1.);
+        addDouble("TruthWeight", weight);
+      }
+      // Keep the schema present even when this event contains no selected muon.
+      for (auto const& column : integers)
+        table->addColumn<int>("detectorAudit" + column.first, column.second, "detector fit audit; selected muons only, truth is evaluation only");
+      for (auto const& column : unsignedIntegers)
+        table->addColumn<uint32_t>("detectorAudit" + column.first, column.second, "detector audit surface or ordered measured-hit fingerprint word");
+      for (auto const& column : doubles)
+        table->addColumn<double>("detectorAudit" + column.first, column.second, "detector fit audit double; truth requires status 1 and is a bracket proxy");
+      auto counters = std::make_unique<nanoaod::FlatTable>(1, "", true, false);
+      std::array<std::string, 8> const names{{"inputCandidates", "attempted", "stateAvailable", "fitAccepted",
+                                             "targetAttempted", "targetValid", "canonicalAccepted", "erased"}};
+      for (unsigned int i = 0; i < names.size(); ++i)
+        counters->addColumn<int>("ShiftDetectorFitAudit" + names[i], std::vector<int>{detectorAuditCounts[i]},
+                                "pre-cleaning native candidate count; detailed closure is selected-only");
+      counters->addColumn<int>("ShiftDetectorFitAuditretained", std::vector<int>{static_cast<int>(selected.size())},
+                              "retained ShiftMuon count after geometric selection and duplicate cleaning");
+      event.put(std::move(counters), "ShiftDetectorFitAudit");
+    }
     table->addColumn<float>("pt", pt, "transverse momentum");
     table->addColumn<float>("eta", eta, "pseudorapidity");
     table->addColumn<float>("phi", phi, "azimuthal angle");
@@ -4866,6 +5189,12 @@ public:
     table->addColumn<int>("directionalRefitAllHitsInput",
                           directionalRefitAllHitsInput,
                           "valid all-muon-system hits supplied to the refit");
+    table->addColumn<int>("directionalRefitAllHitsFitInput",
+                          directionalRefitAllHitsFitInput,
+                          "effective detector-fit input count: raw if copy removal is disabled");
+    table->addColumn<int>("directionalRefitAllHitsExactDuplicatesRemoved",
+                          directionalRefitAllHitsExactDuplicatesRemoved,
+                          "exact leaf-CSC pulse copies removed before fitting; zero when disabled");
     table->addColumn<int>("directionalRefitAllHitsOrderingFallback",
                           directionalRefitAllHitsOrderingFallback,
                           "all-hit measurements ordered by projection after path propagation failed");
@@ -4965,6 +5294,12 @@ public:
     table->addColumn<int>("directionalRefitPrecisionInput",
                           directionalRefitPrecisionInput,
                           "valid DT, CSC, and GEM hits supplied to the precision refit");
+    table->addColumn<int>("directionalRefitPrecisionFitInput",
+                          directionalRefitPrecisionFitInput,
+                          "effective detector-fit input count: raw if copy removal is disabled");
+    table->addColumn<int>("directionalRefitPrecisionExactDuplicatesRemoved",
+                          directionalRefitPrecisionExactDuplicatesRemoved,
+                          "exact leaf-CSC pulse copies removed before fitting; zero when disabled");
     table->addColumn<int>("directionalRefitPrecisionOrderingFallback",
                           directionalRefitPrecisionOrderingFallback,
                           "precision measurements ordered by projection after path propagation failed");
@@ -5969,6 +6304,12 @@ public:
     description.add<double>("directionalRefitFirstPrinciplesStepCm", 0.2);
     description.add<bool>("directionalRefitUseDetailedMaterialEffects", false);
     description.add<bool>("directionalRefitUseDetailedTransportCorrections", false);
+    description.add<bool>("directionalRefitUseConsistentBackwardCovariance", true);
+    description.add<bool>("directionalRefitUseMeanEnergyLossJacobian", true);
+    description.add<bool>("directionalRefitUseFieldGradientJacobian", true);
+    description.add<bool>("directionalRefitUseUnquenchedIonizationVariance", true);
+    description.add<bool>("produceDetectorFitAudit", false);
+    description.add<bool>("removeExactDuplicateMuonFitInputs", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother", false);
@@ -6111,6 +6452,12 @@ private:
   double directionalRefitFirstPrinciplesStepCm_;
   bool directionalRefitUseDetailedMaterialEffects_;
   bool directionalRefitUseDetailedTransportCorrections_ = false;
+  bool directionalRefitUseConsistentBackwardCovariance_ = true;
+  bool directionalRefitUseMeanEnergyLossJacobian_ = true;
+  bool directionalRefitUseFieldGradientJacobian_ = true;
+  bool directionalRefitUseUnquenchedIonizationVariance_ = true;
+  bool produceDetectorFitAudit_ = false;
+  bool removeExactDuplicateMuonFitInputs_ = false;
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;
   bool directionalRefitUseGeometryMaterialEffectsInSmoother_;
