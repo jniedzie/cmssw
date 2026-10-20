@@ -2,6 +2,7 @@
 #include "CommonTools/Statistics/interface/ChiSquaredProbability.h"
 #include "DataFormats/NanoAOD/interface/FlatTable.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/DetectorFitAudit.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/CSCFitCoverage.h"
 #include "PhysicsTools/ShiftMuonSegments/interface/ExactMuonFitInput.h"
 #include <cstring>
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
@@ -335,12 +336,15 @@ namespace {
     double ndof = -1.;
     uint64_t inputHash = 0;
     uint64_t usedHash = 0;
+    uint64_t fittedHash = 0;
+    unsigned int fittedHits = 0;
     TrajectoryStateOnSurface state;
   };
 
-  // Diagnostic fingerprints describe the ordered measured fit input, including
-  // the retained subset after the existing outlier removal. They are not a
-  // channel/pulse identifier and never participate in reconstruction.
+  // InputHash and historical UsedHash describe the supplied ordered input,
+  // before/after explicit outlier removal. FittedHash separately describes
+  // valid smoothed measurements, which can be fewer after a partial fit.
+  // These are not channel/pulse identifiers or reconstruction inputs.
   uint64_t fitHitHash(TransientTrackingRecHit::ConstRecHitContainer const& hits) {
     uint64_t hash = 14695981039346656037ULL;
     auto append = [&hash](uint64_t word) {
@@ -394,6 +398,10 @@ namespace {
     int physicalDirectionSign = 0;
     bool directionalRefitAttempted = false;
     bool directionalRefitValid = false;
+    shift::CSCFitCoverage directionalRefitInputCSC;
+    shift::CSCFitCoverage directionalRefitFittedCSC;
+    bool directionalRefitCSCEndcapCoverageRejected = false;
+    int directionalRefitNativeTargetStatus = 0;
     unsigned int directionalRefitHits = 0;
     double directionalRefitChi2 = 0.;
     double directionalRefitNdof = 0.;
@@ -953,6 +961,8 @@ namespace {
 
   struct RefitIterationResult {
     DetectorFitSnapshot audit;
+    shift::CSCFitCoverage fittedCSC;
+    int targetStatus = 0;
     bool valid = false;
     uint32_t upstreamDetId = 0;
     int status = 0;
@@ -1372,6 +1382,7 @@ namespace {
     unsigned int inputHits = 0;
     unsigned int fitInputHits = 0;
     unsigned int inputStations = 0;
+    shift::CSCFitCoverage inputCSC;
     double inputLeverArm = 0.;
     unsigned int pathOrderingFallbackHits = 0;
     double pathOrderingSpan = 0.;
@@ -1487,6 +1498,7 @@ namespace {
     result.fitInputHits = result.inputHits;
     std::set<unsigned int> inputStations;
     for (auto const& orderedHit : orderedHits) {
+      result.inputCSC.addMeasurement(orderedHit.hit->isValid(), orderedHit.hit->geographicalId());
       auto const station = precisionStationKey(orderedHit.hit->geographicalId());
       if (station != 0)
         inputStations.insert(station);
@@ -1667,6 +1679,18 @@ namespace {
         ++removedOutliers;
       }
 
+      // Observe measurements actually retained by the smoother, not the
+      // supplied iterationHits list: a native fit can return only a prefix.
+      TransientTrackingRecHit::ConstRecHitContainer fittedHits;
+      for (auto const& measurement : smoothed.measurements()) {
+        auto const& hit = measurement.recHit();
+        if (!hit || !hit->isValid() || !measurement.updatedState().isValid())
+          continue;
+        result.fittedCSC.addMeasurement(true, hit->geographicalId());
+        if (produceAudit)
+          fittedHits.push_back(hit);
+      }
+
       // KFTrajectorySmoother returns measurements in reverse filter order.
       // Since this fit was seeded source -> CMS, lastMeasurement is therefore
       // the source-facing state.  Record both surface and direction closure
@@ -1688,6 +1712,8 @@ namespace {
         result.audit.ndof = std::max(1., 2. * static_cast<double>(smoothed.foundHits()) - 5.);
         result.audit.inputHash = fitHitHash(rawFitHits);
         result.audit.usedHash = fitHitHash(iterationHits);
+        result.audit.fittedHash = fitHitHash(fittedHits);
+        result.audit.fittedHits = fittedHits.size();
       }
       auto const& downstream = smoothed.firstMeasurement().updatedState();
       if (!downstream.isValid()) {
@@ -1738,6 +1764,7 @@ namespace {
                                      &targetMaterialPropagator,
                                      sourceSide,
                                      materialBoundaryAbsZCm, fullMaterial);
+      result.targetStatus = materialTargetState.valid ? 1 : -1;
       vacuumTargetState = propagateStateToTargetLine(
           upstreamFreeState, vacuumPropagator, nullptr, sourceSide, materialBoundaryAbsZCm);
       if (produceAudit)
@@ -2678,6 +2705,9 @@ public:
       removeExactDuplicateMuonFitInputs_ = parameters.getParameter<bool>("removeExactDuplicateMuonFitInputs");
     if (parameters.existsAs<bool>("produceDetectorFitAudit"))
       produceDetectorFitAudit_ = parameters.getParameter<bool>("produceDetectorFitAudit");
+    if (parameters.existsAs<bool>("requireDirectionalRefitCSCEndcapCoverage"))
+      requireDirectionalRefitCSCEndcapCoverage_ =
+          parameters.getParameter<bool>("requireDirectionalRefitCSCEndcapCoverage");
     if (parameters.existsAs<bool>("directionalRefitUseConsistentBackwardCovariance"))
       directionalRefitUseConsistentBackwardCovariance_ = parameters.getParameter<bool>("directionalRefitUseConsistentBackwardCovariance");
     if (parameters.existsAs<bool>("directionalRefitUseMeanEnergyLossJacobian"))
@@ -3487,11 +3517,11 @@ public:
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
       auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+      candidate.detectorAuditVariant = usePrecisionRefit ? 1 : 0;
+      candidate.detectorAuditNativeStatus = refit.status;
+      candidate.detectorAuditFirstStatus = refit.first.status;
+      candidate.detectorAuditSecondStatus = refit.second.status;
       if (produceDetectorFitAudit_) {
-        candidate.detectorAuditVariant = usePrecisionRefit ? 1 : 0;
-        candidate.detectorAuditNativeStatus = refit.status;
-        candidate.detectorAuditFirstStatus = refit.first.status;
-        candidate.detectorAuditSecondStatus = refit.second.status;
         if (refit.selectedIteration != 0) {
           candidate.detectorAudit = refit.selected.audit;
           candidate.detectorAuditIteration = refit.selectedIteration;
@@ -3520,10 +3550,23 @@ public:
             refitMomentumRatio <= directionalRefitMaxMomentumRatio_;
       }
 
+      // Observe the existing chosen arm/iteration without promoting a different
+      // fit if it lost an input endcap. Keep the complete pre-refit candidate
+      // state and charge when the optional coverage guard blocks replacement.
+      auto const& coverageIteration = refit.selectedIteration != 0 ? refit.selected : refit.first;
+      candidate.directionalRefitInputCSC = refit.inputCSC;
+      candidate.directionalRefitFittedCSC = coverageIteration.fittedCSC;
+      candidate.directionalRefitNativeTargetStatus = coverageIteration.targetStatus;
+      bool const passesCSCEndcapCoverage = shift::passesCSCFitCoverage(
+          requireDirectionalRefitCSCEndcapCoverage_, refit.inputCSC.endcapMask,
+          coverageIteration.fittedCSC.endcapMask);
+      candidate.directionalRefitCSCEndcapCoverageRejected = refit.valid && !passesCSCEndcapCoverage;
+      bool const useRefitForCanonical = refitPassesMomentumContinuity && passesCSCEndcapCoverage;
+
       // Keep the detector likelihood for the separate prompt hypothesis.
       // Candidate selection and duplicate ranking use only the unconstrained
       // fit, so defer the expensive target transport until a row is selected.
-      if (produceTargetConstrainedMomentum_ && refitPassesMomentumContinuity) {
+      if (produceTargetConstrainedMomentum_ && useRefitForCanonical) {
         candidate.targetConstraintInput = refit.selected.upstreamState;
       } else if (produceTargetConstrainedMomentum_) {
         candidate.constrainedStatus = -10;
@@ -3604,7 +3647,7 @@ public:
       // Keep the established first/second diagnostic branches tied to the
       // all-hit control fit so this production can compare it directly with
       // the new precision-only variant.
-      candidate.directionalRefitValid = refitPassesMomentumContinuity;
+      candidate.directionalRefitValid = useRefitForCanonical;
       candidate.directionalRefitFirstValid = allHitsRefit.first.valid;
       candidate.directionalRefitFirstHits = allHitsRefit.first.hits;
       candidate.directionalRefitFirstChi2 = allHitsRefit.first.chi2;
@@ -3640,7 +3683,7 @@ public:
       if (refit.selected.upstreamP > 0.)
         candidate.directionalRefitFractionalLossAcrossHits =
             (refit.selected.upstreamP - refit.selected.downstreamP) / refit.selected.upstreamP;
-      if (refitPassesMomentumContinuity) {
+      if (useRefitForCanonical) {
         candidate.targetLineState = refit.selected.materialTargetState;
         candidate.detectorState = *refit.selected.upstreamState.freeState();
         candidate.detectorStateValid = true;
@@ -3681,21 +3724,55 @@ public:
     // without preferring either source side or any longitudinal location.
     candidates.erase(std::remove_if(candidates.begin(),
                                     candidates.end(),
-                                    [this](Candidate const& candidate) {
+                                    [this, &event](Candidate const& candidate) {
                                       double const pt = candidate.targetLineState.momentum.perp();
                                       double const absEta =
                                           pt > 0. ? std::abs(std::asinh(candidate.targetLineState.momentum.z() / pt))
                                                   : std::numeric_limits<double>::infinity();
-                                      if (logCandidateSelection_)
+                                      if (logCandidateSelection_) {
+                                        bool const invalidTarget = !candidate.targetLineState.valid;
+                                        bool const noValidHits = candidate.track->numberOfValidHits() == 0;
+                                        bool const failsDca =
+                                            candidate.targetLineState.position.perp() > maxTargetLineDca_;
+                                        bool const failsTargetEta = absEta < minAbsEta_;
+                                        // Bits: invalid target, no valid hits, DCA, target eta.
+                                        unsigned int const rejectionMask = invalidTarget | (noValidHits << 1) |
+                                                                           (failsDca << 2) | (failsTargetEta << 3);
                                         edm::LogVerbatim("ShiftCandidateSelection")
-                                            << "source=" << candidate.source << " index=" << candidate.sourceIndex
+                                            << "event=" << event.id()
+                                            << " source=" << candidate.source << " index=" << candidate.sourceIndex
                                             << " valid=" << candidate.targetLineState.valid
                                             << " hits=" << candidate.track->numberOfValidHits()
                                             << " dca=" << candidate.targetLineState.position.perp()
                                             << " eta=" << absEta
+                                            << " validTarget=" << !invalidTarget << " hasValidHits=" << !noValidHits
+                                            << " passDca=" << !failsDca << " passTargetEta=" << !failsTargetEta
+                                            << " maxDca=" << maxTargetLineDca_ << " minAbsEta=" << minAbsEta_
+                                            << " rejectionMask=" << rejectionMask
+                                            << " detectorAvailable=" << candidate.detectorAudit.available
+                                            << " detectorAccepted=" << candidate.detectorAudit.accepted
+                                            << " targetAttempted=" << candidate.detectorAudit.targetAttempted
+                                            << " targetStatus=" << candidate.detectorAudit.targetStatus
                                             << " refitValid=" << candidate.directionalRefitValid
                                             << " position=" << candidate.targetLineState.position
                                             << " momentum=" << candidate.targetLineState.momentum;
+                                      }
+                                      if (logCandidateSelection_) {
+                                        edm::LogVerbatim("ShiftDirectionalRefitCoverage")
+                                            << "event=" << event.id()
+                                            << " source=" << candidate.source << " index=" << candidate.sourceIndex
+                                            << " inputEndcapMask=" << candidate.directionalRefitInputCSC.endcapMask
+                                            << " inputStationMask=" << candidate.directionalRefitInputCSC.stationMask
+                                            << " inputCSCHits=" << candidate.directionalRefitInputCSC.hits
+                                            << " fittedEndcapMask=" << candidate.directionalRefitFittedCSC.endcapMask
+                                            << " fittedStationMask=" << candidate.directionalRefitFittedCSC.stationMask
+                                            << " fittedCSCHits=" << candidate.directionalRefitFittedCSC.hits
+                                            << " coverageRejected=" << candidate.directionalRefitCSCEndcapCoverageRejected
+                                            << " variant=" << candidate.detectorAuditVariant
+                                            << " nativeStatus=" << candidate.detectorAuditNativeStatus
+                                            << " firstStatus=" << candidate.detectorAuditFirstStatus
+                                            << " targetStatus=" << candidate.directionalRefitNativeTargetStatus;
+                                      }
                                       return !candidate.targetLineState.valid ||
                                              candidate.track->numberOfValidHits() == 0 ||
                                              candidate.targetLineState.position.perp() > maxTargetLineDca_ ||
@@ -4744,15 +4821,34 @@ public:
     }
 
     auto table = std::make_unique<nanoaod::FlatTable>(selected.size(), "ShiftMuon", false, false);
+    std::vector<int> inputCSCEndcapMask, fittedCSCEndcapMask, fittedCSCStationMask, fittedCSCHits,
+        cscEndcapCoverageRejected;
+    for (auto const* candidate : selected) {
+      inputCSCEndcapMask.push_back(candidate->directionalRefitInputCSC.endcapMask);
+      fittedCSCEndcapMask.push_back(candidate->directionalRefitFittedCSC.endcapMask);
+      fittedCSCStationMask.push_back(candidate->directionalRefitFittedCSC.stationMask);
+      fittedCSCHits.push_back(candidate->directionalRefitFittedCSC.hits);
+      cscEndcapCoverageRejected.push_back(candidate->directionalRefitCSCEndcapCoverageRejected);
+    }
+    table->addColumn<int>("directionalRefitInputCSCEndcapMask", inputCSCEndcapMask,
+                          "chosen refit input CSC endcaps: bit 0 +z, bit 1 -z");
+    table->addColumn<int>("directionalRefitFittedCSCEndcapMask", fittedCSCEndcapMask,
+                          "valid smoothed CSC endcaps in chosen iteration, or first failed attempt; bit 0 +z, bit 1 -z");
+    table->addColumn<int>("directionalRefitFittedCSCStationMask", fittedCSCStationMask,
+                          "valid smoothed CSC stations: bits 0..3 +z stations 1..4, bits 4..7 -z stations 1..4");
+    table->addColumn<int>("directionalRefitFittedCSCHits", fittedCSCHits,
+                          "valid CSC measurements actually retained by the smoother; repeated layer inputs count separately");
+    table->addColumn<int>("directionalRefitCSCEndcapCoverageRejected", cscEndcapCoverageRejected,
+                          "1 when the optional guard preserves the pre-refit state because the chosen fit lost a CSC endcap");
     if (produceDetectorFitAudit_) {
       // Only retained ShiftMuon rows have detailed closure. The singleton
       // counters below retain the denominator before candidate cuts/cleaning.
       std::map<std::string, std::vector<int>> integers;
       std::map<std::string, std::vector<uint32_t>> unsignedIntegers;
       std::map<std::string, std::vector<double>> doubles;
-      for (auto const* name : {"Available", "FitAccepted", "TargetAttempted", "TargetStatus", "CanonicalAccepted", "Variant", "Iteration", "SnapshotKind", "NativeStatus", "FirstStatus", "SecondStatus", "UsedHits", "Charge", "LocalPzSign", "TruthStatus", "TruthSimTrackId", "TruthCharge", "TruthLocalPzSign", "TruthLowerKind", "TruthUpperKind"})
+      for (auto const* name : {"Available", "FitAccepted", "TargetAttempted", "TargetStatus", "CanonicalAccepted", "Variant", "Iteration", "SnapshotKind", "NativeStatus", "FirstStatus", "SecondStatus", "UsedHits", "FittedHits", "Charge", "LocalPzSign", "TruthStatus", "TruthSimTrackId", "TruthCharge", "TruthLocalPzSign", "TruthLowerKind", "TruthUpperKind"})
         integers[name] = {};
-      for (auto const* name : {"SurfaceId", "InputHashLo", "InputHashHi", "UsedHashLo", "UsedHashHi"})
+      for (auto const* name : {"SurfaceId", "InputHashLo", "InputHashHi", "UsedHashLo", "UsedHashHi", "FittedHashLo", "FittedHashHi"})
         unsignedIntegers[name] = {};
       for (auto const* name : {"X", "Y", "Z", "Px", "Py", "Pz", "Par0", "Par1", "Par2", "Par3", "Par4", "Cov00", "Cov10", "Cov11", "Cov20", "Cov21", "Cov22", "Cov30", "Cov31", "Cov32", "Cov33", "Cov40", "Cov41", "Cov42", "Cov43", "Cov44", "Chi2", "Ndof", "TruthX", "TruthY", "TruthZ", "TruthPx", "TruthPy", "TruthPz", "TruthPar0", "TruthPar1", "TruthPar2", "TruthPar3", "TruthPar4", "TruthLowerX", "TruthLowerY", "TruthLowerZ", "TruthLowerPx", "TruthLowerPy", "TruthLowerPz", "TruthUpperX", "TruthUpperY", "TruthUpperZ", "TruthUpperPx", "TruthUpperPy", "TruthUpperPz", "TruthLowerLocalZ", "TruthUpperLocalZ", "TruthSpan", "TruthWeight"})
         doubles[name] = {};
@@ -4785,6 +4881,7 @@ public:
         addInt("FirstStatus", candidate.detectorAuditFirstStatus);
         addInt("SecondStatus", candidate.detectorAuditSecondStatus);
         addInt("UsedHits", audit.hits);
+        addInt("FittedHits", audit.fittedHits);
         addInt("Charge", audit.available ? audit.state.charge() : 0);
         addInt("LocalPzSign", audit.available ? audit.state.localParameters().pzSign() : 0);
         addUInt("SurfaceId", audit.surfaceId);
@@ -4792,6 +4889,8 @@ public:
         addUInt("InputHashHi", audit.inputHash >> 32);
         addUInt("UsedHashLo", audit.usedHash & 0xffffffffULL);
         addUInt("UsedHashHi", audit.usedHash >> 32);
+        addUInt("FittedHashLo", audit.fittedHash & 0xffffffffULL);
+        addUInt("FittedHashHi", audit.fittedHash >> 32);
         std::array<double, 6> state{{-999., -999., -999., -999., -999., -999.}};
         if (audit.available) {
           auto const x = audit.state.globalPosition();
@@ -4891,7 +4990,8 @@ public:
       for (auto const& column : integers)
         table->addColumn<int>("detectorAudit" + column.first, column.second, "detector fit audit; selected muons only, truth is evaluation only");
       for (auto const& column : unsignedIntegers)
-        table->addColumn<uint32_t>("detectorAudit" + column.first, column.second, "detector audit surface or ordered measured-hit fingerprint word");
+        table->addColumn<uint32_t>("detectorAudit" + column.first, column.second,
+                                   "detector audit word; UsedHash is supplied input after explicit outliers, FittedHash is valid smoothed measurements");
       for (auto const& column : doubles)
         table->addColumn<double>("detectorAudit" + column.first, column.second, "detector fit audit double; truth requires status 1 and is a bracket proxy");
       auto counters = std::make_unique<nanoaod::FlatTable>(1, "", true, false);
@@ -6309,6 +6409,7 @@ public:
     description.add<bool>("directionalRefitUseFieldGradientJacobian", true);
     description.add<bool>("directionalRefitUseUnquenchedIonizationVariance", true);
     description.add<bool>("produceDetectorFitAudit", false);
+    description.add<bool>("requireDirectionalRefitCSCEndcapCoverage", false);
     description.add<bool>("removeExactDuplicateMuonFitInputs", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
@@ -6457,6 +6558,7 @@ private:
   bool directionalRefitUseFieldGradientJacobian_ = true;
   bool directionalRefitUseUnquenchedIonizationVariance_ = true;
   bool produceDetectorFitAudit_ = false;
+  bool requireDirectionalRefitCSCEndcapCoverage_ = false;
   bool removeExactDuplicateMuonFitInputs_ = false;
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;

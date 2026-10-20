@@ -70,3 +70,7 @@
   <use name="clhep"/>
 </bin>
 <test name="testShiftExactMuonFitInputRun" command="testShiftExactMuonFitInput"/>
+<bin file="testCSCFitCoverage.cc" name="testShiftCSCFitCoverage">
+  <use name="DataFormats/MuonDetId"/>
+</bin>
+<test name="testShiftCSCFitCoverageRun" command="testShiftCSCFitCoverage"/>
