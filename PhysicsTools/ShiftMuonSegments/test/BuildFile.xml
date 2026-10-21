@@ -74,3 +74,4 @@
   <use name="DataFormats/MuonDetId"/>
 </bin>
 <test name="testShiftCSCFitCoverageRun" command="testShiftCSCFitCoverage"/>
+<test name="testShiftIteratedTrajectoryFit" command="python3 ${LOCALTOP}/src/PhysicsTools/ShiftMuonSegments/test/testIteratedTrajectoryFit.py"/>
