@@ -1512,6 +1512,7 @@ namespace {
                                           bool produceAudit = false,
                                           bool removeExactDuplicates = false,
                                           bool recoverFailedTargetPca = false,
+                                          bool seedFromOppositeEndpoint = false,
                                           std::string const& traceContext = "") {
     struct OrderedHit {
       TransientTrackingRecHit::RecHitPointer hit;
@@ -1628,10 +1629,33 @@ namespace {
       return result;
     }
 
+    // Compare endpoint initialization using the same canonical hit order and
+    // multiplicity. The other measured posterior is an alternative seed only.
+    bool const useOppositeSeed = seedFromOppositeEndpoint && result.inputCSC.endcapMask == 3;
+    std::unique_ptr<Propagator> seedPositioner;
+    if (useOppositeSeed) {
+      auto const other = useOuter ? trajectoryStateTransform::innerFreeState(track, &magneticField)
+                                  : trajectoryStateTransform::outerFreeState(track, &magneticField);
+      if (!other.hasError()) {
+        result.status = -3;
+        return result;
+      }
+      auto const otherMomentum = other.momentum();
+      GlobalTrajectoryParameters const otherParameters(
+          other.position(), sign * seedMomentumScale * otherMomentum,
+          sign * other.charge(), &magneticField);
+      iterationSeed = FreeTrajectoryState(
+          otherParameters, CurvilinearTrajectoryError(
+              shift::seedCovariance(other.curvilinearError().matrix(), sign, seedMomentumScale)));
+      seedPositioner.reset(fitMaterialPropagator.clone());
+      seedPositioner->setPropagationDirection(oppositeToMomentum);
+    }
+
     KFUpdator updator;
     auto runIteration = [&](FreeTrajectoryState const& uninflatedSeed,
                             double iterationSeedErrorRescale,
-                            double iterationMaxHitChi2) {
+                            double iterationMaxHitChi2,
+                            bool positionOppositeSeed) {
       RefitIterationResult result;
       Chi2MeasurementEstimator estimator(iterationMaxHitChi2);
       KFTrajectoryFitter fitter(fitMaterialPropagator, updator, estimator, 3, nullptr, &hitCloner);
@@ -1659,7 +1683,21 @@ namespace {
       };
       auto fitAndSmooth = [&](Trajectory::RecHitContainer const& iterationHits, int& status) {
         Trajectory invalid;
-        auto const firstPredicted = fitMaterialPropagator.propagate(start, *iterationHits.front()->surface());
+        TrajectoryStateOnSurface firstPredicted;
+        if (positionOppositeSeed) {
+          auto const positioned = seedPositioner->propagateWithPath(start, *iterationHits.front()->surface());
+          if (!traceContext.empty())
+            edm::LogVerbatim("ShiftDirectionalFitStages") << traceContext
+                << " stage=opposite-seed-positioning valid=" << positioned.first.isValid()
+                << " path=" << positioned.second << " seedP=" << start.momentum().mag();
+          if (!positioned.first.isValid() || !std::isfinite(positioned.second) || positioned.second > 0.) {
+            status = 19;
+            return invalid;
+          }
+          firstPredicted = positioned.first;
+        } else {
+          firstPredicted = fitMaterialPropagator.propagate(start, *iterationHits.front()->surface());
+        }
         if (!firstPredicted.isValid()) {
           status = 10;
           return invalid;
@@ -1857,7 +1895,7 @@ namespace {
       return result;
     };
 
-    result.first = runIteration(iterationSeed, seedCurvatureErrorRescale, initialMaxHitChi2);
+    result.first = runIteration(iterationSeed, seedCurvatureErrorRescale, initialMaxHitChi2, useOppositeSeed);
     if (!result.first.valid) {
       result.status = 100 + result.first.status;
       return result;
@@ -1876,7 +1914,7 @@ namespace {
     // prior. Keep its covariance inflation independently controllable so the
     // repeated-measurement feedback can be tested without changing pass one.
     result.second =
-        runIteration(*result.first.upstreamState.freeState(), secondSeedErrorRescale, maxHitChi2);
+        runIteration(*result.first.upstreamState.freeState(), secondSeedErrorRescale, maxHitChi2, false);
     if (result.second.valid) {
       double const denominator = std::max(std::abs(result.first.signedInverseMomentum), 1.e-12);
       result.relativeQoverPChange =
@@ -2774,6 +2812,8 @@ public:
       produceDetectorFitAudit_ = parameters.getParameter<bool>("produceDetectorFitAudit");
     if (parameters.existsAs<bool>("recoverFailedTargetPca"))
       recoverFailedTargetPca_ = parameters.getParameter<bool>("recoverFailedTargetPca");
+    if (parameters.existsAs<bool>("directionalRefitUseOppositeEndpointRefinement"))
+      directionalRefitUseOppositeEndpointRefinement_ = parameters.getParameter<bool>("directionalRefitUseOppositeEndpointRefinement");
     if (parameters.existsAs<bool>("requireDirectionalRefitCSCEndcapCoverage"))
       requireDirectionalRefitCSCEndcapCoverage_ =
           parameters.getParameter<bool>("requireDirectionalRefitCSCEndcapCoverage");
@@ -3521,12 +3561,13 @@ public:
       // direction.  This changes the direction in which the Kalman filter
       // applies material updates; flipping a completed fit cannot do that.
       candidate.directionalRefitAttempted = true;
-      auto runDirectionalRefit = [&](bool precisionHitsOnly, int hitSideSelection = 0) {
+      auto runDirectionalRefit = [&](bool precisionHitsOnly, int hitSideSelection = 0,
+                                     bool seedFromOppositeEndpoint = false) {
         std::ostringstream trace;
         if (logCandidateSelection_)
           trace << "event=" << event.id() << " source=" << candidate.source
                 << " index=" << candidate.sourceIndex << " precision=" << precisionHitsOnly
-                << " side=" << hitSideSelection;
+                << " side=" << hitSideSelection << " oppositeSeed=" << seedFromOppositeEndpoint;
         return directionalRefit(*candidate.track,
                                 directionSign,
                                 eventSourceSide,
@@ -3551,7 +3592,8 @@ public:
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
                                 &additionalHits, useMaterialAwarePcaTransport_, produceDetectorFitAudit_,
-                                removeExactDuplicateMuonFitInputs_, recoverFailedTargetPca_, trace.str());
+                                removeExactDuplicateMuonFitInputs_, recoverFailedTargetPca_,
+                                seedFromOppositeEndpoint, trace.str());
       };
       auto const allHitsRefit = runDirectionalRefit(false);
       auto const precisionRefit = useImprovedMomentumRefit_ ? runDirectionalRefit(true) : DirectionalRefitResult{};
@@ -3590,7 +3632,35 @@ public:
                                      precisionRefit.valid &&
                                      precisionRefit.inputStations >= directionalRefitMinPrecisionStations_ &&
                                      precisionHasShiftTopology && precisionAgreesWithAllHits;
-      auto const& refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+      auto refit = usePrecisionRefit ? precisionRefit : allHitsRefit;
+      if (directionalRefitUseOppositeEndpointRefinement_ && refit.valid &&
+          refit.inputCSC.endcapMask == 3 && refit.selected.hits == refit.fitInputHits) {
+        auto passesTopology = [&](DirectionalRefitResult const& fit) {
+          auto const& target = fit.selected.materialTargetState;
+          double const pt = target.momentum.perp();
+          double const absEta = pt > 0. ? std::abs(std::asinh(target.momentum.z() / pt))
+                                       : std::numeric_limits<double>::infinity();
+          return target.valid && target.position.perp() <= maxTargetLineDca_ && absEta >= minAbsEta_;
+        };
+        if (passesTopology(refit)) {
+          // Refine the already chosen complete measurement likelihood. Failed
+          // fits, charge ambiguity and a different hit variant stay separate.
+          auto const alternate = runDirectionalRefit(usePrecisionRefit, 0, true);
+          bool const accept = alternate.valid && alternate.inputHits == refit.inputHits &&
+                              alternate.fitInputHits == refit.fitInputHits &&
+                              alternate.selected.hits == alternate.fitInputHits &&
+                              alternate.selected.signedInverseMomentum * refit.selected.signedInverseMomentum > 0. &&
+                              passesTopology(alternate);
+          if (logCandidateSelection_)
+            edm::LogVerbatim("ShiftDirectionalFitStages") << "event=" << event.id()
+                << " source=" << candidate.source << " index=" << candidate.sourceIndex
+                << " stage=endpoint-refinement accepted=" << accept
+                << " baselineP=" << refit.selected.upstreamP
+                << " alternateP=" << alternate.selected.upstreamP;
+          if (accept)
+            refit = alternate;
+        }
+      }
       candidate.detectorAuditVariant = usePrecisionRefit ? 1 : 0;
       candidate.detectorAuditNativeStatus = refit.status;
       candidate.detectorAuditFirstStatus = refit.first.status;
@@ -6537,6 +6607,7 @@ public:
     description.add<double>("targetSigmaZ", 50.0);
     description.add<bool>("requireSharedInputsForDuplicates", false);
     description.add<bool>("preferFitQualityAmongBoth", false);
+    description.add<bool>("directionalRefitUseOppositeEndpointRefinement", false);
     description.add<double>("minSharedHitFraction", 0.5);
     description.add<unsigned int>("minSharedDetIds", 2);
     description.add<double>("maxDuplicateAngle", 0.03);
@@ -6635,6 +6706,7 @@ private:
   bool produceDetectorFitAudit_ = false;
   bool requireDirectionalRefitCSCEndcapCoverage_ = false;
   bool recoverFailedTargetPca_ = false;
+  bool directionalRefitUseOppositeEndpointRefinement_ = false;
   bool removeExactDuplicateMuonFitInputs_ = false;
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;
