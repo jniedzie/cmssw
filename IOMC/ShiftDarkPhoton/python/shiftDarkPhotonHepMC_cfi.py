@@ -1,4 +1,3 @@
-# Code style: human-code.
 import FWCore.ParameterSet.Config as cms
 
 
@@ -12,6 +11,4 @@ shiftDarkPhotonHepMC = cms.EDProducer(
     generatedMassMinGeV=cms.double(12.0),
     generatedMassMaxGeV=cms.double(18.0),
     momentumRelativeTolerance=cms.double(1.e-6),
-    # Requires a PDG-32 physics definition and Generator.AlwaysTrackDecaysTo.
-    transportPredefinedSignalDecays=cms.untracked.bool(False),
 )
