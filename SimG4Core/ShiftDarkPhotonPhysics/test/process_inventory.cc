@@ -14,6 +14,11 @@
 #include "G4SystemOfUnits.hh"
 #include "G4VPhysicsConstructor.hh"
 #include "G4Version.hh"
+#include "G4HepEmTrackingManager.hh"
+#include "G4Box.hh"
+#include "G4LogicalVolume.hh"
+#include "G4NistManager.hh"
+#include "G4PVPlacement.hh"
 
 #include <fstream>
 #include <algorithm>
@@ -24,11 +29,12 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <typeinfo>
 
 class NoopExactNominal : public PhysicsListMakerBase {
 public:
   std::unique_ptr<PhysicsList> make(const edm::ParameterSet& parameters, SimActivityRegistry& registry) const override {
-    std::unique_ptr<PhysicsListMakerBase> nominal(PhysicsListFactory::get()->create("SimG4Core/Physics/FTFP_BERT_EMM"));
+    std::unique_ptr<PhysicsListMakerBase> nominal(PhysicsListFactory::get()->create(parameters.getParameter<std::string>("type")));
     return nominal->make(parameters,registry);
   }
 };
@@ -40,6 +46,11 @@ void dumpParticle(std::ostream& out, const G4ParticleDefinition& particle) {
       << ",\"twice_spin\":" << particle.GetPDGiSpin() << ",\"charge_e\":" << particle.GetPDGCharge()/CLHEP::eplus
       << ",\"stable\":" << (particle.GetPDGStable()?"true":"false")
       << ",\"short_lived\":" << (particle.IsShortLived()?"true":"false")
+      << ",\"g4hepem_tracking_manager\":" << (dynamic_cast<const G4HepEmTrackingManager*>(particle.GetTrackingManager())?"true":"false")
+      << ",\"tracking_manager_class\":";
+  const auto* tracking = particle.GetTrackingManager();
+  if (tracking) out << std::quoted(std::string(typeid(*tracking).name())); else out << "null";
+  out
       << ",\"processes\":";
   auto* manager = particle.GetProcessManager();
   if (manager == nullptr) {
@@ -67,7 +78,10 @@ int main(int argc, char** argv) {
       throw std::runtime_error("Unknown control mode");
     edmplugin::PluginManager::configure(edmplugin::standard::config());
     auto parameters = edm::cmspybind11::readPSetsFrom(argv[1])->getParameter<edm::ParameterSet>("physics");
-    const std::string factory = "SimG4Core/Physics/" + std::string(mode=="dark-photon" || mode=="conflict" ? "FTFP_BERT_EMM_DarkPhoton" : "FTFP_BERT_EMM");
+    const auto nominalFactory = parameters.getParameter<std::string>("type");
+    if (nominalFactory != "SimG4Core/Physics/FTFP_BERT_EMM" && nominalFactory != "SimG4Core/Physics/FTFP_BERT_EMH")
+      throw std::runtime_error("The control requires the explicit nominal EMM or EMH physics type");
+    const std::string factory = nominalFactory + (mode=="dark-photon" || mode=="conflict" ? "_DarkPhoton" : "");
     parameters.addParameter<std::string>("type",factory);
     SimActivityRegistry registry;
     // Provide the normal Geant4 kernel and ownership, without initializing
@@ -94,13 +108,21 @@ int main(int argc, char** argv) {
     if (G4ParticleTable::GetParticleTable()->entries()!=initialCount)
       throw std::runtime_error("Repeated particle construction duplicated definitions");
     G4ParticleTable::GetParticleTable()->SetReadiness(true);
+    // G4HepEm initializes its safety navigator during process construction.
+    // Supply a synthetic empty world; never load CMS/LSS geometry or run events.
+    auto* material = G4NistManager::Instance()->FindOrBuildMaterial("G4_Galactic");
+    auto* solid = new G4Box("ProcessInventoryWorld",CLHEP::m,CLHEP::m,CLHEP::m);
+    auto* logical = new G4LogicalVolume(solid,material,"ProcessInventoryWorld");
+    auto* world = new G4PVPlacement(nullptr,G4ThreeVector(),logical,"ProcessInventoryWorld",nullptr,false,0);
+    runManager.DefineWorldVolume(world);
     // Construct initializes process managers and calls the nominal constructors;
     // no geometry, physics tables, tracking, detector or event processing is run.
     physics->Construct();
     std::ofstream out(argv[3]);
     if (!out) throw std::runtime_error("Cannot write process inventory");
     out << std::setprecision(17) << "{\"schema\":\"shift-dp-native-process-inventory-v1\",\"mode\":"
-        << std::quoted(mode) << ",\"geant4_version_number\":" << G4VERSION_NUMBER << ",\"constructors\":[";
+        << std::quoted(mode) << ",\"nominal_factory\":" << std::quoted(nominalFactory)
+        << ",\"geant4_version_number\":" << G4VERSION_NUMBER << ",\"constructors\":[";
     for (int index=0; const auto* constructor=physics->GetPhysics(index); ++index) {
       if (index) out << ',';
       out << "{\"name\":" << std::quoted(std::string(constructor->GetPhysicsName()))
@@ -152,7 +174,7 @@ int main(int argc, char** argv) {
       first = false;
       out << std::quoted(library);
     }
-    out << "],\"geometry_loaded\":false,\"events_transported\":0}\n";
+    out << "],\"synthetic_vacuum_world\":true,\"detector_geometry_loaded\":false,\"events_transported\":0}\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';

@@ -4,16 +4,22 @@
 #include "SimG4Core/ShiftDarkPhotonPhysics/interface/PredefinedSignalDecayPhysics.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
-class FTFPBertEmmDarkPhotonMaker : public PhysicsListMakerBase {
+class DarkPhotonPhysicsListMaker : public PhysicsListMakerBase {
 public:
+  explicit DarkPhotonPhysicsListMaker(std::string nominalFactory) : nominalFactory_(std::move(nominalFactory)) {}
+
   std::unique_ptr<PhysicsList> make(const edm::ParameterSet& parameters, SimActivityRegistry& registry) const override {
     const auto& point = parameters.getParameter<edm::ParameterSet>("DarkPhoton");
     auto particle = std::make_unique<ShiftDarkPhotonPhysics>(point.getParameter<double>("massGeV"),
                                                             point.getParameter<double>("properCTauMm"));
     // Use the ordinary CMS factory and its existing observer enrollment. The
     // returned object is the actual nominal list, with its parameters unchanged.
-    std::unique_ptr<PhysicsListMakerBase> nominal(PhysicsListFactory::get()->create("SimG4Core/Physics/FTFP_BERT_EMM"));
-    auto physics = nominal->make(parameters, registry);
+    // EMH uses this exact type string to enable G4HepEm. Forwarding the wrapper
+    // name would silently select different electromagnetic physics.
+    auto nominalParameters = parameters;
+    nominalParameters.addParameter<std::string>("type", nominalFactory_);
+    std::unique_ptr<PhysicsListMakerBase> nominal(PhysicsListFactory::get()->create(nominalFactory_));
+    auto physics = nominal->make(nominalParameters, registry);
     const auto* originalDecay = dynamic_cast<const G4DecayPhysics*>(physics->GetPhysics("Decay"));
     if (originalDecay == nullptr)
       throw cms::Exception("DarkPhotonPhysics") << "The exact nominal list must provide its standard decay constructor.";
@@ -33,6 +39,20 @@ public:
     particle.release();  // The modular physics list owns registered constructors.
     return physics;
   }
+
+private:
+  const std::string nominalFactory_;
+};
+
+class FTFPBertEmmDarkPhotonMaker : public DarkPhotonPhysicsListMaker {
+public:
+  FTFPBertEmmDarkPhotonMaker() : DarkPhotonPhysicsListMaker("SimG4Core/Physics/FTFP_BERT_EMM") {}
+};
+
+class FTFPBertEmhDarkPhotonMaker : public DarkPhotonPhysicsListMaker {
+public:
+  FTFPBertEmhDarkPhotonMaker() : DarkPhotonPhysicsListMaker("SimG4Core/Physics/FTFP_BERT_EMH") {}
 };
 
 DEFINE_EDM_PLUGIN(PhysicsListFactory, FTFPBertEmmDarkPhotonMaker, "SimG4Core/Physics/FTFP_BERT_EMM_DarkPhoton");
+DEFINE_EDM_PLUGIN(PhysicsListFactory, FTFPBertEmhDarkPhotonMaker, "SimG4Core/Physics/FTFP_BERT_EMH_DarkPhoton");
