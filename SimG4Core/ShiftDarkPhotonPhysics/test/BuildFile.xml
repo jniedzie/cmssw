@@ -1,0 +1,13 @@
+<!-- Code style: AI-code. AI-generated isolated process-inventory controls. -->
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/PythonParameterSet"/>
+<use name="FWCore/PluginManager"/>
+<use name="SimG4Core/Physics"/>
+<use name="SimG4Core/ShiftDarkPhotonPhysics"/>
+<use name="geant4core"/>
+<bin file="process_inventory.cc" name="testShiftDarkPhotonProcessInventory"/>
+<test name="testShiftDarkPhotonPhysics" command="python3 ${SCRAM_TEST_PATH}/test_process_inventory.py"/>
+<bin file="test_predefined_decay_boost.cc" name="testShiftPredefinedDecayBoost">
+  <use name="SimG4Core/ShiftDarkPhotonPhysics"/>
+</bin>
+<test name="testShiftPredefinedDecayCovariance" command="testShiftPredefinedDecayBoost"/>

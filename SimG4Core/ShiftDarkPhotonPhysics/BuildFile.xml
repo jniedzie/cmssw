@@ -1,0 +1,7 @@
+<!-- Code style: AI-code. AI-generated particle-only physics extension. -->
+<use name="FWCore/Utilities"/>
+<use name="geant4core"/>
+<use name="clhep"/>
+<export>
+  <lib name="1"/>
+</export>

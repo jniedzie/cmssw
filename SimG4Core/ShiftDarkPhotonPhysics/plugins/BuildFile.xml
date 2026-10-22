@@ -1,0 +1,10 @@
+<!-- Code style: AI-code. AI-generated optional exact-nominal wrapper plugin. -->
+<use name="SimG4Core/ShiftDarkPhotonPhysics"/>
+<use name="SimG4Core/Physics"/>
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/PluginManager"/>
+<use name="FWCore/Utilities"/>
+<use name="geant4core"/>
+<library file="*.cc" name="SimG4CoreShiftDarkPhotonPhysicsPlugins">
+  <flags EDM_PLUGIN="1"/>
+</library>
