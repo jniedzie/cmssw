@@ -1,3 +1,4 @@
+// Code style: human-code.
 #include "SimG4Core/Generators/interface/Generator.h"
 #include "SimG4Core/Generators/interface/HepMCParticle.h"
 #include "SimG4Core/Generators/interface/LumiMonitorFilter.h"
@@ -16,6 +17,7 @@
 #include <CLHEP/Units/SystemOfUnits.h>
 #include "G4UnitsTable.hh"
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -46,7 +48,12 @@ Generator::Generator(const ParameterSet &p)
       Z_hector(0),
       pdgFilterSel(false),
       fPDGFilter(false),
-      debugMuonPrimaries_(p.getUntrackedParameter<bool>("DebugMuonPrimaries", false)) {
+      debugMuonPrimaries_(p.getUntrackedParameter<bool>("DebugMuonPrimaries", false)),
+      alwaysTrackDecaysTo_(p.getUntrackedParameter<std::vector<int>>("AlwaysTrackDecaysTo", {})) {
+  for (int pdg : alwaysTrackDecaysTo_) {
+    if (pdg <= 0)
+      throw SimG4Exception("AlwaysTrackDecaysTo requires positive absolute PDG IDs");
+  }
   bool lumi = p.getParameter<bool>("ApplyLumiMonitorCuts");
   if (lumi) {
     fLumiFilter = new LumiMonitorFilter();
@@ -113,6 +120,18 @@ Generator::Generator(const ParameterSet &p)
 }
 
 Generator::~Generator() { delete fLumiFilter; }
+
+bool Generator::hasTrackedDecayDaughter(const HepMC::GenParticle *particle) const {
+  if (particle->end_vertex() == nullptr || alwaysTrackDecaysTo_.empty())
+    return false;
+  for (auto daughter = particle->end_vertex()->particles_out_const_begin();
+       daughter != particle->end_vertex()->particles_out_const_end(); ++daughter) {
+    if (std::find(alwaysTrackDecaysTo_.begin(), alwaysTrackDecaysTo_.end(), std::abs((*daughter)->pdg_id())) !=
+        alwaysTrackDecaysTo_.end())
+      return true;
+  }
+  return false;
+}
 
 void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
   HepMC::GenEvent *evt = new HepMC::GenEvent(*evt_orig);
@@ -203,6 +222,12 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
       // have the end_vertex with a radius greater than the radius of beampipe
       // cylinder (no requirement on the Z of the vertex is applyed).
       else if (status == 2) {
+        // A selected signal's parent must traverse material before decaying,
+        // even when its generator decay vertex lies outside the CMS cylinder.
+        if (hasTrackedDecayDaughter(*pitr)) {
+          qvtx = true;
+          break;
+        }
         if ((*pitr)->end_vertex() != nullptr) {
           double xx = (*pitr)->end_vertex()->position().x();
           double yy = (*pitr)->end_vertex()->position().y();
@@ -429,7 +454,9 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
           // Decay chain outside the fiducial cylinder defined by theRDecLenCut
           // are used for Geant4 tracking with predefined decay channel
           // In the case of decay in vacuum particle is not tracked by Geant4
-        } else if (2 == status && x2 * x2 + y2 * y2 >= theDecRCut2 && (fSlepton || std::abs(z2) < Z_hector)) {
+        } else if (2 == status &&
+                   (hasTrackedDecayDaughter(*pitr) ||
+                    (x2 * x2 + y2 * y2 >= theDecRCut2 && (fSlepton || std::abs(z2) < Z_hector)))) {
           toBeAdded = true;
           if (verbose > 1)
             edm::LogVerbatim("SimG4CoreGenerator") << "GenParticle barcode = " << (*pitr)->barcode() << " passed case 2"

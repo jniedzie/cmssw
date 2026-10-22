@@ -1,3 +1,4 @@
+// Code style: human-code.
 #ifndef SimG4Core_Generator_H
 #define SimG4Core_Generator_H
 
@@ -36,6 +37,7 @@ private:
   bool isExotic(int pdgcode) const;
   bool isExoticNonDetectable(int pdgcode) const;
   bool IsInTheFilterList(int pdgcode) const;
+  bool hasTrackedDecayDaughter(const HepMC::GenParticle *particle) const;
   void particleAssignDaughters(G4PrimaryParticle *p, HepMC::GenParticle *hp, double length);
   void setGenId(G4PrimaryParticle *p, int id) const { p->SetUserInformation(new GenParticleInfo(id)); }
 
@@ -67,6 +69,7 @@ private:
   bool pdgFilterSel;
   bool fPDGFilter;
   bool debugMuonPrimaries_;
+  std::vector<int> alwaysTrackDecaysTo_;
 };
 
 #endif

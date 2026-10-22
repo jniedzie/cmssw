@@ -1,0 +1,9 @@
+<!-- Code style: AI-code. AI-generated native decay-tree regression. -->
+<bin file="testPredefinedSignalDecay.cc" name="testPredefinedSignalDecay">
+  <use name="SimG4Core/Generators"/>
+  <use name="FWCore/ParameterSet"/>
+  <use name="hepmc"/>
+  <use name="hepmc3"/>
+  <use name="geant4core"/>
+</bin>
+<test name="testPredefinedSignalDecayGraph" command="testPredefinedSignalDecay"/>

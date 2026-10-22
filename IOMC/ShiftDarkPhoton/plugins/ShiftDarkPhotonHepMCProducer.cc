@@ -1,3 +1,4 @@
+// Code style: human-code.
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/Framework/interface/global/EDProducer.h"
@@ -30,11 +31,13 @@ namespace {
 }  // namespace
 
 // Pythia owns the physical production, polarization and complete decay graph.
-// Mark its completed neutral signal parents as generator-only (HepMC status 3).
+// By default, mark completed signal parents as generator-only (HepMC status 3).
 // The standard CMSSW generator otherwise can try to transport a status-2 PDG 32
 // with a predefined decay, although no Geant4 dark-photon definition is present.
 // The CMS Pythia interface also retains native hard/recoil-copy statuses.
 // Daughters retain their original displaced vertices; no decay is resampled.
+// Nested long-lived decays may instead retain status 2, with an explicit
+// Geant4 PDG-32 definition and parent tracking enabled in the simulation config.
 class ShiftDarkPhotonHepMCProducer : public edm::global::EDProducer<> {
 public:
   explicit ShiftDarkPhotonHepMCProducer(edm::ParameterSet const& config)
@@ -42,7 +45,8 @@ public:
         massGeV_(config.getParameter<double>("massGeV")),
         generatedMassMinGeV_(config.getParameter<double>("generatedMassMinGeV")),
         generatedMassMaxGeV_(config.getParameter<double>("generatedMassMaxGeV")),
-        momentumTolerance_(config.getParameter<double>("momentumRelativeTolerance")) {
+        momentumTolerance_(config.getParameter<double>("momentumRelativeTolerance")),
+        transportPredefinedSignalDecays_(config.getUntrackedParameter<bool>("transportPredefinedSignalDecays", false)) {
     if (!(std::isfinite(massGeV_) && massGeV_ > 0. && std::isfinite(generatedMassMinGeV_) &&
           generatedMassMinGeV_ > 0. && std::isfinite(generatedMassMaxGeV_) &&
           generatedMassMaxGeV_ > generatedMassMinGeV_ && massGeV_ >= generatedMassMinGeV_ &&
@@ -136,8 +140,9 @@ public:
                 << "PDG 32 barcode " << parent->barcode() << " decay violates four-momentum conservation";
         }
       }
-      if (parent->status() != 3) {
-        parent->set_status(3);
+      int outputStatus = transportPredefinedSignalDecays_ && !hasSignalContinuation ? 2 : 3;
+      if (parent->status() != outputStatus) {
+        parent->set_status(outputStatus);
         ++adaptedParents;
       }
     }
@@ -154,12 +159,14 @@ public:
     description.add<double>("generatedMassMinGeV");
     description.add<double>("generatedMassMaxGeV");
     description.add<double>("momentumRelativeTolerance", 1.e-6);
+    description.addUntracked<bool>("transportPredefinedSignalDecays", false);
     descriptions.add("shiftDarkPhotonHepMC", description);
   }
 
 private:
   edm::EDGetTokenT<edm::HepMCProduct> token_;
   double const massGeV_, generatedMassMinGeV_, generatedMassMaxGeV_, momentumTolerance_;
+  bool const transportPredefinedSignalDecays_;
 };
 
 DEFINE_FWK_MODULE(ShiftDarkPhotonHepMCProducer);
