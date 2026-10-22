@@ -84,3 +84,17 @@
   <use name="eigen"/>
 </bin>
 <test name="testShiftIteratedDetectorFitIterationRun" command="testShiftIteratedDetectorFitIteration"/>
+
+<!-- Experimental CSC point covariance adapter/oracle only; no production hook. -->
+<bin file="testCSCAlignmentXYRecHit.cc" name="testShiftCSCAlignmentXYRecHit">
+  <use name="DataFormats/CLHEP"/>
+  <use name="DataFormats/CSCRecHit"/>
+  <use name="DataFormats/GeometryCommonDetAlgo"/>
+  <use name="DataFormats/GeometrySurface"/>
+  <use name="DataFormats/TrackingRecHit"/>
+  <use name="Geometry/CommonTopologies"/>
+  <use name="RecoMuon/TransientTrackingRecHit"/>
+  <use name="TrackingTools/TransientTrackingRecHit"/>
+  <use name="clhep"/>
+</bin>
+<test name="testShiftCSCAlignmentXYRecHitRun" command="testShiftCSCAlignmentXYRecHit"/>
