@@ -1,3 +1,4 @@
+// Code style: human-code.
 #ifndef SimG4Core_StackingAction_H
 #define SimG4Core_StackingAction_H
 
@@ -18,7 +19,7 @@ class CMSG4TrackInterface;
 
 class StackingAction : public G4UserStackingAction {
 public:
-  explicit StackingAction(const edm::ParameterSet& ps, const CMSSteppingVerbose*);
+  explicit StackingAction(const edm::ParameterSet& ps, const CMSSteppingVerbose*, bool sourceCorridor = false);
 
   ~StackingAction() override = default;
 
@@ -40,6 +41,7 @@ private:
   void printRegions(const std::vector<const G4Region*>& reg, const std::string& word) const;
 
 private:
+  bool sourceCorridor_;
   bool savePDandCinTracker, savePDandCinCalo;
   bool savePDandCinMuon, saveFirstSecondary;
   bool savePDandCinAll;

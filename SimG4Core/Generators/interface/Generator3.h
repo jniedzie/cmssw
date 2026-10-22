@@ -38,6 +38,7 @@ private:
   bool isExoticNonDetectable(int pdgcode) const;
   bool IsInTheFilterList(int pdgcode) const;
   bool hasTrackedDecayDaughter(const HepMC3::GenParticle *particle) const;
+  bool hasFiniteHadronFlight(const HepMC3::GenParticle *particle) const;
   void particleAssignDaughters(G4PrimaryParticle *p, HepMC3::GenParticle *hp, double length);
   void setGenId(G4PrimaryParticle *p, int id) const { p->SetUserInformation(new GenParticleInfo(id)); }
 
@@ -70,6 +71,7 @@ private:
   bool fPDGFilter;
   bool debugMuonPrimaries_;
   std::vector<int> alwaysTrackDecaysTo_;
+  bool trackAllHadronDecays_;
 };
 
 #endif

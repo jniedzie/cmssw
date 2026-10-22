@@ -1,4 +1,6 @@
+// Code style: human-code.
 #include "SimG4Core/Application/interface/StackingAction.h"
+#include "SimG4Core/Generators/interface/SourceAncestry.h"
 #include "SimG4Core/Notification/interface/MCTruthUtil.h"
 #include "SimG4Core/Notification/interface/TrackInformation.h"
 #include "SimG4Core/Notification/interface/CMSSteppingVerbose.h"
@@ -18,7 +20,8 @@
 #include "G4GammaGeneralProcess.hh"
 #include "G4LossTableManager.hh"
 
-StackingAction::StackingAction(const edm::ParameterSet& p, const CMSSteppingVerbose* sv) : steppingVerbose(sv) {
+StackingAction::StackingAction(const edm::ParameterSet& p, const CMSSteppingVerbose* sv, bool sourceCorridor)
+    : sourceCorridor_(sourceCorridor), steppingVerbose(sv) {
   trackNeutrino = p.getParameter<bool>("TrackNeutrino");
   killHeavy = p.getParameter<bool>("KillHeavy");
   killGamma = p.getParameter<bool>("KillGamma");
@@ -166,6 +169,8 @@ StackingAction::StackingAction(const edm::ParameterSet& p, const CMSSteppingVerb
 }
 
 G4ClassificationOfNewTrack StackingAction::ClassifyNewTrack(const G4Track* aTrack) {
+  // Register physical source lineage before any secondary can be killed.
+  sim::sourceAncestry::remember(aTrack);
   // G4 interface part
   G4ClassificationOfNewTrack classification = fUrgent;
   const int pdg = aTrack->GetDefinition()->GetPDGEncoding();
@@ -227,7 +232,8 @@ G4ClassificationOfNewTrack StackingAction::ClassifyNewTrack(const G4Track* aTrac
                                        << " Ekin(MeV)=" << ke / CLHEP::MeV << " subType=" << subType << " ";
 
       // kill tracks in specific regions
-      if (isThisRegion(reg, deadRegions)) {
+      if (isThisRegion(reg, deadRegions) &&
+          !(sourceCorridor_ && sim::sourceAncestry::isExternal(aTrack))) {
         classification = fKill;
       }
       if (classification != fKill && ke <= limitEnergyForVacuum && isThisRegion(reg, lowdensRegions)) {

@@ -1,3 +1,4 @@
+// Code style: human-code.
 #ifndef SimG4Core_SteppingAction_H
 #define SimG4Core_SteppingAction_H
 
@@ -11,6 +12,7 @@
 #include "G4VPhysicalVolume.hh"
 #include "G4VTouchable.hh"
 #include "G4Track.hh"
+#include "SimG4Core/Generators/interface/SourceAncestry.h"
 
 #include <string>
 #include <vector>
@@ -100,6 +102,8 @@ inline bool SteppingAction::isForZDC(const G4LogicalVolume* lv, int pdg) const {
 }
 
 inline bool SteppingAction::isForSHIFT(const G4Region* reg, const G4Track* track) const {
+  if (sim::sourceAncestry::enabled())
+    return m_CMStoZDCtransport && isInsideDeadRegion(reg) && sim::sourceAncestry::isExternal(track);
   return (m_CMStoZDCtransport && isInsideDeadRegion(reg) &&
           std::abs(track->GetDefinition()->GetPDGEncoding()) == 13 && track->GetParentID() == 0 &&
           track->GetVertexPosition().z() * track->GetMomentumDirection().z() < 0.0);

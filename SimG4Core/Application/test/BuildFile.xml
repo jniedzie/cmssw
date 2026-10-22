@@ -1,3 +1,4 @@
+<!-- Code style: human-code. -->
 <environment>
   <use name="FWCore/Framework"/>
   <library file="SimHitCaloHitDumper.cc" name="SimHitCaloHitDumper">
@@ -14,3 +15,11 @@
   </library>
 
 </environment>
+<bin file="testSourceStacking.cc" name="testSourceStacking">
+  <use name="SimG4Core/Application"/>
+  <use name="SimG4Core/Generators"/>
+  <use name="SimG4Core/Physics"/>
+  <use name="FWCore/ParameterSetReader"/>
+  <use name="geant4core"/>
+</bin>
+<test name="testExternalSourceStacking" command="testSourceStacking ${SCRAM_TEST_PATH}/testSourceStacking_cfg.py"/>

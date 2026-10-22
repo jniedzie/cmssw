@@ -2,6 +2,7 @@
 #include "SimG4Core/Generators/interface/Generator3.h"
 #include "SimG4Core/Generators/interface/HepMCParticle.h"
 #include "SimG4Core/Generators/interface/LumiMonitorFilter.h"
+#include "SimG4Core/Generators/interface/SourceAncestry.h"
 
 #include "SimG4Core/Notification/interface/SimG4Exception.h"
 
@@ -13,6 +14,7 @@
 #include "G4HEPEvtParticle.hh"
 #include "G4Log.hh"
 #include "G4ParticleDefinition.hh"
+#include "G4ParticleTable.hh"
 #include "G4PhysicalConstants.hh"
 #include <CLHEP/Units/SystemOfUnits.h>
 #include "G4UnitsTable.hh"
@@ -20,6 +22,8 @@
 #include "HepMC3/Print.h"
 
 #include <algorithm>
+#include <cmath>
+#include <set>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -51,7 +55,8 @@ Generator3::Generator3(const ParameterSet &p)
       pdgFilterSel(false),
       fPDGFilter(false),
       debugMuonPrimaries_(p.getUntrackedParameter<bool>("DebugMuonPrimaries", false)),
-      alwaysTrackDecaysTo_(p.getUntrackedParameter<std::vector<int>>("AlwaysTrackDecaysTo", {})) {
+      alwaysTrackDecaysTo_(p.getUntrackedParameter<std::vector<int>>("AlwaysTrackDecaysTo", {})),
+      trackAllHadronDecays_(p.getUntrackedParameter<bool>("TrackAllHadronDecays", false)) {
   for (int pdg : alwaysTrackDecaysTo_) {
     if (pdg <= 0)
       throw SimG4Exception("AlwaysTrackDecaysTo requires positive absolute PDG IDs");
@@ -131,7 +136,38 @@ bool Generator3::hasTrackedDecayDaughter(const HepMC3::GenParticle *particle) co
   return false;
 }
 
+bool Generator3::hasFiniteHadronFlight(const HepMC3::GenParticle *particle) const {
+  if (!trackAllHadronDecays_ || particle->status() != 2 || !particle->production_vertex() ||
+      !particle->end_vertex() || !HepPDT::ParticleID(particle->pid()).isHadron())
+    return false;
+  if (fPDGFilter) {
+    const bool listed = IsInTheFilterList(particle->pid());
+    if ((!pdgFilterSel && listed) || (pdgFilterSel && !listed))
+      return false;
+  }
+  const auto &birth = particle->production_vertex()->position();
+  const auto &decay = particle->end_vertex()->position();
+  const double length = std::hypot(decay.x() - birth.x(), decay.y() - birth.y(), decay.z() - birth.z());
+  const double deltaCt = decay.t() - birth.t();
+  const auto &p4 = particle->momentum();
+  const double momentum = std::hypot(p4.px(), p4.py(), p4.pz());
+  if (!std::isfinite(length) || !std::isfinite(deltaCt) || deltaCt < 0. ||
+      !std::isfinite(momentum) || !std::isfinite(p4.e()) || p4.e() <= 0.)
+    throw SimG4Exception("TrackAllHadronDecays requires finite forward-time hadron flight and momentum");
+  // At rest a finite positive clock is a real lifetime, not prompt history.
+  if (length == 0. && deltaCt == 0.)
+    return false;
+  if ((length == 0.) != (momentum == 0.))
+    throw SimG4Exception("TrackAllHadronDecays found inconsistent spatial flight and parent momentum");
+  if (particle->end_vertex()->particles_in().size() != 1)
+    throw SimG4Exception("TrackAllHadronDecays requires a single parent at a finite decay vertex");
+  if (G4ParticleTable::GetParticleTable()->FindParticle(particle->pid()) == nullptr)
+    throw SimG4Exception("TrackAllHadronDecays cannot transport an undefined Geant4 hadron");
+  return true;
+}
+
 void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
+  sim::sourceAncestry::reset(trackAllHadronDecays_, maxZCentralCMS);
   HepMC3::GenEvent *evt = new HepMC3::GenEvent(*evt_orig);
   //HepMC3::Print::listing(*evt);
 
@@ -170,6 +206,30 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
   unsigned int nG4MuonPrimaries = 0;
   std::map<std::string, unsigned int> muonFirstFailure;
 
+  std::set<const HepMC3::GenParticle *> transportedDescendants;
+  for (const auto &parent : evt->particles()) {
+    if (!hasFiniteHadronFlight(parent.get()))
+      continue;
+    std::vector<HepMC3::GenParticlePtr> pending = parent->end_vertex()->particles_out();
+    while (!pending.empty()) {
+      auto child = pending.back();
+      pending.pop_back();
+      if (child == parent)
+        throw SimG4Exception("TrackAllHadronDecays found a cyclic decay graph");
+      if (!transportedDescendants.insert(child.get()).second)
+        continue;
+      if (G4ParticleTable::GetParticleTable()->FindParticle(child->pid()) == nullptr)
+        throw SimG4Exception("TrackAllHadronDecays found an undefined preassigned Geant4 daughter");
+      if (auto end = child->end_vertex()) {
+        if (child->status() != 2 && !(child->status() > 50 && child->status() < 100))
+          throw SimG4Exception("TrackAllHadronDecays found an unsupported preassigned daughter status");
+        for (const auto &next : end->particles_out())
+          pending.push_back(next);
+      }
+    }
+  }
+
+
   for (const HepMC3::GenVertexPtr &vitr : evt->vertices()) {
     // loop for vertex, is it a real vertex?
     // Set qvtx to true for any particles that should be propagated by GEANT,
@@ -177,6 +237,8 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
     // beampipe.
     G4bool qvtx = false;
     for (const HepMC3::GenParticlePtr &pitr : vitr->particles_out()) {
+      if (transportedDescendants.count(pitr.get()))
+        continue;
       // For purposes of this function, the status is defined as follows:
       // 1:  particles are not decayed by generator
       // 2:  particles are decayed by generator but need to be propagated by GEANT
@@ -225,7 +287,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
       else if (status == 2) {
         // A selected signal's parent must traverse material before decaying,
         // even when its generator decay vertex lies outside the CMS cylinder.
-        if (hasTrackedDecayDaughter(pitr.get())) {
+        if (hasTrackedDecayDaughter(pitr.get()) || hasFiniteHadronFlight(pitr.get())) {
           qvtx = true;
           break;
         }
@@ -274,6 +336,8 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
     G4PrimaryVertex *g4vtx = new G4PrimaryVertex(x1, y1, z1, t1);
 
     for (const HepMC3::GenParticlePtr &pitr : vitr->particles_out()) {
+      if (transportedDescendants.count(pitr.get()))
+        continue;
       int status = pitr->status();
       int pdg = pitr->pid();
       bool hasDecayVertex = (nullptr != pitr->end_vertex());
@@ -371,7 +435,11 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
         // directed from either SHIFT side back toward CMS.
         const bool inwardSHIFTMuon =
             (13 == std::abs(pdg) && std::abs(z1) >= Z_hector && z1 * pz < 0.0);
-        toBeAdded = (2112 == std::abs(pdg) || 22 == pdg || inwardSHIFTMuon);
+        const bool externalSourceParticle = trackAllHadronDecays_ && std::abs(z1) >= maxZCentralCMS &&
+                                            (std::abs(pdg) == 13 || HepPDT::ParticleID(pdg).isHadron());
+        toBeAdded = (2112 == std::abs(pdg) || 22 == pdg || inwardSHIFTMuon || externalSourceParticle);
+        if (externalSourceParticle && G4ParticleTable::GetParticleTable()->FindParticle(pdg) == nullptr)
+          throw SimG4Exception("TrackAllHadronDecays cannot transport an undefined external Geant4 particle");
         if (verbose > 1) {
           edm::LogVerbatim("SimG4CoreGenerator3")
               << "GenParticle barcode = " << pitr->id() << " very forward; to be added: " << toBeAdded;
@@ -457,7 +525,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
           // are used for Geant4 tracking with predefined decay channel
           // In the case of decay in vacuum particle is not tracked by Geant4
         } else if (2 == status &&
-                   (hasTrackedDecayDaughter(pitr.get()) ||
+                   (hasTrackedDecayDaughter(pitr.get()) || hasFiniteHadronFlight(pitr.get()) ||
                     (x2 * x2 + y2 * y2 >= theDecRCut2 && (fSlepton || std::abs(z2) < Z_hector)))) {
           toBeAdded = true;
           if (verbose > 1)
@@ -573,7 +641,14 @@ void Generator3::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC3::GenPart
   math::XYZTLorentzVector p(vp->momentum().px(), vp->momentum().py(), vp->momentum().pz(), vp->momentum().e());
 
   // defined preassigned decay time
-  double proper_time = decaylength / (p.Beta() * p.Gamma() * c_light);
+  double proper_time;
+  if (hasFiniteHadronFlight(vp) && p.P2() == 0.) {
+    // The original at-rest lifetime is encoded in ct; the moving formula is
+    // undefined at beta=0. Do not change the old/default moving-parent clock.
+    proper_time = (vp->end_vertex()->position().t() - vp->production_vertex()->position().t()) * CLHEP::mm / c_light;
+  } else {
+    proper_time = decaylength / (p.Beta() * p.Gamma() * c_light);
+  }
   g4p->SetProperTime(proper_time);
 
   if (verbose > 2) {

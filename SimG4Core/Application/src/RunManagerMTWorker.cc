@@ -1,3 +1,4 @@
+// Code style: human-code.
 #include "SimG4Core/Application/interface/RunManagerMTWorker.h"
 #include "SimG4Core/Application/interface/RunManagerMT.h"
 #include "SimG4Core/Application/interface/SimRunInterface.h"
@@ -484,7 +485,8 @@ void RunManagerMTWorker::initializeUserActions() {
   if (m_isPhase2) {
     userStackingAction = new Phase2StackingAction(m_pStackingAction, m_sVerbose.get());
   } else {
-    userStackingAction = new StackingAction(m_pStackingAction, m_sVerbose.get());
+    userStackingAction = new StackingAction(
+        m_pStackingAction, m_sVerbose.get(), m_pSteppingAction.getParameter<bool>("CMStoZDCtransport"));
   }
   if (m_UseG4EventManager) {
     eventManager->SetUserAction(userEventAction);

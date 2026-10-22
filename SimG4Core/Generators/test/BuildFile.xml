@@ -7,3 +7,11 @@
   <use name="geant4core"/>
 </bin>
 <test name="testPredefinedSignalDecayGraph" command="testPredefinedSignalDecay"/>
+<bin file="testHadronSourceTransport.cc" name="testHadronSourceTransport">
+  <use name="SimG4Core/Generators"/>
+  <use name="FWCore/ParameterSet"/>
+  <use name="hepmc"/>
+  <use name="hepmc3"/>
+  <use name="geant4core"/>
+</bin>
+<test name="testHadronSourceTransportGraph" command="testHadronSourceTransport"/>
