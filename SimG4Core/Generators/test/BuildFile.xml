@@ -15,3 +15,8 @@
   <use name="geant4core"/>
 </bin>
 <test name="testHadronSourceTransportGraph" command="testHadronSourceTransport"/>
+<bin file="testPromptDecaySupport.cc" name="testPromptDecaySupport">
+  <use name="hepmc"/>
+  <use name="hepmc3"/>
+</bin>
+<test name="testPromptDecaySupportGraph" command="testPromptDecaySupport"/>
