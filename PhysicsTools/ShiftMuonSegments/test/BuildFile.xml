@@ -75,3 +75,12 @@
 </bin>
 <test name="testShiftCSCFitCoverageRun" command="testShiftCSCFitCoverage"/>
 <test name="testShiftIteratedTrajectoryFit" command="python3 ${LOCALTOP}/src/PhysicsTools/ShiftMuonSegments/test/testIteratedTrajectoryFit.py"/>
+<!-- Experimental mathematical references; no production fitter is enabled. -->
+<bin file="testIteratedDetectorFit.cc" name="testShiftIteratedDetectorFit">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftIteratedDetectorFitRun" command="testShiftIteratedDetectorFit"/>
+<bin file="testIteratedDetectorFitIteration.cc" name="testShiftIteratedDetectorFitIteration">
+  <use name="eigen"/>
+</bin>
+<test name="testShiftIteratedDetectorFitIterationRun" command="testShiftIteratedDetectorFitIteration"/>
