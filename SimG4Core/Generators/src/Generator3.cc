@@ -177,6 +177,11 @@ bool Generator3::hasFiniteHadronFlight(const HepMC3::GenParticle *particle) cons
 void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
   sim::sourceAncestry::reset(trackAllHadronDecays_, maxZCentralCMS);
   HepMC3::GenEvent *evt = new HepMC3::GenEvent(*evt_orig);
+  double sourcePrecisionScaleGeV=1.;
+  if (trackAllHadronDecays_) {
+    for (const auto& p:evt->particles())
+      sourcePrecisionScaleGeV=std::max(sourcePrecisionScaleGeV,std::abs(p->momentum().e()));
+  }
   //HepMC3::Print::listing(*evt);
 
   if ((evt->vertices()).empty()) {
@@ -591,7 +596,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
         }
 
         if (trackAllHadronDecays_)
-          sim::setRecordedPrimaryMomentum(*g4prim, pitr->momentum(), pitr->generated_mass());
+          sim::setRecordedPrimaryMomentum(*g4prim, pitr->momentum(), pitr->generated_mass(),sourcePrecisionScaleGeV);
 
         // V.I. do not use SetWeight but the same code
         // value of the code compute inside TrackWithHistory
@@ -599,7 +604,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
         setGenId(g4prim, pitr->id());
 
         if (2 == status) {
-          particleAssignDaughters(g4prim, pitr.get(), decay_length);
+          particleAssignDaughters(g4prim, pitr.get(), decay_length,sourcePrecisionScaleGeV);
         }
         if (verbose > 1)
           g4prim->Print();
@@ -659,7 +664,7 @@ void Generator3::HepMC2G4(const HepMC3::GenEvent *evt_orig, G4Event *g4evt) {
   delete evt;
 }
 
-void Generator3::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC3::GenParticle *vp, double decaylength) {
+void Generator3::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC3::GenParticle *vp, double decaylength, double sourcePrecisionScaleGeV) {
   if (verbose > 1) {  // MK: Check message below
     LogDebug("SimG4CoreGenerator3") << "Special case of long decay length \n"
                                     << "Assign daughters to mother with decaylength=" << decaylength / CLHEP::cm
@@ -709,7 +714,7 @@ void Generator3::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC3::GenPart
     }
 
     if (trackAllHadronDecays_)
-      sim::setRecordedPrimaryMomentum(*g4daught, pdec, vpdec->generated_mass());
+      sim::setRecordedPrimaryMomentum(*g4daught, pdec, vpdec->generated_mass(),sourcePrecisionScaleGeV);
 
     // V.I. do not use SetWeight but the same code
     // value of the code compute inside TrackWithHistory
@@ -733,7 +738,7 @@ void Generator3::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC3::GenPart
       double y2 = vpdec->end_vertex()->position().y();
       double z2 = vpdec->end_vertex()->position().z();
       double dd = std::sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2) * (z1 - z2));
-      particleAssignDaughters(g4daught, vpdec.get(), dd);
+      particleAssignDaughters(g4daught, vpdec.get(), dd,sourcePrecisionScaleGeV);
     }
     vpdec->set_status(1000 + status);
     g4p->SetDaughter(g4daught);
