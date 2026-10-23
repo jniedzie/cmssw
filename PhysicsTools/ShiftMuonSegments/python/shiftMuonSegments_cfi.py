@@ -1,3 +1,4 @@
+# Code style: human-code.
 import FWCore.ParameterSet.Config as cms
 from TrackingTools.TrackAssociator.default_cfi import TrackAssociatorParameters as _trackAssociatorParameters
 
@@ -125,9 +126,10 @@ shiftMuonTable = cms.EDProducer(
     # Keep material updates in the canonical Kalman fit. The material-free
     # v9 control remains available through this switch for focused ablations.
     directionalRefitUseMaterialEffects=cms.bool(True),
-    # Canonical material transport: query the Geant4 detector material at
-    # every curved SteppingHelix integration point and use the same model in
-    # the filter, smoother, and backward target extrapolation.
+    # Use each CSC point once and add alignment uncertainty in its x/y chart.
+    removeExactDuplicateMuonFitInputs=cms.bool(True),
+    correctCSC2DAlignmentCovariance=cms.bool(True),
+    # The default uses the approximate SteppingHelix material model.
     # The exact Geant4-material provider is retained as a controlled closure
     # option.  A paired reconstruction test found it neutral relative to the
     # standard SteppingHelix material model, while costing substantially more

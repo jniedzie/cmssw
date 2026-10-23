@@ -6,6 +6,7 @@
 #include "TrackPropagation/RungeKutta/interface/defaultRKPropagator.h"
 #include <sstream>
 #include "PhysicsTools/ShiftMuonSegments/interface/ExactMuonFitInput.h"
+#include "PhysicsTools/ShiftMuonSegments/interface/CSCAlignmentXYRecHit.h"
 #include <cstring>
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/TrackReco/interface/Track.h"
@@ -1511,6 +1512,7 @@ namespace {
                                           bool fullMaterial = false,
                                           bool produceAudit = false,
                                           bool removeExactDuplicates = false,
+                                          bool correctCSC2DAlignmentCovariance = false,
                                           bool recoverFailedTargetPca = false,
                                           bool seedFromOppositeEndpoint = false,
                                           std::string const& traceContext = "") {
@@ -1524,7 +1526,8 @@ namespace {
         continue;
       if (precisionHitsOnly && !isPrecisionMuonSubdetector((*hit)->geographicalId().subdetId()))
         continue;
-      auto transientHit = hitBuilder.build(&**hit);
+      auto transientHit = shift::alignment_xy::correctedHit(
+          hitBuilder.build(&**hit), correctCSC2DAlignmentCovariance);
       if (!transientHit || !transientHit->isValid() || !transientHit->det())
         continue;
       // Optional diagnostic split for full-lever-arm tracks. +1 keeps the
@@ -1540,7 +1543,8 @@ namespace {
         if (!transientHit || !transientHit->isValid() || !transientHit->det() ||
             (precisionHitsOnly && !precision))
           continue;
-        orderedHits.push_back({transientHit, usePathOrdering ? 0. : sourceSide * transientHit->globalPosition().z()});
+        auto const fitHit = shift::alignment_xy::correctedHit(transientHit, correctCSC2DAlignmentCovariance);
+        orderedHits.push_back({fitHit, usePathOrdering ? 0. : sourceSide * fitHit->globalPosition().z()});
       }
 
     DirectionalRefitResult result;
@@ -2806,6 +2810,8 @@ public:
     if (parameters.existsAs<bool>("directionalRefitUseDetailedTransportCorrections"))
       directionalRefitUseDetailedTransportCorrections_ =
           parameters.getParameter<bool>("directionalRefitUseDetailedTransportCorrections");
+    if (parameters.existsAs<bool>("correctCSC2DAlignmentCovariance"))
+      correctCSC2DAlignmentCovariance_ = parameters.getParameter<bool>("correctCSC2DAlignmentCovariance");
     if (parameters.existsAs<bool>("removeExactDuplicateMuonFitInputs"))
       removeExactDuplicateMuonFitInputs_ = parameters.getParameter<bool>("removeExactDuplicateMuonFitInputs");
     if (parameters.existsAs<bool>("produceDetectorFitAudit"))
@@ -3592,7 +3598,7 @@ public:
                                 useImprovedMomentumRefit_ && usePropagatedPathOrdering_,
                                 hitSideSelection,
                                 &additionalHits, useMaterialAwarePcaTransport_, produceDetectorFitAudit_,
-                                removeExactDuplicateMuonFitInputs_, recoverFailedTargetPca_,
+                                removeExactDuplicateMuonFitInputs_, correctCSC2DAlignmentCovariance_, recoverFailedTargetPca_,
                                 seedFromOppositeEndpoint, trace.str());
       };
       auto const allHitsRefit = runDirectionalRefit(false);
@@ -6555,7 +6561,8 @@ public:
     description.add<bool>("produceDetectorFitAudit", false);
     description.add<bool>("requireDirectionalRefitCSCEndcapCoverage", false);
     description.add<bool>("recoverFailedTargetPca", false);
-    description.add<bool>("removeExactDuplicateMuonFitInputs", false);
+    description.add<bool>("removeExactDuplicateMuonFitInputs", true);
+    description.add<bool>("correctCSC2DAlignmentCovariance", true);
     description.add<bool>("directionalRefitUseGeometryMaterialEffects", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInFitter", false);
     description.add<bool>("directionalRefitUseGeometryMaterialEffectsInSmoother", false);
@@ -6707,7 +6714,8 @@ private:
   bool requireDirectionalRefitCSCEndcapCoverage_ = false;
   bool recoverFailedTargetPca_ = false;
   bool directionalRefitUseOppositeEndpointRefinement_ = false;
-  bool removeExactDuplicateMuonFitInputs_ = false;
+  bool removeExactDuplicateMuonFitInputs_ = true;
+  bool correctCSC2DAlignmentCovariance_ = true;
   bool directionalRefitUseGeometryMaterialEffects_;
   bool directionalRefitUseGeometryMaterialEffectsInFitter_;
   bool directionalRefitUseGeometryMaterialEffectsInSmoother_;
