@@ -143,6 +143,16 @@ int main() {
     }
     { G4PrimaryParticle particle(22);
       rejected([&]{sim::setRecordedPrimaryMomentum(particle,G4LorentzVector(1.,0.,0.,.5),0.);}); }
+    {
+      // A real boosted pion whose local energy hides accumulated input error.
+      const G4LorentzVector source(.5106473297550549,.24222631765634767,
+                                   -23.10845736398936,23.115789318382205);
+      G4PrimaryParticle particle(211);
+      rejected([&]{sim::setRecordedPrimaryMomentum(particle,source,.13957);});
+      sim::setRecordedPrimaryMomentum(particle,source,.13957,6800.);
+      require(particle.GetMass()==.13957*GeV,"Event-scale check changed the source mass");
+      rejected([&]{sim::setRecordedPrimaryMomentum(particle,G4LorentzVector(1.,0.,0.,.5),0.,6800.);});
+    }
     unsigned cases=0;
     double maximumResidual=0.;
     for(bool matched:{false,true}) for(int shape=0;shape<3;++shape) for(int state=0;state<3;++state) {
