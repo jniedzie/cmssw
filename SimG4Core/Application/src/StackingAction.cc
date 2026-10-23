@@ -1,6 +1,7 @@
 // Code style: human-code.
 #include "SimG4Core/Application/interface/StackingAction.h"
 #include "SimG4Core/Generators/interface/SourceAncestry.h"
+#include "SimG4Core/Generators/interface/PreassignedDecayKinematics.h"
 #include "SimG4Core/Notification/interface/MCTruthUtil.h"
 #include "SimG4Core/Notification/interface/TrackInformation.h"
 #include "SimG4Core/Notification/interface/CMSSteppingVerbose.h"
@@ -171,6 +172,13 @@ StackingAction::StackingAction(const edm::ParameterSet& p, const CMSSteppingVerb
 G4ClassificationOfNewTrack StackingAction::ClassifyNewTrack(const G4Track* aTrack) {
   // Register physical source lineage before any secondary can be killed.
   sim::sourceAncestry::remember(aTrack);
+  if (sim::sourceAncestry::enabled() && aTrack->GetDynamicParticle()->GetPrimaryParticle()) {
+    auto& born = *const_cast<G4Track*>(aTrack);
+    if (born.GetParentID() == 0)
+      sim::preservePreassignedDecayKinematics(born);
+    else
+      sim::preservePreassignedDaughterMass(born);
+  }
   // G4 interface part
   G4ClassificationOfNewTrack classification = fUrgent;
   const int pdg = aTrack->GetDefinition()->GetPDGEncoding();

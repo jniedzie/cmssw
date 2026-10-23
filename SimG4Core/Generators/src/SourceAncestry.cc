@@ -5,15 +5,18 @@
 #include <cmath>
 #include <map>
 #include <stdexcept>
+#include <set>
 
 namespace {
   thread_local bool active = false;
   thread_local double boundary = 0.;
   thread_local std::map<int, double> rootBirthZ;
+  thread_local std::set<int> restoredKinematics;
 }
 
 void sim::sourceAncestry::reset(bool enabled, double externalBoundary) {
   rootBirthZ.clear();
+  restoredKinematics.clear();
   active = enabled;
   boundary = externalBoundary;
   if (active && (!std::isfinite(boundary) || boundary <= 0.))
@@ -52,4 +55,12 @@ bool sim::sourceAncestry::isExternal(const G4Track* track) {
   if (found == rootBirthZ.end())
     throw std::runtime_error("Source ancestry track was not registered before classification");
   return std::abs(found->second) >= boundary;
+}
+
+void sim::sourceAncestry::markKinematicsRestored(const G4Track* track) {
+  const int id = track->GetTrackID();
+  if (!active || id <= 0 || !rootBirthZ.count(id))
+    throw std::runtime_error("Preassigned decay repair requires registered active source ancestry");
+  if (!restoredKinematics.insert(id).second)
+    throw std::runtime_error("Preassigned decay repair was already applied to this track");
 }

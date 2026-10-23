@@ -3,6 +3,8 @@
 #include "SimG4Core/Generators/interface/HepMCParticle.h"
 #include "SimG4Core/Generators/interface/LumiMonitorFilter.h"
 #include "SimG4Core/Generators/interface/SourceAncestry.h"
+#include "SimG4Core/Generators/interface/PromptDecaySupport.h"
+#include "SimG4Core/Generators/interface/RecordedPrimaryMomentum.h"
 
 #include "SimG4Core/Notification/interface/SimG4Exception.h"
 
@@ -54,7 +56,11 @@ Generator::Generator(const ParameterSet &p)
       fPDGFilter(false),
       debugMuonPrimaries_(p.getUntrackedParameter<bool>("DebugMuonPrimaries", false)),
       alwaysTrackDecaysTo_(p.getUntrackedParameter<std::vector<int>>("AlwaysTrackDecaysTo", {})),
-      trackAllHadronDecays_(p.getUntrackedParameter<bool>("TrackAllHadronDecays", false)) {
+      trackAllHadronDecays_(p.getUntrackedParameter<bool>("TrackAllHadronDecays", false)),
+      maxUntrackedHadronFlightMm_(p.getUntrackedParameter<double>("MaxUntrackedHadronFlightMm", 0.)) {
+  if (!std::isfinite(maxUntrackedHadronFlightMm_) || maxUntrackedHadronFlightMm_ < 0. ||
+      maxUntrackedHadronFlightMm_ > 1.e-5 || (!trackAllHadronDecays_ && maxUntrackedHadronFlightMm_ != 0.))
+    throw SimG4Exception("Tiny-flight approximation requires complete transport and a budget between zero and 10 nm");
   for (int pdg : alwaysTrackDecaysTo_) {
     if (pdg <= 0)
       throw SimG4Exception("AlwaysTrackDecaysTo requires positive absolute PDG IDs");
@@ -163,8 +169,10 @@ bool Generator::hasFiniteHadronFlight(const HepMC::GenParticle *particle) const 
     throw SimG4Exception("TrackAllHadronDecays found inconsistent spatial flight and parent momentum");
   if (particle->end_vertex()->particles_in_size() != 1)
     throw SimG4Exception("TrackAllHadronDecays requires a single parent at a finite decay vertex");
-  if (G4ParticleTable::GetParticleTable()->FindParticle(particle->pdg_id()) == nullptr)
-    throw SimG4Exception("TrackAllHadronDecays cannot transport an undefined Geant4 hadron");
+  if (G4ParticleTable::GetParticleTable()->FindParticle(particle->pdg_id()) == nullptr) {
+    if (sim::promptDecay::withinPromptBudget(*particle,maxUntrackedHadronFlightMm_)) return false;
+    throw SimG4Exception("TrackAllHadronDecays cannot transport an undefined Geant4 hadron beyond its prompt budget");
+  }
   return true;
 }
 
@@ -208,6 +216,17 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
   // Attach each finite hadron tree once, independent of HepMC vertex order.
   std::set<const HepMC::GenParticle *> transportedDescendants;
   for (auto parent = evt->particles_begin(); parent != evt->particles_end(); ++parent) {
+    if (trackAllHadronDecays_ && maxUntrackedHadronFlightMm_ > 0. && (*parent)->status()==2 &&
+        G4ParticleTable::GetParticleTable()->FindParticle((*parent)->pdg_id()) == nullptr &&
+        !sim::promptDecay::exactlyPrompt(*(*parent)) &&
+        sim::promptDecay::withinPromptBudget(*(*parent),maxUntrackedHadronFlightMm_)) {
+      const auto& a=(*parent)->production_vertex()->position();
+      const auto& z=(*parent)->end_vertex()->position();
+      std::cout << "[SHIFT tiny-flight approximation] event=" << g4evt->GetEventID()
+                << " barcode=" << (*parent)->barcode() << " pdg=" << (*parent)->pdg_id()
+                << " flight_mm=" << std::hypot(z.x()-a.x(),z.y()-a.y(),z.z()-a.z())
+                << " delta_ct_mm=" << z.t()-a.t() << " maximum_mm=" << maxUntrackedHadronFlightMm_ << std::endl;
+    }
     if (!hasFiniteHadronFlight(*parent))
       continue;
     std::vector<HepMC::GenParticle *> pending;
@@ -221,8 +240,13 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
         throw SimG4Exception("TrackAllHadronDecays found a cyclic decay graph");
       if (!transportedDescendants.insert(child).second)
         continue;
-      if (G4ParticleTable::GetParticleTable()->FindParticle(child->pdg_id()) == nullptr)
-        throw SimG4Exception("TrackAllHadronDecays found an undefined preassigned Geant4 daughter");
+      if (G4ParticleTable::GetParticleTable()->FindParticle(child->pdg_id()) == nullptr) {
+        // Native Geant4 promotes undefined prompt nodes. Validate that this
+        // loses exactly zero source flight/time; finite unknowns still fail.
+        sim::promptDecay::frontier(*child, [](int id) {
+          return G4ParticleTable::GetParticleTable()->FindParticle(id) != nullptr;
+        }, maxUntrackedHadronFlightMm_);
+      }
       if (auto *end = child->end_vertex()) {
         if (child->status() != 2 && !(child->status() > 50 && child->status() < 100))
           throw SimG4Exception("TrackAllHadronDecays found an unsupported preassigned daughter status");
@@ -568,6 +592,9 @@ void Generator::HepMC2G4(const HepMC::GenEvent *evt_orig, G4Event *g4evt) {
           g4prim->SetCharge(charge);
         }
 
+        if (trackAllHadronDecays_)
+          sim::setRecordedPrimaryMomentum(*g4prim, (*pitr)->momentum(), (*pitr)->generated_mass());
+
         // V.I. do not use SetWeight but the same code
         // value of the code compute inside TrackWithHistory
         // g4prim->SetWeight( 10000*(*vpitr)->barcode() ) ;
@@ -643,7 +670,11 @@ void Generator::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC::GenPartic
 
   // defined preassigned decay time
   double proper_time;
-  if (hasFiniteHadronFlight(vp) && p.P2() == 0.) {
+  if (trackAllHadronDecays_ && (sim::promptDecay::exactlyPrompt(*vp) ||
+      (g4p->GetG4code()==nullptr && sim::promptDecay::withinPromptBudget(*vp,maxUntrackedHadronFlightMm_)))) {
+    // A recorded prompt particle at rest has zero lifetime, not 0/0.
+    proper_time = 0.;
+  } else if (hasFiniteHadronFlight(vp) && p.P2() == 0.) {
     // The original at-rest lifetime is encoded in ct; the moving formula is
     // undefined at beta=0. Do not change the old/default moving-parent clock.
     proper_time = (vp->end_vertex()->position().t() - vp->production_vertex()->position().t()) * CLHEP::mm / c_light;
@@ -679,6 +710,9 @@ void Generator::particleAssignDaughters(G4PrimaryParticle *g4p, HepMC::GenPartic
       g4daught->SetMass(g4daught->GetG4code()->GetPDGMass());
       g4daught->SetCharge(g4daught->GetG4code()->GetPDGCharge());
     }
+
+    if (trackAllHadronDecays_)
+      sim::setRecordedPrimaryMomentum(*g4daught, pdec, (*vpdec)->generated_mass());
 
     // V.I. do not use SetWeight but the same code
     // value of the code compute inside TrackWithHistory

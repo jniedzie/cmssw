@@ -1,6 +1,7 @@
 // Code style: AI-code. AI-generated exact-zero-flight preassigned-decay support.
 #ifndef SimG4Core_Generators_PromptDecaySupport_h
 #define SimG4Core_Generators_PromptDecaySupport_h
+#include "HepPDT/ParticleID.hh"
 #include "HepMC/GenParticle.h"
 #include "HepMC/GenVertex.h"
 #include "HepMC3/GenParticle.h"
@@ -41,6 +42,23 @@ namespace sim::promptDecay {
     return true;
   }
 
+  // User-approved approximation, separate from the exact-zero default.
+  // Both spatial flight and elapsed ct must fit the explicit length budget.
+  template <typename Particle>
+  bool withinPromptBudget(const Particle& p, double maximumFlightMm) {
+    if (!std::isfinite(maximumFlightMm) || maximumFlightMm < 0.)
+      throw std::runtime_error("Invalid tiny-flight approximation budget");
+    if (exactlyPrompt(p)) return true;
+    if (maximumFlightMm == 0. || !HepPDT::ParticleID(pdg(p)).isHadron() ||
+        !p.production_vertex() || !p.end_vertex()) return false;
+    const auto& a=p.production_vertex()->position();
+    const auto& b=p.end_vertex()->position();
+    const double distance=std::hypot(b.x()-a.x(),b.y()-a.y(),b.z()-a.z());
+    const double ct=b.t()-a.t();
+    return std::isfinite(distance) && std::isfinite(ct) && ct >= 0. &&
+           distance <= maximumFlightMm && ct <= maximumFlightMm;
+  }
+
   template <typename Particle>
   [[noreturn]] void unsupported(const Particle& p, const char* reason) {
     throw std::runtime_error("Undefined preassigned particle PDG=" + std::to_string(pdg(p)) +
@@ -49,18 +67,18 @@ namespace sim::promptDecay {
 
   template <typename Particle, typename Known>
   void appendFrontier(const Particle& p, Known known, std::set<const Particle*>& path,
-                      std::vector<const Particle*>& result) {
+                      std::vector<const Particle*>& result, double maximumFlightMm) {
     if (!path.insert(&p).second) unsupported(p, "cycle in prompt decay tree");
     if (known(pdg(p))) {
       result.push_back(&p);
     } else {
       if (p.status() != 2 || !p.production_vertex() || !p.end_vertex())
         unsupported(p, "unknown terminal particle or missing decay vertices");
-      if (!exactlyPrompt(p)) unsupported(p, "nonzero or nonfinite flight cannot be collapsed");
+      if (!withinPromptBudget(p,maximumFlightMm)) unsupported(p, "nonzero or nonfinite flight exceeds prompt budget");
       if (incoming(p) != 1) unsupported(p, "decay vertex does not have exactly one incoming particle");
       const auto daughters = children(p);
       if (daughters.empty()) unsupported(p, "unknown decay has no daughters");
-      for (const auto* daughter : daughters) appendFrontier(*daughter, known, path, result);
+      for (const auto* daughter : daughters) appendFrontier(*daughter, known, path, result, maximumFlightMm);
     }
     path.erase(&p);
   }
@@ -69,10 +87,12 @@ namespace sim::promptDecay {
   // Geant4 already promotes undefined nodes; this validates that promotion loses
   // exactly zero flight/time. Supported nodes keep their own preassigned decay.
   template <typename Particle, typename Known>
-  std::vector<const Particle*> frontier(const Particle& p, Known known) {
+  std::vector<const Particle*> frontier(const Particle& p, Known known, double maximumFlightMm=0.) {
+    if (!std::isfinite(maximumFlightMm) || maximumFlightMm < 0.)
+      throw std::runtime_error("Invalid tiny-flight approximation budget");
     std::set<const Particle*> path;
     std::vector<const Particle*> result;
-    appendFrontier(p, known, path, result);
+    appendFrontier(p, known, path, result, maximumFlightMm);
     return result;
   }
 }

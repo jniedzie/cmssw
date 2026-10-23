@@ -87,14 +87,16 @@ namespace {
     for(const auto& x:v)e->add_vertex(x);
     e->weights().push_back(-.03125); return e;
   }
-  std::unique_ptr<G4Event> convert(const Graph& g, bool hep3, bool enabled, bool reverse=false, bool explicitOption=true) {
+  std::unique_ptr<G4Event> convert(const Graph& g, bool hep3, bool enabled, bool reverse=false, bool explicitOption=true, double tinyFlightMm=0.) {
+    auto config=parameters(enabled,explicitOption);
+    if(tinyFlightMm!=0.) config.addUntrackedParameter<double>("MaxUntrackedHadronFlightMm",tinyFlightMm);
     auto out=std::make_unique<G4Event>(1);
     if(hep3) {
-      auto e=event3(g,reverse); Generator3 gen(parameters(enabled,explicitOption)); gen.HepMC2G4(e.get(),out.get());
+      auto e=event3(g,reverse); Generator3 gen(config); gen.HepMC2G4(e.get(),out.get());
       close(gen.eventWeight(),-.03125); require(e->weights()[0]==-.03125,"HepMC3 native weight changed");
       for(const auto& p:e->particles())require(p->status()<1000,"HepMC3 source graph mutated");
     } else {
-      auto e=event2(g,reverse); Generator gen(parameters(enabled,explicitOption)); gen.HepMC2G4(e.get(),out.get());
+      auto e=event2(g,reverse); Generator gen(config); gen.HepMC2G4(e.get(),out.get());
       close(gen.eventWeight(),-.03125); require(e->weights()[0]==-.03125,"HepMC2 native weight changed");
       for(auto p=e->particles_begin();p!=e->particles_end();++p)require((*p)->status()<1000,"HepMC2 source graph mutated");
     }
@@ -168,8 +170,24 @@ int main() {
         auto g=cascade(z,beta);auto converted=convert(g,hep3,true,reverse);checkCascade(*converted);checkMomenta(*converted,g);++checked;
       }
       checkCascade(*convert(cascade(148000.,0.),hep3,true));++checked;
+      {
+        auto tiny=cascade(148000.,-.8);tiny.particles[1].pdg=413;
+        tiny.vertices[2]=tiny.vertices[1]+G4LorentzVector(0.,0.,-1.2e-6,1.2e-6);
+        bool failed=false;try{convert(tiny,hep3,true);}catch(...){failed=true;}
+        require(failed,"Default accepted finite unknown resonance");
+        auto projected=convert(tiny,hep3,true,false,true,1.e-5);
+        require(roots(*projected).size()==1,"Bounded unknown became an independent primary");
+        checkMomenta(*projected,tiny);++checked;
+        tiny.vertices[2]=tiny.vertices[1]+G4LorentzVector(0.,0.,-1.e-3,1.e-3);
+        failed=false;try{convert(tiny,hep3,true,false,true,1.e-5);}catch(...){failed=true;}
+        require(failed,"Over-budget finite unknown resonance accepted");++checked;
+      }
       auto prompt=cascade(148000.,-.8,true);auto omitted=convert(prompt,hep3,false,false,false);auto disabled=convert(prompt,hep3,false);auto enabled=convert(prompt,hep3,true);
-      require(signature(*omitted)==signature(*disabled) && signature(*disabled)==signature(*enabled),"Zero4 prompt history changed");
+      require(signature(*omitted)==signature(*disabled),"Default zero4 prompt history changed");
+      // Opt-in conversion now preserves GEN p4/mass explicitly. Compare the
+      // enabled physical values to the source, retaining exact default parity.
+      require(roots(*enabled).size()==roots(*disabled).size(),"Opt-in prompt primary count changed");
+      checkMomenta(*enabled,prompt);
       for(int pdg:{13,211})for(double direction:{-1.,1.}) {
         Graph stable{{{0.,0.,148000.,0.}},{{pdg,1,0,-1,{0.,0.,10.*direction,std::hypot(10.,G4ParticleTable::GetParticleTable()->FindParticle(pdg)->GetPDGMass()/GeV)}}}};
         auto result=convert(stable,hep3,true);require(roots(*result).size()==1 && roots(*result)[0]->GetPDGcode()==pdg,"External stable muon/hadron lost");++checked;

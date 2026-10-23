@@ -72,6 +72,7 @@ private:
   bool debugMuonPrimaries_;
   std::vector<int> alwaysTrackDecaysTo_;
   bool trackAllHadronDecays_;
+  double maxUntrackedHadronFlightMm_;
 };
 
 #endif

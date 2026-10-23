@@ -16,7 +16,13 @@
 </bin>
 <test name="testHadronSourceTransportGraph" command="testHadronSourceTransport"/>
 <bin file="testPromptDecaySupport.cc" name="testPromptDecaySupport">
+  <use name="heppdt"/>
   <use name="hepmc"/>
   <use name="hepmc3"/>
 </bin>
 <test name="testPromptDecaySupportGraph" command="testPromptDecaySupport"/>
+<bin file="testPreassignedDecayKinematics.cc" name="testPreassignedDecayKinematics">
+  <use name="SimG4Core/Generators"/>
+  <use name="geant4core"/>
+</bin>
+<test name="testPreassignedDecayKinematicsNative" command="testPreassignedDecayKinematics"/>

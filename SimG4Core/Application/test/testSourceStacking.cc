@@ -13,6 +13,9 @@
 #include "G4NistManager.hh"
 #include "G4PVPlacement.hh"
 #include "G4ParticleTable.hh"
+#include "G4PrimaryParticle.hh"
+#include <algorithm>
+#include <limits>
 #include "G4Region.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4TransportationManager.hh"
@@ -68,7 +71,38 @@ int main(int argc,char** argv) {
         require(action.ClassifyNewTrack(neutrino.get())==fKill,"Neutrino guard changed");++checked;
       }
     }
+    int birthChecks=0;
+    for(bool active:{false,true}) {
+      sim::sourceAncestry::reset(active,boundary);
+      const double sourceMass=G4ParticleTable::GetParticleTable()->FindParticle(13)->GetPDGMass();
+      G4PrimaryParticle rootSource(13,3.*GeV,4.*GeV,-50.*GeV);
+      rootSource.SetMass(sourceMass);
+      auto root=makeTrack(1,0,13,148.*m,0.,-1.);
+      const_cast<G4DynamicParticle*>(root->GetDynamicParticle())->SetPrimaryParticle(&rootSource);
+      const auto oldRoot=root->GetMomentum();
+      require(on.ClassifyNewTrack(root.get())==fUrgent,"Tagged primary was rejected");
+      const auto expectedRoot=active?rootSource.GetMomentum():oldRoot;
+      require((root->GetMomentum()-expectedRoot).mag()<=32*std::numeric_limits<double>::epsilon()*expectedRoot.mag(),
+              "Actual stacking primary conversion is wrong");
+      CMSG4TrackInterface::instance()->setCurrentTrack(root.get());
+      // The daughter's current momentum represents the parent's transported
+      // decay. Its original GEN momentum is deliberately very different.
+      G4PrimaryParticle childSource(13,0.,0.,-200.*GeV);
+      childSource.SetMass(sourceMass);
+      auto child=makeTrack(2,1,13,30.*m,0.,-1.);
+      auto* dynamic=const_cast<G4DynamicParticle*>(child->GetDynamicParticle());
+      dynamic->SetPrimaryParticle(&childSource);
+      dynamic->SetMass(sourceMass+1.e-5*MeV);
+      const auto physicalMomentum=child->GetMomentum();
+      const auto initialMass=dynamic->GetMass();
+      require(on.ClassifyNewTrack(child.get())==fUrgent,"Tagged daughter was rejected");
+      require((child->GetMomentum()-physicalMomentum).mag()<=32*std::numeric_limits<double>::epsilon()*physicalMomentum.mag(),
+              "Actual stacking reset a daughter to original GEN momentum");
+      require(dynamic->GetMass()==(active?sourceMass:initialMass),"Wrong opt-in daughter mass");
+      require(childSource.GetMomentum().z()==-200.*GeV,"Actual stacking changed the source record");
+      birthChecks+=2;
+    }
     sim::sourceAncestry::reset(false,boundary);
-    std::cout<<"Actual stacking: "<<checked<<" corridor/source/direction cases plus normal-region, time and neutrino controls passed. IDs were fixture-assigned.\n";return 0;
+    std::cout<<"Actual stacking: "<<checked<<" corridor/source/direction cases plus normal-region, time and neutrino controls passed; "<<birthChecks<<" tagged birth integration checks. IDs were fixture-assigned.\n";return 0;
   }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
 }

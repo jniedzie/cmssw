@@ -60,5 +60,38 @@ int main() {
     rejects([&]{return sim::promptDecay::frontier(*a,known);},"cycle");++checks;
     v1->remove_particle(b);v2->remove_particle(b);v1->remove_particle(a);v2->remove_particle(a);delete a;delete b;delete v1;delete v2;
   }
-  std::cout<<"{\"checks\":"<<checks<<",\"passed\":true,\"nonzero_flight_never_collapsed\":true}"<<std::endl;
+  {
+    HepMC::GenEvent event(HepMC::Units::GEV,HepMC::Units::MM);
+    auto* a=new HepMC::GenVertex({0.,0.,0.,0.});auto* z=new HepMC::GenVertex({0.,0.,1.2e-6,1.2e-6});
+    auto* p=new HepMC::GenParticle({0.,0.,10.,11.},413,2);
+    auto* d=new HepMC::GenParticle({0.,0.,10.,11.},421,1);
+    a->add_particle_out(p);z->add_particle_in(p);z->add_particle_out(d);event.add_vertex(a);event.add_vertex(z);
+    const auto bounded=[&]{return sim::promptDecay::frontier(*p,known,1.e-5);};
+    rejects([&]{sim::promptDecay::frontier(*p,known);},"nonzero");++checks;
+    require(bounded()==std::vector<const HepMC::GenParticle*>({d}),"Tiny H2 flight rejected");++checks;
+    require(z->position().z()==1.2e-6 && p->status()==2,"Tiny H2 source mutated");++checks;
+    z->set_position({0.,0.,1.e-5,1.e-5});require(bounded().size()==1,"H2 budget edge rejected");++checks;
+    z->set_position({0.,0.,std::nextafter(1.e-5,1.),1.e-5});rejects(bounded,"nonzero");++checks;
+    z->set_position({0.,0.,0.,std::nextafter(1.e-5,1.)});rejects(bounded,"nonzero");++checks;
+    z->set_position({0.,0.,0.,-1.e-6});rejects(bounded,"nonzero");++checks;
+    rejects([&]{sim::promptDecay::frontier(*p,known,-1.);},"Invalid");++checks;
+  }
+  {
+    auto a=std::make_shared<HepMC3::GenVertex>(HepMC3::FourVector(0.,0.,0.,0.));
+    auto z=std::make_shared<HepMC3::GenVertex>(HepMC3::FourVector(0.,0.,1.2e-6,1.2e-6));
+    auto p=std::make_shared<HepMC3::GenParticle>(HepMC3::FourVector(0.,0.,10.,11.),413,2);
+    auto d=std::make_shared<HepMC3::GenParticle>(HepMC3::FourVector(0.,0.,10.,11.),421,1);
+    a->add_particle_out(p);z->add_particle_in(p);z->add_particle_out(d);
+    HepMC3::GenEvent event(HepMC3::Units::GEV,HepMC3::Units::MM);event.add_vertex(a);event.add_vertex(z);
+    const auto bounded=[&]{return sim::promptDecay::frontier(*p,known,1.e-5);};
+    rejects([&]{sim::promptDecay::frontier(*p,known);},"nonzero");++checks;
+    require(bounded()==std::vector<const HepMC3::GenParticle*>({d.get()}),"Tiny H3 flight rejected");++checks;
+    require(z->position().z()==1.2e-6 && p->status()==2,"Tiny H3 source mutated");++checks;
+    z->set_position({0.,0.,1.e-5,1.e-5});require(bounded().size()==1,"H3 budget edge rejected");++checks;
+    z->set_position({0.,0.,std::nextafter(1.e-5,1.),1.e-5});rejects(bounded,"nonzero");++checks;
+    z->set_position({0.,0.,0.,std::nextafter(1.e-5,1.)});rejects(bounded,"nonzero");++checks;
+    z->set_position({0.,0.,0.,-1.e-6});rejects(bounded,"nonzero");++checks;
+    rejects([&]{sim::promptDecay::frontier(*p,known,std::numeric_limits<double>::infinity());},"Invalid");++checks;
+  }
+  std::cout<<"{\"checks\":"<<checks<<",\"passed\":true,\"default_nonzero_flight_never_collapsed\":true}"<<std::endl;
 }
