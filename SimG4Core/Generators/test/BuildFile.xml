@@ -26,3 +26,7 @@
   <use name="geant4core"/>
 </bin>
 <test name="testPreassignedDecayKinematicsNative" command="testPreassignedDecayKinematics"/>
+<bin file="testRecordedPrimarySMPrecision.cc" name="testRecordedPrimarySMPrecision">
+  <use name="geant4core"/>
+</bin>
+<test name="testRecordedPrimarySMPrecisionNative" command="testRecordedPrimarySMPrecision"/>
