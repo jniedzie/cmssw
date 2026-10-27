@@ -41,6 +41,9 @@ public:
 
   RPCRecHit* clone() const override;
 
+  /// Compare the recorded roll, BX and strip-cluster inputs rather than fitted positions.
+  bool sharesInput(const TrackingRecHit* other, SharedInputType what) const override;
+
   /// Access to component RecHits.
   /// No components rechits: it returns a null vector
   std::vector<const TrackingRecHit*> recHits() const override;

@@ -40,6 +40,9 @@ using namespace edm;
 // constructors and destructor
 //
 CosmicMuonProducer::CosmicMuonProducer(const ParameterSet& iConfig) {
+  // Only explicit offline users opt in; ordinary cosmic reconstruction is unchanged.
+  if (iConfig.existsAs<bool>("UseSharedHitTrajectoryCleaner"))
+    useSharedHitTrajectoryCleaner_ = iConfig.getParameter<bool>("UseSharedHitTrajectoryCleaner");
   ParameterSet tbpar = iConfig.getParameter<ParameterSet>("TrajectoryBuilderParameters");
 
   theSeedCollectionToken =
@@ -79,7 +82,7 @@ void CosmicMuonProducer::produce(Event& iEvent, const EventSetup& iSetup) {
 
   // Update the services
   theService->update(iSetup);
-  theTrackFinder->reconstruct(seeds, iEvent, iSetup);
+  theTrackFinder->reconstruct(seeds, iEvent, iSetup, useSharedHitTrajectoryCleaner_);
 }
 
 #include "FWCore/Framework/interface/MakerMacros.h"

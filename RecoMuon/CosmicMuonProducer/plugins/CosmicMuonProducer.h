@@ -22,6 +22,7 @@ public:
   void produce(edm::Event&, const edm::EventSetup&) override;
 
 private:
+  bool useSharedHitTrajectoryCleaner_ = false;
   std::unique_ptr<MuonTrackFinder> theTrackFinder;
 
   /// the event setup proxy, it takes care the services update

@@ -5,6 +5,9 @@
  */
 
 #include "DataFormats/RPCRecHit/interface/RPCRecHit.h"
+#include "FWCore/Utilities/interface/Exception.h"
+#include <algorithm>
+#include <cstdint>
 
 RPCRecHit::RPCRecHit(const RPCDetId& rpcId, int bx)
     : RecHit2DLocalPos(rpcId),
@@ -71,6 +74,25 @@ RPCRecHit::RPCRecHit(
 RPCRecHit::~RPCRecHit() {}
 
 RPCRecHit* RPCRecHit::clone() const { return new RPCRecHit(*this); }
+
+bool RPCRecHit::sharesInput(const TrackingRecHit* other, SharedInputType what) const {
+  auto const* rpc = dynamic_cast<const RPCRecHit*>(other);
+  if (!rpc || geographicalId() != rpc->geographicalId() || BunchX() != rpc->BunchX())
+    return false;
+
+  std::int64_t first = firstClusterStrip(), otherFirst = rpc->firstClusterStrip();
+  std::int64_t size = clusterSize(), otherSize = rpc->clusterSize();
+  // Constructors without cluster information use (99,99). Do not invent an identity.
+  if (first < 1 || otherFirst < 1 || size < 1 || otherSize < 1 || (first == 99 && size == 99) ||
+      (otherFirst == 99 && otherSize == 99))
+    throw cms::Exception("UnsupportedRPCInputIdentity") << "RPC cluster has missing or invalid strip metadata";
+
+  if (what == TrackingRecHit::all)
+    return first == otherFirst && size == otherSize;
+  if (what == TrackingRecHit::some)
+    return std::max(first, otherFirst) <= std::min(first + size - 1, otherFirst + otherSize - 1);
+  throw cms::Exception("UnsupportedRPCInputIdentity") << "Unknown shared-input policy";
+}
 
 // Access to component RecHits.
 // No components rechits: it returns a null vector
