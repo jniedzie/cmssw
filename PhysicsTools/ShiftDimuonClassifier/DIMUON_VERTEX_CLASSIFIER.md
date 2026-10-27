@@ -1,3 +1,4 @@
+<!-- Code style: human-code. -->
 # SHIFT dimuon vertex classifier
 
 Started 2026-10-09. Owner: this task log for standalone classifier experiments.
@@ -6,6 +7,17 @@ reconstruction findings remain in `SHIFT_RECONSTRUCTION.md`.
 
 ## Aim and current status
 
+The October14 overall working choice is the equal-weight ensemble of the
+two rich119-input DNN seeds, with a fixed mean-score cut0.3016294240951538.
+It retains90.27% of genuine SM development pairs and rejects52.04% of fakes;
+new30-point signal validation retains701/760 known genuine pairs. Selection
+uses validation performance, mass/position/category/estimated-proper-length
+dependence and member-omission stability. Category information is already
+encoded by the reconstructed topology inputs. Finer bins expose residual
+tails, so no universal flatness, final physics cut or luminosity-transfer
+claim is made. Final PDFs and the single recommended model are in
+`tea_shift_cmssw/plots/vertex_classifier/Vertex_best_20261014/`. Production scores are unchanged.
+
 The first seven-model pilot and fresh 26-fit SM comparison are complete.
 The original uniformity BDT remains the frozen ntuple benchmark. A subsequent
 25-fit capacity/uniformity/data-size study improves rejection substantially,
@@ -13,16 +25,34 @@ but no candidate passes all acceptance gates. Quantitative results follow.
 Provisional scores, histograms and held-out evaluation are complete for 510
 simulation Nano files spanning all 19 SM bins and nine signal points (October
 12 first look below). No score cut was applied. A mass/lifetime-independent final classifier selection is not
-validated. N_eff is the effective MC normalization fitted to collision data;
-it is separate from the classifier efficiency/AUC reported in this study.
+validated. The J/psi-calibrated source factor K_2023 is separate from classifier
+efficiency/AUC and is not determined here. N_eff denotes effective weighted MC
+support, rather than a normalization fitted to collision data.
 
 The October 13 follow-up completes 70 neural fits, a BDT overtraining audit
 and category-resolved diagnostics. A penalized DNN improves genuine Near-Both
 retention at approximately the same rejection as the flatter BDT. It does not
 improve pooled rejection substantially, and category/seed dependence remains.
 All new results and PDF figures are inside
-`tea_shift_cmssw/plots/DNN_vertex_20261013/`. The original deployed BDT remains
+`tea_shift_cmssw/plots/vertex_classifier/DNN_vertex_20261013/`. The original deployed BDT remains
 unchanged. See the new activity entry and the study README for exact results.
+
+The subsequent one-hour information study completes 32 additional fits with
+119 reconstructed inputs. The richer pooled DNN rejects about 49% of SM
+development fakes with both seeds passing the reconstructed mass/position/
+category envelope, versus 41% for the earlier constrained DNN. Signal
+retention varies between seeds, so mass/lifetime independence is still
+unproven. Final PDF results and receipts are in
+`tea_shift_cmssw/plots/vertex_classifier/DNN_vertex_information_20261013/`.
+
+The following response study compares the existing fixed cuts with full GEN
+denominators at physical proper-lifetime anchors. Six complete points retain
+1,200 generated events, including zero-candidate parents. The rich DNN keeps
+163/173 or 152/173 genuine signal events; the strong BDT keeps 173/173.
+Local lifetime importance sampling is available but fails the current
+selected-effective-event precision requirement. Final PDFs and evidence are
+in `tea_shift_cmssw/plots/vertex_classifier/Vertex_efficiency_20261013/`. Missing points stay
+unknown, and no real recording acceptance or J/psi data correction is claimed.
 
 Select two distinct genuine muons from a common physical vertex. Preserve genuine
 DY and genuine QCD vertices alongside J/psi. Reject accidental different-vertex
@@ -93,6 +123,87 @@ track PCA/reference coordinates, not measurements of a production vertex.
 The current common-line pair vertex is not a fully prior-free fit.
 
 ## Activity log
+
+### 2026-10-13: associated muon information and event occupancy
+
+The user requested a one-hour study of richer reconstructed information,
+category-aware training and decorrelation. It completes 24 controlled fits
+and eight validation-only refinements, keeping the original event split,
+labels and supervised population (9,826 train, 3,400 validation). This adds
+information rather than increasing training statistics. No generator field
+enters the predictors. Final results and PDF-only plots are indexed by
+`tea_shift_cmssw/plots/vertex_classifier/DNN_vertex_information_20261013/README.md`.
+
+The original 50 predictors independently sorted single-muon quality/errors,
+losing their association with each leg. The new 119-column cache preserves
+that original prefix and adds 64 pT-ordered per-leg quality/hit/timing fields
+plus five reconstructed event counts. All 20,212 rows, 187,394 parent events,
+weights, labels and original arrays remain exact. Sixty-two new columns vary;
+seven are constant zero. Timing comes from reconstructed segments, not truth.
+Original detector-track errors divided by transported pT are quality proxies,
+not calibrated propagated errors. Covariances tied to target/prompt fit
+hypotheses are excluded. Independent audits verify row order, uint64 event
+identities, associated quality parity, full parents and event-split separation.
+
+Shared category-input networks and small category-specific heads are tested
+against the pooled model. A separate cut-focused loss uses training-defined
+genuine groups and a detached training-derived 90% cut; it is validated with
+real hard cuts. Both architecture and loss controls preserve generator-free
+inference. All 32 fits precede global selection and new score evaluation.
+Only recipe families with both seeds passing the unchanged acceptance
+envelope are eligible; ranking maximizes the weaker seed's rejection.
+
+Only `global_rich` qualifies in validation (45.62/46.94% rejection).
+Category heads lose too many genuine Other vertices. The cut-focused loss
+reaches 61--66% rejection in development but lowest-DY-mass retention falls
+to 65--71%, so it is not acceptance-safe. A weaker-penalty refinement gains
+some rejection but misses the predeclared minimum retention; the gates are
+not relaxed to select it. Adding the five event counts to otherwise identical
+rich predictors gains 6.28/11.40 validation rejection points for the seeds.
+
+| Previously inspected SM development test | Genuine kept | Fake rejected | Near-Both genuine kept | Lowest DY mass bin kept |
+| --- | ---: | ---: | ---: | ---: |
+| Earlier constrained DNN, seed 71 | 90.95% | 40.95% | 88.77% | 86.76% |
+| Rich pooled DNN, seed 71 | 90.80% | 49.10% | 89.04% | 87.50% |
+| Rich pooled DNN, seed 72 | 89.93% | 49.27% | 87.67% | 86.03% |
+
+Models are `info_global_rich_s71` and `info_global_rich_s72`. Both pass the
+development envelope. Supported marginal spans are 6.93/6.31 points and
+category spans 12.63/8.33 points, with joint class-conditional distance
+correlations about 0.10. Fake-rejection gains over the earlier constrained
+DNN are 8.16/8.32 points; paired 95% event-bootstrap intervals are
+[4.40, 11.91]/[4.08, 12.23]. Genuine-retention changes are -0.15/-1.02
+points, intervals [-1.44, 1.14]/[-2.42, 0.34]. Each cut keeps 2,516/2,795
+validation genuine pairs; no test equal-efficiency retuning occurs. These
+intervals describe consumed development data and do not account for model
+search. Genuine QCD still has no test support, and sparse joint cells are
+unvalidated. The pooled rejection gain comes from DY/J/psi fakes.
+
+The six previously inspected signal points receive the same new inputs,
+preserving all 1,200 parents, 240 pairs, 173 genuine and 56 unknown pairs.
+Selected rich seeds retain 163/173 and 152/173 genuine pairs, compared with
+160/173 for the earlier constrained DNN, 147/173 flatter BDT and 173/173
+strong BDT. Pointwise ranges are 87.9--100% and 81.8--95.8%; both rich seeds
+retain all 18 non-Both-Both genuines. The seed difference occurs within
+Both-Both. This does not establish improved signal mass/lifetime uniformity.
+Only 24--33 genuine pairs support each point, the grid remains incomplete,
+and the sample is no longer independent confirmation. Reconstructed z/r
+regularization is not proper-lifetime decorrelation.
+
+Validation passes 156 classifier tests, six diagnostic tests, 17 focused
+feature/category/signal tests, four comparison tests and five bootstrap
+assertions. Seven model diagnostic PDFs pass 924 numerical cohort checks;
+category/signal figures add 59 reviewed pages. Source/cut hashes and trusted
+reload prediction parity are checked. An extractor change after sealing
+stopped the first launch before any fit; the pinned source was restored and
+the update retained separately, without modifying the study protocol.
+
+The best next test is a fresh, representative SM sample, genuine-QCD support,
+the complete signal grid and more training seeds. Associated covariance at
+the same reference surface may add information. No new Condor submission,
+shared release rebuild, electronics/trigger modification, production model
+replacement or ntuple cut occurs. The preceding code was committed as CMSSW
+`0ded56efdf9` and TEA `a890545`; new study sources remain uncommitted.
 
 ### 2026-10-13: overtraining audit, vertex categories and penalized DNNs
 
@@ -311,7 +422,7 @@ pairs. The 103 classifier tests, 52 analysis tests and eight reserved-test
 contracts pass; ten existing mixing tests are skipped in this environment.
 Their logs are in the same directory. Reviewed PDF-only plots
 are directly available through
-[`tea_shift_cmssw/plots/BDT_improvement_20261012/README.md`](../../../../tea_shift_cmssw/plots/BDT_improvement_20261012/README.md).
+[`tea_shift_cmssw/plots/vertex_classifier/BDT_improvement_20261012/README.md`](../../../../tea_shift_cmssw/plots/vertex_classifier/BDT_improvement_20261012/README.md).
 
 Next: preserve these two ends of the rejection/acceptance tradeoff, investigate
 reconstructed quality information with correct leg associations and
@@ -1319,3 +1430,99 @@ These output names already exist and are protected. Use new output names for
 reproduction with the frozen inventory and implementation; reuse the saved
 complete dataset for model reproduction. Existing test predictions remain
 historical evidence, not fresh data for further tuning.
+
+### 2026-10-13: complete reconstructed inputs and learning curves
+
+The complete-input study is in
+`tea_shift_cmssw/plots/vertex_classifier/Vertex_complete_20261013/` from the workspace root.
+Every BDT and DNN receives all 119 reconstructed predictors and five explicit
+category columns. GEN quantities and labels never enter prediction. Each
+domain has 81 completed fits: three BDT settings and three shared/category-head
+DNN architectures with classification or strong decorrelation losses, three
+nested event-grouped training sizes and three seeds. Sources, inputs,
+partitions, fit receipts, validation cuts and family choices are sealed;
+all fits precede development inference. Independent gate/ranking/hash audits
+agree with the locks. Saved-model reload predictions agree exactly.
+
+Current training already uses all compatible completed V10 reconstruction:
+187,214 SM parents and 9,826 known-label training pairs. A new inventory audit
+found the older large binned reconstruction that earlier classifier studies
+had omitted: 329,997 parents and 6,472 vertices, including 1,449 QCD fakes.
+It has all reconstructed columns, but uses IR1/ATLAS proxy geometry and older
+HardQCD/decay settings. Train and evaluate it separately. Its genuine class
+is almost entirely J/psi and fake class almost entirely QCD; a high pooled
+ROC alone does not establish vertex-quality learning. Current QCD has no
+genuine training/development support and only one genuine validation pair.
+
+Full-size current development: regularized depth-five BDT rejects 77.98% of
+fakes at 89.86% genuine retention; shared 64/32 classification DNN rejects
+73.41--73.57% at 90.39--91.33%. Their 25%-training rejections were
+70.47--73.41% and 65.91--68.03%, respectively. More data help, but neither
+current family passes the fixed uniformity envelope. The current development
+partition was previously inspected; no independent-confirmation claim.
+
+At the user's wrap-up request, submitted Condor `12913514.0--.5` to finish a
+separate frozen 81-fit loss-setting comparison in `current_refinement/`.
+It retains complete inputs, the same partitions/subsets and BDT controls,
+and tests moderate decorrelation or direct soft acceptance for each DNN
+architecture. Driver/menu tests, a real soft-acceptance fit, shell syntax
+and Condor dry-run passed. Initial scheduler readback: all six running,
+no holds. The protocol was frozen before the initial development inference.
+Do not edit it, overwrite evidence, or duplicate live shards. After all 81
+receipts exist and jobs are reconciled, execute the frozen
+`vertex_complete_refinement.py` to lock and evaluate, then use the complete
+diagnostic utilities. Inspect the study README and submission receipt first.
+
+All final figures are PDF inside the TEA repository. Existing production
+scores/cuts, labels, normalization and detector/trigger configuration are
+unchanged. The existing BSM simulation campaign remains independently owned;
+do not submit duplicate signal production for this study.
+
+### 2026-10-14: one overall working choice
+
+Reconciled Condor12913514: all six shards terminated normally, exit0; all81
+refinement fits exist, and their frozen validation selection/evaluation
+completed. No full-size refinement family passes the original full envelope.
+An additional81-fit full-information menu tests the pooled joint/category
+regularization without the extra conditional loss, with or without a direct
+acceptance penalty. It also retains the same BDT controls, event partitions,
+training fractions and seeds. Driver/menu and inference tests pass.
+
+The final comparison uses28 full-information families, averaging their fixed
+training-seed models. Original acceptance bounds and additional signed
+reconstructed-proper-length bounds must hold for the ensemble and every
+member-omission variant. Ranking maximizes the weakest variant's validation
+rejection. The manifest and source snapshots precede validation inference;
+only the selected model subsequently sees development and signal inputs.
+Current SM development was previously inspected and is not fresh confirmation.
+
+The recommended two-member rich DNN ensemble retains2385/2642 genuine SM
+pairs (90.27%) and rejects319/613 fakes (52.04%), AUC0.8067, at mean score
+>=0.3016294240951538. Its source/feature/model/cut hashes and trusted reload
+parity are recorded. The119 predictors include single-muon association,
+event occupancy and topology: min/max muon topology uniquely determines the
+stored five-category schema, so the pooled network has category information.
+
+Thirty newly complete points provide7500 distinct GEN parents and1157
+reconstructed candidates. The extractor preserves zero-candidate parents,
+weights and exact uint64 identities, excludes previous populations, and
+reads labels separately from RECO features. The selected ensemble retains
+701/760 known genuine signal pairs; four >100-pair points retain88.3--96.5%.
+Other points have fewer than30 genuine pairs and remain unresolved.
+No signal point defines the model or cut. GEN mass/lifetime label plots only.
+
+The signed reconstructed length estimate uses fitted mass/momentum and
+displacement from the nominal148m target. Target spread and fit uncertainties
+prevent treating it as a calibrated proper time. Supported coarse mass/z/r
+spans reach9.10points, reconstructed length3.87points; finer bins expose a
+J/psi mass tail with25/34 retained and a DY low-mass/long-length joint cell
+with45/58 retained. These residuals, sparse high-mass/long-lifetime signals,
+unknown matches and missing genuine-QCD support prevent final physics
+selection or luminosity-transfer claims. More compatible distinct events
+are needed to validate those regions.
+
+The single-choice PDFs, event-bootstrap numerical profiles, frozen ensemble
+and resume instructions are under
+`tea_shift_cmssw/plots/vertex_classifier/Vertex_best_20261014/`, with final figures in
+`final_reviewed/`. No detector/trigger changes, shared release build, new
+production submission, deployed score replacement, Git commit or push was made.
